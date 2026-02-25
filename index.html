@@ -630,11 +630,12 @@ select option{background:#1A2A3A}
     </div>
 
     <!-- view toggle -->
-    <div class="vtog">
+    <div class="vtog" style="grid-template-columns:repeat(5,1fr)">
       <button class="vbtn on" id="tv-list"  onclick="setTaskView('list')">📋 Lista</button>
       <button class="vbtn"    id="tv-day"   onclick="setTaskView('day')">📅 Dia</button>
       <button class="vbtn"    id="tv-week"  onclick="setTaskView('week')">🗓 Sem</button>
       <button class="vbtn"    id="tv-month" onclick="setTaskView('month')">📆 Mês</button>
+      <button class="vbtn"    id="tv-plan"  onclick="setTaskView('plan')">🔮 Plan</button>
     </div>
 
     <!-- LIST -->
@@ -674,6 +675,12 @@ select option{background:#1A2A3A}
       </div>
       <div class="mgrid" id="tm-grid"></div>
       <div id="tm-list"></div>
+    </div>
+
+    <!-- PLAN -->
+    <div id="tvw-plan" style="display:none">
+      <div class="slbl" style="padding-top:8px">🔮 Próximos 90 dias</div>
+      <div id="tp-body"></div>
     </div>
 
   </div><!-- /sec-task -->
@@ -1185,7 +1192,7 @@ function delTask(id){
 
 function setTaskView(v){
   curTaskView=v;
-  ['list','day','week','month'].forEach(function(x){
+  ['list','day','week','month','plan'].forEach(function(x){
     document.getElementById('tvw-'+x).style.display=x===v?'block':'none';
     document.getElementById('tv-'+x).classList.toggle('on',x===v);
   });
@@ -1197,6 +1204,7 @@ function renderTasks(){
   if(curTaskView==='day')   renderTD();
   if(curTaskView==='week')  renderTW();
   if(curTaskView==='month') renderTM();
+  if(curTaskView==='plan')  renderTP();
 }
 
 function taskCard(t,wrap){
@@ -1341,6 +1349,90 @@ function renderTM(){
 }
 function shiftTM(n){ tmDate.setMonth(tmDate.getMonth()+n); renderTM(); }
 function taskMoDay(d){ tdDate=new Date(d+'T00:00:00'); setTaskView('day'); }
+
+// TASK PLAN — próximos 90 dias agrupado por semana e mês
+function renderTP(){
+  var now=new Date(); now.setHours(0,0,0,0);
+  var html='';
+
+  for(var mOff=0;mOff<3;mOff++){
+    var mDate=new Date(now.getFullYear(), now.getMonth()+mOff, 1);
+    var yr=mDate.getFullYear(); var mo=mDate.getMonth();
+    var ms=yr+'-'+pad(mo+1);
+    var ld=new Date(yr,mo+1,0).getDate();
+    var isCur=mOff===0;
+
+    // tarefas do mês
+    var moTasks=TASKS.filter(function(t){
+      return t.deadline && ymds(t.deadline).startsWith(ms) && t.status!=='done';
+    });
+    var doneCount=TASKS.filter(function(t){
+      return t.deadline && ymds(t.deadline).startsWith(ms) && t.status==='done';
+    }).length;
+    var totalCount=moTasks.length+doneCount;
+
+    var mLabel=mDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    var summary=moTasks.length+' pendente'+(moTasks.length!==1?'s':'')+
+      (doneCount?' · '+doneCount+' concluída'+(doneCount!==1?'s':''):'');
+
+    // cabeçalho do mês
+    html+='<div class="fmb">'+
+      '<div class="fmb-title">'+
+      '<span>'+(isCur?'☀️ ':'')+mLabel+'</span>'+
+      '<span style="font-size:11px;color:var(--t2)">'+summary+'</span>'+
+      '</div>';
+
+    // semanas do mês
+    var whtml='';
+    var wNum=1;
+    for(var day=1;day<=ld;day+=7){
+      var wEnd=Math.min(day+6,ld);
+      var from=yr+'-'+pad(mo+1)+'-'+pad(day);
+      var to=yr+'-'+pad(mo+1)+'-'+pad(wEnd);
+
+      // só mostrar semanas a partir de hoje no mês atual
+      if(isCur && to < ymd(now)) { wNum++; continue; }
+
+      var wTasks=TASKS.filter(function(t){
+        var d=ymds(t.deadline);
+        return t.deadline && d>=from && d<=to && t.status!=='done';
+      });
+      var wDone=TASKS.filter(function(t){
+        var d=ymds(t.deadline);
+        return t.deadline && d>=from && d<=to && t.status==='done';
+      }).length;
+
+      var dayLabel=pad(day)+'/'+pad(mo+1)+' – '+pad(wEnd)+'/'+pad(mo+1);
+      var hasOv=wTasks.some(function(t){ return ymds(t.deadline)<ymd(now); });
+
+      // cabeçalho da semana — clicável para ir para view semana
+      whtml+='<div class="fwr" onclick="taskWkFrom(''+from+'')" style="'+(hasOv?'border-color:rgba(255,107,107,.3)':'')+'">'+
+        '<div class="fwl">'+dayLabel+'</div>'+
+        '<div class="fwa">'+
+        (wTasks.length||wDone
+          ?'<span style="color:var(--yellow)">'+wTasks.length+' pendente'+(wTasks.length!==1?'s':'')+'</span>'+
+           (wDone?'<span style="color:var(--green)">'+wDone+' ✅</span>':'')
+          :'<span style="color:var(--t3);font-size:11px">sem tarefas</span>')+
+        '</div></div>';
+
+      // listar tarefas desta semana expandidas (só mês atual / próxima semana)
+      if(wTasks.length && mOff<=1){
+        whtml+=wTasks.map(function(t){return taskCard(t);}).join('');
+      }
+      wNum++;
+    }
+
+    html+=whtml+'</div>';
+  }
+
+  document.getElementById('tp-body').innerHTML = html ||
+    emptyHTML('🔮','Sem tarefas planejadas','Crie tarefas com prazo para ver o planejamento');
+}
+
+function taskWkFrom(from){
+  twStart=new Date(from+'T00:00:00');
+  setTaskView('week');
+}
 
 // ════════════════════════════════════════
 //  EMPTY HTML
