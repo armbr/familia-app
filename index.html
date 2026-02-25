@@ -482,7 +482,7 @@ select option{background:#1A2A3A}
 <!-- ══ HEADER ══ -->
 <div id="hdr" style="display:none">
   <div id="hdr-top">
-    <div class="logo">💰 Família</div>
+    <div class="logo" onclick="if(confirm('Trocar URL do servidor?'))resetSetup();" style="cursor:pointer" title="Toque 3x para configurar">💰 Família</div>
     <div class="right">
       <span id="offline-badge">● offline</span>
       <div id="month-chip">—</div>
@@ -702,7 +702,7 @@ select option{background:#1A2A3A}
 // ════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════
-var API = localStorage.getItem('ff_api') || '';
+var API = ''; // will be loaded in init() after DOM ready
 var TXS   = JSON.parse(localStorage.getItem('ff_txs')   || '[]');
 var TASKS = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
 
@@ -772,10 +772,24 @@ function balOf(list){
 // ════════════════════════════════════════
 function doSetup(){
   var u=document.getElementById('su-url').value.trim();
-  if(!u.startsWith('https://')){toast('⚠️ URL inválida','err');return;}
-  API=u; localStorage.setItem('ff_api',u);
+  if(!u){toast('⚠️ Cole a URL do Apps Script','err');return;}
+  // Accept any URL - user might paste without https in some cases
+  if(u.indexOf('script.google.com')===-1 && u.indexOf('http')===-1){
+    toast('⚠️ URL inválida — verifique','err');return;
+  }
+  API=u;
+  try{ localStorage.setItem('ff_api',u); }catch(e){}
   document.getElementById('setup').style.display='none';
   boot();
+}
+
+function resetSetup(){
+  try{ localStorage.removeItem('ff_api'); }catch(e){}
+  API='';
+  document.getElementById('setup').style.display='flex';
+  document.getElementById('hdr').style.display='none';
+  document.getElementById('content').style.display='none';
+  document.getElementById('nav').style.display='none';
 }
 
 // ════════════════════════════════════════
@@ -1447,9 +1461,24 @@ function emptyHTML(icon,title,desc){
 // ════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════
-if(API){
-  document.getElementById('setup').style.display='none';
-  boot();
+function init(){
+  // Try to read saved API URL
+  try{ API = localStorage.getItem('ff_api') || ''; }catch(e){ API=''; }
+
+  if(API){
+    document.getElementById('setup').style.display='none';
+    boot();
+  } else {
+    // Show setup - already visible by default, just make sure
+    document.getElementById('setup').style.display='flex';
+  }
+}
+
+// Run after DOM is fully parsed
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
 }
 </script>
 </body>
