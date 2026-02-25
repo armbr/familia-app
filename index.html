@@ -721,6 +721,7 @@ var tmDate  = new Date(); // task month
 // ════════════════════════════════════════
 function today0(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function ymds(s){ /* normalise any date string to YYYY-MM-DD */ if(!s)return ''; var p=String(s).trim().split('-'); if(p.length!==3)return String(s).trim(); return p[0]+'-'+pad(parseInt(p[1]))+'-'+pad(parseInt(p[2])); }
 function pad(n){ return String(n).padStart(2,'0'); }
 function weekStart(d){
   var dt=new Date(d); var day=dt.getDay();
@@ -732,7 +733,9 @@ function fmtBRL(v){
 }
 function fmtDate(s){
   if(!s) return '';
-  var p=String(s).split('-'); return p[2]+'/'+p[1]+'/'+p[0];
+  var p=String(s).trim().split('-');
+  if(p.length!==3) return String(s);
+  return pad(parseInt(p[2]))+'/'+pad(parseInt(p[1]))+'/'+p[0];
 }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toast(msg,type){
@@ -903,7 +906,7 @@ function delTx(id){
 }
 
 function filteredTxs(){
-  return TXS.filter(function(t){return String(t.date).startsWith(selMonth);});
+  return TXS.filter(function(t){return ymds(t.date).startsWith(selMonth);});
 }
 
 function renderBal(){
@@ -916,7 +919,7 @@ function renderBal(){
 }
 
 function renderHist(){
-  var months=[...new Set(TXS.map(function(t){return String(t.date).substring(0,7);}))].sort().reverse();
+  var months=[...new Set(TXS.map(function(t){return ymds(t.date).substring(0,7);}))].sort().reverse();
   var mf=document.getElementById('mf-row');
   mf.innerHTML=months.map(function(m){
     var p=m.split('-');
@@ -975,8 +978,8 @@ function renderFinView(){
   if(curFinView==='future') renderFuture();
 }
 
-function txsOn(d){ return TXS.filter(function(t){return String(t.date)===ymd(d);}); }
-function txsIn(from,to){ return TXS.filter(function(t){var d=String(t.date);return d>=from&&d<=to;}); }
+function txsOn(d){ var target=ymd(d); return TXS.filter(function(t){return ymds(t.date)===target;}); }
+function txsIn(from,to){ return TXS.filter(function(t){var d=ymds(t.date);return d>=from&&d<=to;}); }
 
 function balMini(id,b){
   document.getElementById(id).innerHTML=
@@ -988,7 +991,7 @@ function balMini(id,b){
 function groupedTxHTML(txs){
   if(!txs.length) return emptyHTML('💸','Nenhum lançamento','Nenhuma transação neste período');
   var byD={};
-  txs.forEach(function(t){ var d=String(t.date); if(!byD[d])byD[d]=[]; byD[d].push(t); });
+  txs.forEach(function(t){ var d=ymds(t.date); if(!byD[d])byD[d]=[]; byD[d].push(t); });
   var tod=ymd(new Date());
   return Object.keys(byD).sort().reverse().map(function(d){
     var p=d.split('-');
@@ -1068,7 +1071,7 @@ function renderFM(){
   }
   document.getElementById('fm-grid').innerHTML=gh;
   var ms=yr+'-'+pad(mo+1);
-  var moTxs=TXS.filter(function(t){return String(t.date).startsWith(ms);}).sort(function(a,b){return String(a.date).localeCompare(String(b.date));});
+  var moTxs=TXS.filter(function(t){return ymds(t.date).startsWith(ms);}).sort(function(a,b){return ymds(a.date).localeCompare(ymds(b.date));});
   balMini('fm-bal',balOf(moTxs));
   document.getElementById('fm-list').innerHTML=groupedTxHTML(moTxs);
 }
@@ -1082,7 +1085,7 @@ function renderFuture(){
     var d=new Date(now.getFullYear(),now.getMonth()+mOff,1);
     var yr=d.getFullYear(); var mo=d.getMonth();
     var ms=yr+'-'+pad(mo+1);
-    var mTxs=TXS.filter(function(t){return String(t.date).startsWith(ms);});
+    var mTxs=TXS.filter(function(t){return ymds(t.date).startsWith(ms);});
     var b=balOf(mTxs);
     var isCur=mOff===0;
     var projI=0,projE=0;
@@ -1091,7 +1094,7 @@ function renderFuture(){
       for(var p=1;p<=2;p++){
         var pd=new Date(now.getFullYear(),now.getMonth()-p,1);
         var ps=pd.getFullYear()+'-'+pad(pd.getMonth()+1);
-        var ptx=TXS.filter(function(t){return String(t.date).startsWith(ps);});
+        var ptx=TXS.filter(function(t){return ymds(t.date).startsWith(ps);});
         if(ptx.length) past.push(balOf(ptx));
       }
       if(past.length){
@@ -1203,7 +1206,7 @@ function taskCard(t,wrap){
     :'<span class="tag pend">⏳ Pendente</span>';
   var ttag=t.type==='work'?'<span class="tag work">💼 Profissional</span>':'<span class="tag pers">👤 Pessoal</span>';
   var tod=ymd(new Date());
-  var ov=t.deadline&&String(t.deadline)<tod&&!done;
+  var ov=t.deadline&&ymds(t.deadline)<tod&&!done;
   var dead=t.deadline?'<span class="'+(ov?'ov':'')+'">📅 '+fmtDate(t.deadline)+(ov?' ⚠️':'')+'</span>':'';
   var html='<div class="taski'+(wrap?' '+wrap:'')+'">'+
     '<div class="taski-hdr">'+
@@ -1228,9 +1231,9 @@ function renderTL(){
   var tod=ymd(new Date());
   var open=TASKS.filter(function(t){return t.status!=='done';});
   var done=TASKS.filter(function(t){return t.status==='done';});
-  var ov=open.filter(function(t){return t.deadline&&String(t.deadline)<tod;});
-  var tdy=open.filter(function(t){return String(t.deadline)===tod;});
-  var soon=open.filter(function(t){return t.deadline&&String(t.deadline)>tod;});
+  var ov=open.filter(function(t){return t.deadline&&ymds(t.deadline)<tod;});
+  var tdy=open.filter(function(t){return ymds(t.deadline)===tod;});
+  var soon=open.filter(function(t){return t.deadline&&ymds(t.deadline)>tod;});
   var nd=open.filter(function(t){return !t.deadline;});
   var h='';
   if(ov.length)   h+='<div class="glbl g-overdue">⚠️ Atrasadas <span class="gbadge">'+ov.length+'</span></div>'+ov.map(function(t){return taskCard(t);}).join('');
@@ -1251,7 +1254,7 @@ function renderTD(){
     ?'Hoje, '+tdDate.toLocaleDateString('pt-BR',{day:'numeric',month:'long'})
     :tdDate.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('td-sub').textContent=isT?'☀️ hoje':tdDate.toLocaleDateString('pt-BR',{year:'numeric'});
-  var tasks=TASKS.filter(function(t){return String(t.deadline)===d;});
+  var tasks=TASKS.filter(function(t){return ymds(t.deadline)===d;});
   document.getElementById('td-list').innerHTML=tasks.length
     ?tasks.map(function(t){return taskCard(t);}).join('')
     :emptyHTML('✨','Nenhuma tarefa neste dia','Crie uma tarefa com prazo em '+fmtDate(d));
@@ -1270,7 +1273,7 @@ function renderTW(){
   for(var i=0;i<7;i++){
     var d=new Date(twStart); d.setDate(d.getDate()+i);
     var dy=ymd(d); dates.push(dy);
-    var has=TASKS.some(function(t){return String(t.deadline)===dy;});
+    var has=TASKS.some(function(t){return ymds(t.deadline)===dy;});
     sh+='<div class="wdc"><div class="wdc-lbl">'+days[i]+'</div>'+
       '<div class="wdc-num'+(dy===tod?' today':'')+'" onclick="taskWkDay(\''+dy+'\')">'+d.getDate()+'</div>'+
       '<div class="wdc-dots">'+(has?'<div class="dot" style="background:var(--yellow)"></div>':'')+'</div></div>';
@@ -1278,7 +1281,7 @@ function renderTW(){
   document.getElementById('tw-strip').innerHTML=sh;
   var h='';
   dates.forEach(function(dy){
-    var dt=TASKS.filter(function(t){return String(t.deadline)===dy;});
+    var dt=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
     if(!dt.length)return; total+=dt.length;
     var p=dy.split('-');
     var lbl=new Date(p[0],parseInt(p[1])-1,parseInt(p[2])).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
@@ -1307,7 +1310,7 @@ function renderTM(){
     if(dn<1||dn>ld.getDate()){gh+='<div class="mgc om"><div class="mgn"></div></div>';continue;}
     var d=new Date(yr,mo,dn); var dy=ymd(d);
     var isT=dy===tod;
-    var dTasks=TASKS.filter(function(t){return String(t.deadline)===dy&&t.status!=='done';});
+    var dTasks=TASKS.filter(function(t){return ymds(t.deadline)===dy&&t.status!=='done';});
     var dots=dTasks.slice(0,3).map(function(t){
       var c=t.status==='done'?'var(--green)':t.status==='prog'?'var(--blue)':'var(--yellow)';
       return '<div class="dot" style="background:'+c+'"></div>';
@@ -1318,7 +1321,7 @@ function renderTM(){
   }
   document.getElementById('tm-grid').innerHTML=gh;
   var ms=yr+'-'+pad(mo+1);
-  var moTasks=TASKS.filter(function(t){return t.deadline&&String(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
+  var moTasks=TASKS.filter(function(t){return t.deadline&&ymds(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
   var h='';
   if(moTasks.length){
     var fd2=new Date(yr,mo,1);
