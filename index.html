@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0F1923">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Família">
+<link rel="manifest" href="manifest.json">
+<title>Família · Finanças & Tarefas</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0F1923; --bg2:#162030; --bg3:#1E2D40;
+  --card:#1A2A3A; --card2:#213346;
+  --border:rgba(255,255,255,0.07);
+  --green:#2ECC9A; --green-dim:rgba(46,204,154,0.15);
+  --red:#FF6B6B; --red-dim:rgba(255,107,107,0.15);
+  --yellow:#FFD166; --yellow-dim:rgba(255,209,102,0.12);
+  --blue:#5B9BD5; --blue-dim:rgba(91,155,213,0.15);
+  --text:#EDF2F7; --text2:#8FA8C4; --text3:#526680;
+  --radius:18px; --radius-sm:12px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;max-width:430px;margin:0 auto;padding-bottom:90px}
+::-webkit-scrollbar{width:0}
+
+/* ── SETUP SCREEN ── */
+#setupScreen{
+  position:fixed;inset:0;background:var(--bg);z-index:1000;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px 24px;text-align:center;
+}
+#setupScreen h2{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px}
+#setupScreen p{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6}
+.setup-input{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:13px;padding:13px 14px;outline:none;margin-bottom:10px;transition:border-color .2s}
+.setup-input:focus{border-color:var(--green)}
+.setup-btn{width:100%;padding:14px;border:none;border-radius:var(--radius-sm);background:var(--green);color:#0A1A12;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px}
+.setup-note{font-size:11px;color:var(--text3);line-height:1.6;background:var(--bg3);border-radius:var(--radius-sm);padding:12px 14px;text-align:left}
+.setup-note strong{color:var(--text2)}
+
+/* ── LOADER ── */
+.loader-overlay{
+  position:fixed;inset:0;background:rgba(15,25,35,0.85);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:500;backdrop-filter:blur(6px);
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.loader-overlay.show{opacity:1;pointer-events:all}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:12px}
+.loader-msg{font-size:13px;color:var(--text2);font-weight:500}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── HEADER ── */
+.header{padding:20px 20px 16px;background:linear-gradient(180deg,var(--bg2) 0%,transparent 100%);position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.app-name{font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3)}
+.header-right{display:flex;align-items:center;gap:8px}
+.month-label{font-size:13px;font-weight:600;color:var(--text2);background:var(--card);padding:5px 12px;border-radius:100px;border:1px solid var(--border)}
+.sync-btn{background:var(--card);border:1px solid var(--border);color:var(--text2);font-size:13px;padding:5px 10px;border-radius:100px;cursor:pointer;font-family:inherit;font-weight:600;transition:all .2s}
+.sync-btn:active{transform:scale(.95)}
+.sync-btn.syncing{color:var(--green);border-color:var(--green)}
+
+/* ── BALANCE ── */
+.balance-card{background:linear-gradient(135deg,#1E3A5F 0%,#0F2438 100%);border:1px solid rgba(91,155,213,.2);border-radius:var(--radius);padding:20px;margin-bottom:16px;position:relative;overflow:hidden}
+.balance-card::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,rgba(46,204,154,.12) 0%,transparent 70%)}
+.balance-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text2);margin-bottom:6px}
+.balance-value{font-size:34px;font-weight:800;color:var(--text);letter-spacing:-1px;margin-bottom:16px}
+.balance-value.negative{color:var(--red)}
+.balance-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.balance-item{background:rgba(255,255,255,.05);border-radius:var(--radius-sm);padding:10px 12px}
+.balance-item-label{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.balance-item-label.income{color:var(--green)}
+.balance-item-label.expense{color:var(--red)}
+.balance-item-value{font-size:16px;font-weight:700;color:var(--text)}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:6px}
+.tab{flex:1;padding:9px 4px;border:none;background:var(--card);color:var(--text3);border-radius:var(--radius-sm);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid var(--border)}
+.tab.active{background:var(--green);color:#0A1A12;border-color:var(--green)}
+
+/* ── CONTENT ── */
+.content{padding:0 16px}
+.page{display:none}
+.page.active{display:block}
+.section-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);padding:16px 0 10px}
+
+/* ── QUICK ADD ── */
+.quick-add{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:8px}
+.quick-add-title{font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px}
+.type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.type-btn{padding:10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:transparent;color:var(--text2);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
+.type-btn.active-expense{background:var(--red-dim);border-color:var(--red);color:var(--red)}
+.type-btn.active-income{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.field-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+input,select,textarea{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:14px;padding:11px 13px;outline:none;transition:border-color .2s;-webkit-appearance:none;appearance:none}
+input:focus,select:focus{border-color:var(--green)}
+input[type="number"]{font-size:16px;font-weight:700}
+select option{background:var(--bg2)}
+.value-input-wrap{position:relative}
+.value-input-wrap::before{content:'R$';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:700;color:var(--text3);z-index:1;pointer-events:none}
+.value-input-wrap input{padding-left:38px}
+.btn-add{width:100%;padding:14px;border:none;border-radius:var(--radius-sm);background:var(--green);color:#0A1A12;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;transition:opacity .2s,transform .1s;margin-top:4px}
+.btn-add:active{transform:scale(.98);opacity:.9}
+.btn-add:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── TX LIST ── */
+.tx-list{display:flex;flex-direction:column;gap:8px}
+.tx-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;display:flex;align-items:center;gap:12px;animation:slideIn .25s ease both}
+@keyframes slideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.tx-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.tx-icon.expense{background:var(--red-dim)}
+.tx-icon.income{background:var(--green-dim)}
+.tx-info{flex:1;min-width:0}
+.tx-desc{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.tx-meta{font-size:11px;color:var(--text3);display:flex;gap:6px;align-items:center}
+.tx-cat{background:var(--bg3);padding:2px 7px;border-radius:4px;font-weight:600}
+.tx-value{font-size:16px;font-weight:800;flex-shrink:0}
+.tx-value.expense{color:var(--red)}
+.tx-value.income{color:var(--green)}
+.tx-delete{background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:4px;border-radius:8px;transition:color .2s,background .2s}
+.tx-delete:hover{color:var(--red);background:var(--red-dim)}
+
+/* ── CATEGORY SUMMARY ── */
+.cat-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.cat-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px}
+.cat-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.cat-name{font-size:13px;font-weight:600;color:var(--text)}
+.cat-amount{font-size:14px;font-weight:700;color:var(--red)}
+.cat-bar-bg{height:5px;background:var(--bg3);border-radius:100px;overflow:hidden}
+.cat-bar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--red),#FF9A9A);transition:width .5s ease}
+
+/* ── TASKS ── */
+.task-form{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:8px}
+.task-list{display:flex;flex-direction:column;gap:8px}
+.task-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;animation:slideIn .25s ease both}
+.task-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.task-check{width:22px;height:22px;border-radius:7px;border:2px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;margin-top:1px;background:transparent;font-size:12px;font-weight:700;color:#0A1A12}
+.task-check.done{background:var(--green);border-color:var(--green)}
+.task-title-text{font-size:14px;font-weight:600;color:var(--text);flex:1;line-height:1.4}
+.task-title-text.done-text{text-decoration:line-through;color:var(--text3)}
+.task-delete{background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:2px 4px;border-radius:6px;transition:color .2s;flex-shrink:0}
+.task-delete:hover{color:var(--red)}
+.task-meta-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.task-tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:100px}
+.tag-pending{background:var(--yellow-dim);color:var(--yellow)}
+.tag-progress{background:var(--blue-dim);color:var(--blue)}
+.tag-done{background:var(--green-dim);color:var(--green)}
+.tag-personal{background:rgba(180,130,255,.12);color:#B482FF}
+.tag-work{background:rgba(91,155,213,.12);color:var(--blue)}
+.task-detail{font-size:12px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.status-select{font-size:11px;padding:5px 10px;border-radius:8px;font-weight:600;background:var(--bg3);border-color:var(--border);color:var(--text);cursor:pointer;width:auto}
+
+/* ── FILTER CHIPS ── */
+.filter-row{display:flex;gap:6px;overflow-x:auto;padding:4px 0 8px;scrollbar-width:none}
+.filter-chip{flex-shrink:0;padding:6px 14px;border:1.5px solid var(--border);border-radius:100px;background:transparent;color:var(--text2);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.filter-chip.active{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-title{font-size:15px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.empty-desc{font-size:13px;line-height:1.5}
+
+/* ── OFFLINE BADGE ── */
+.offline-badge{background:var(--yellow-dim);border:1px solid var(--yellow);color:var(--yellow);font-size:11px;font-weight:700;padding:3px 10px;border-radius:100px;letter-spacing:.5px}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:var(--bg2);border-top:1px solid var(--border);display:flex;padding:10px 8px calc(10px + env(safe-area-inset-bottom,0px));gap:4px;z-index:200;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:none;background:none;color:var(--text3);font-family:inherit;font-size:10px;font-weight:600;letter-spacing:.5px;cursor:pointer;border-radius:var(--radius-sm);transition:all .2s}
+.nav-btn.active{color:var(--green);background:var(--green-dim)}
+.nav-icon{font-size:20px}
+
+/* ── TOAST ── */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);font-weight:700;font-size:13px;padding:12px 20px;border-radius:100px;z-index:999;transition:transform .3s cubic-bezier(0.34,1.56,.64,1);white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.toast.success{background:var(--green);color:#0A1A12}
+.toast.error{background:var(--red);color:#fff}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+.mt8{margin-top:8px}
+
+/* ── FIN CALENDAR BALANCE MINI CARD ── */
+.fin-cal-balance{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;
+  margin-bottom:12px;
+}
+.fcb-item{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px 12px;text-align:center;
+}
+.fcb-label{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.fcb-label.income{color:var(--green)}
+.fcb-label.expense{color:var(--red)}
+.fcb-label.balance{color:var(--blue)}
+.fcb-value{font-size:13px;font-weight:800;color:var(--text)}
+.fcb-value.neg{color:var(--red)}
+.fcb-value.pos{color:var(--green)}
+
+/* ── TX CALENDAR ITEM (compact) ── */
+.tx-cal-group{margin-bottom:4px}
+.tx-cal-date-label{
+  font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--text3);padding:12px 0 6px;display:flex;align-items:center;gap:6px;
+}
+.tx-cal-date-label.is-today{color:var(--green)}
+.tx-cal-date-label .tgl-badge{background:var(--bg3);color:var(--text2);font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px}
+
+/* ── FUTURE PLANNER ── */
+.future-month-block{margin-bottom:20px}
+.future-month-title{
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:800;
+  color:var(--text);background:var(--card2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.future-proj{font-size:12px;font-weight:600}
+.future-proj.pos{color:var(--green)}
+.future-proj.neg{color:var(--red)}
+.future-week-row{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 14px;margin-bottom:6px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.future-week-label{font-size:12px;font-weight:600;color:var(--text2)}
+.future-week-amounts{display:flex;gap:10px;font-size:12px;font-weight:700}
+.future-week-amounts .inc{color:var(--green)}
+.future-week-amounts .exp{color:var(--red)}
+
+/* ── TASK VIEW TOGGLE ── */
+.task-view-toggle{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:5px;
+  background:var(--bg3);border-radius:var(--radius-sm);padding:4px;
+  margin-bottom:14px;
+}
+.tvt-btn{
+  padding:8px 4px;border:none;background:transparent;
+  color:var(--text3);font-family:inherit;font-size:11px;font-weight:700;
+  border-radius:9px;cursor:pointer;transition:all .2s;letter-spacing:.3px;
+}
+.tvt-btn.active{background:var(--card2);color:var(--green);}
+
+/* ── DAY VIEW ── */
+.day-nav{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 14px;margin-bottom:12px;
+}
+.day-nav-btn{background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:8px;transition:background .2s}
+.day-nav-btn:active{background:var(--bg3)}
+.day-nav-label{text-align:center}
+.day-nav-date{font-size:15px;font-weight:800;color:var(--text)}
+.day-nav-weekday{font-size:11px;color:var(--text3);margin-top:2px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+
+/* ── WEEK VIEW ── */
+.week-strip{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:4px;
+  margin-bottom:12px;
+}
+.week-day-col{display:flex;flex-direction:column;align-items:center;gap:4px}
+.week-day-label{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text3)}
+.week-day-num{
+  width:30px;height:30px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;color:var(--text2);
+  background:var(--bg3);cursor:pointer;transition:all .2s;border:1.5px solid transparent;
+}
+.week-day-num.today{background:var(--green-dim);color:var(--green);border-color:var(--green)}
+.week-day-num.selected{background:var(--green);color:#0A1A12;border-color:var(--green)}
+.week-day-num.has-tasks::after{content:'';display:block;width:4px;height:4px;border-radius:50%;background:var(--yellow);position:absolute;bottom:3px}
+.week-day-num{position:relative}
+.week-day-dot{width:4px;height:4px;border-radius:50%;background:var(--yellow);margin-top:2px;opacity:0;transition:opacity .2s}
+.week-day-dot.visible{opacity:1}
+.week-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.week-nav-label{font-size:13px;font-weight:700;color:var(--text2)}
+.week-nav-btn{background:var(--card);border:1px solid var(--border);color:var(--text2);font-size:13px;padding:5px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:600}
+
+/* ── MONTH VIEW ── */
+.month-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.month-nav-label{font-size:15px;font-weight:800;color:var(--text);text-transform:capitalize}
+.month-nav-btn{background:var(--card);border:1px solid var(--border);color:var(--text2);font-size:16px;width:32px;height:32px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px}
+.month-day-head{font-size:9px;font-weight:700;text-transform:uppercase;color:var(--text3);text-align:center;padding:6px 0}
+.month-day-cell{
+  aspect-ratio:1;border-radius:9px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .2s;position:relative;gap:2px;
+  background:transparent;border:1.5px solid transparent;
+}
+.month-day-cell:hover{background:var(--bg3)}
+.month-day-cell.today{background:var(--green-dim);border-color:var(--green)}
+.month-day-cell.selected{background:var(--green);border-color:var(--green)}
+.month-day-cell.other-month .mdc-num{color:var(--text3)}
+.mdc-num{font-size:12px;font-weight:700;color:var(--text2);line-height:1}
+.month-day-cell.today .mdc-num,.month-day-cell.selected .mdc-num{color:#0A1A12}
+.mdc-dots{display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:20px}
+.mdc-dot{width:4px;height:4px;border-radius:50%}
+.mdc-dot.pending{background:var(--yellow)}
+.mdc-dot.progress{background:var(--blue)}
+.mdc-dot.done{background:var(--green)}
+
+/* ── GROUPED TASKS (all views) ── */
+.task-group-label{
+  font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text3);padding:14px 0 8px;display:flex;align-items:center;gap:6px;
+}
+.task-group-label .tgl-badge{
+  background:var(--bg3);color:var(--text2);
+  font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;
+}
+.task-group-label .tgl-urgent{color:var(--red)}
+.task-group-label .tgl-today{color:var(--green)}
+.task-group-label .tgl-soon{color:var(--yellow)}
+.task-group-label .tgl-later{color:var(--text3)}
+.overdue-task .task-item{border-color:rgba(255,107,107,.25);background:rgba(255,107,107,.04)}
+.today-task .task-item{border-color:rgba(46,204,154,.2)}
+
+</head>
+<body>
+
+<!-- ══════════════ SETUP SCREEN ══════════════ -->
+<div id="setupScreen">
+  <div style="font-size:48px;margin-bottom:16px">🏠</div>
+  <h2>Configurar o App</h2>
+  <p>Cole abaixo a URL do seu Google Apps Script publicado.<br>Você só precisa fazer isso uma vez.</p>
+  <input class="setup-input" id="setupUrl" type="url" placeholder="https://script.google.com/macros/s/..." autocomplete="off">
+  <button class="setup-btn" onclick="saveSetup()">Salvar e Começar →</button>
+  <div class="setup-note">
+    <strong>Como obter a URL:</strong><br>
+    1. Abra o Google Apps Script (script.google.com)<br>
+    2. Cole o código do arquivo <strong>Code.gs</strong><br>
+    3. Clique em <strong>Implantar → Nova implantação</strong><br>
+    4. Tipo: <strong>App da Web</strong> · Acesso: <strong>Qualquer pessoa</strong><br>
+    5. Copie a URL gerada e cole aqui
+  </div>
+</div>
+
+<!-- ══════════════ LOADER ══════════════ -->
+<div class="loader-overlay" id="loader">
+  <div class="spinner"></div>
+  <div class="loader-msg" id="loaderMsg">Carregando...</div>
+</div>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<div class="header" id="mainHeader" style="display:none">
+  <div class="header-top">
+    <div class="app-name">💰 Família</div>
+    <div class="header-right">
+      <span id="offlineBadge" class="offline-badge" style="display:none">● offline</span>
+      <div class="month-label" id="currentMonth"></div>
+      <button class="sync-btn" id="syncBtn" onclick="syncAll()">↻ Sync</button>
+    </div>
+  </div>
+
+  <div class="balance-card" id="balanceCard">
+    <div class="balance-label">Saldo do Mês</div>
+    <div class="balance-value" id="balanceValue">R$ 0,00</div>
+    <div class="balance-row">
+      <div class="balance-item">
+        <div class="balance-item-label income">↑ Receitas</div>
+        <div class="balance-item-value" id="totalIncome">R$ 0,00</div>
+      </div>
+      <div class="balance-item">
+        <div class="balance-item-label expense">↓ Gastos</div>
+        <div class="balance-item-value" id="totalExpense">R$ 0,00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs" id="finTabs">
+    <button class="tab active" onclick="switchTab('add')">➕ Registrar</button>
+    <button class="tab" onclick="switchTab('history')">📋 Histórico</button>
+    <button class="tab" onclick="switchTab('summary')">📊 Resumo</button>
+    <button class="tab" onclick="switchTab('agenda')">📅 Agenda</button>
+  </div>
+</div>
+
+<!-- ══════════════ CONTENT ══════════════ -->
+<div class="content" id="mainContent" style="display:none">
+
+  <!-- FINANÇAS -->
+  <div id="finPage">
+
+    <!-- ADD -->
+    <div class="page active" id="page-add">
+      <div class="quick-add">
+        <div class="quick-add-title">⚡ Registro rápido</div>
+        <div class="type-toggle">
+          <button class="type-btn active-expense" id="btnExpense" onclick="setType('expense')">🔴 Gasto</button>
+          <button class="type-btn" id="btnIncome" onclick="setType('income')">🟢 Receita</button>
+        </div>
+        <div class="input-row">
+          <div>
+            <div class="field-label">Descrição</div>
+            <input type="text" id="txDesc" placeholder="Ex: Mercado, Salário..." maxlength="50">
+          </div>
+          <div>
+            <div class="field-label">Valor</div>
+            <div class="value-input-wrap">
+              <input type="number" id="txValue" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+            </div>
+          </div>
+        </div>
+        <div class="input-row">
+          <div>
+            <div class="field-label">Categoria</div>
+            <select id="txCat">
+              <option>🍽️ Alimentação</option>
+              <option>🚗 Transporte</option>
+              <option>🏠 Casa/Moradia</option>
+              <option>💊 Saúde</option>
+              <option>📚 Educação</option>
+              <option>👗 Roupas</option>
+              <option>🎮 Lazer</option>
+              <option>💼 Salário</option>
+              <option>💰 Extra</option>
+              <option>📦 Outros</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Data</div>
+            <input type="date" id="txDate">
+          </div>
+        </div>
+        <button class="btn-add" id="btnAddTx" onclick="addTransaction()">Registrar ✓</button>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="page" id="page-history">
+      <div class="filter-row" id="monthFilter"></div>
+      <div class="section-title">Lançamentos</div>
+      <div class="tx-list" id="txList"></div>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="page" id="page-summary">
+      <div class="section-title">Gastos por Categoria — <span id="summaryMonth"></span></div>
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+
+    <!-- AGENDA -->
+    <div class="page" id="page-agenda">
+
+      <!-- VIEW TOGGLE -->
+      <div class="task-view-toggle" style="margin-top:14px">
+        <button class="tvt-btn active" id="fvt-day"   onclick="setFinView('day')">📅 Dia</button>
+        <button class="tvt-btn"        id="fvt-week"  onclick="setFinView('week')">🗓 Semana</button>
+        <button class="tvt-btn"        id="fvt-month" onclick="setFinView('month')">📆 Mês</button>
+        <button class="tvt-btn"        id="fvt-future" onclick="setFinView('future')">🔮 Planej.</button>
+      </div>
+
+      <!-- FIN DAY VIEW -->
+      <div id="fview-day">
+        <div class="day-nav">
+          <button class="day-nav-btn" onclick="shiftFinDay(-1)">&#8249;</button>
+          <div class="day-nav-label">
+            <div class="day-nav-date" id="finDayNavDate"></div>
+            <div class="day-nav-weekday" id="finDayNavSub"></div>
+          </div>
+          <button class="day-nav-btn" onclick="shiftFinDay(1)">&#8250;</button>
+        </div>
+        <div id="finDayBalance" class="fin-cal-balance"></div>
+        <div id="finDayList" class="tx-list"></div>
+      </div>
+
+      <!-- FIN WEEK VIEW -->
+      <div id="fview-week" style="display:none">
+        <div class="week-nav">
+          <button class="week-nav-btn" onclick="shiftFinWeek(-1)">&#8249; Anterior</button>
+          <div class="week-nav-label" id="finWeekNavLabel"></div>
+          <button class="week-nav-btn" onclick="shiftFinWeek(1)">Próxima &#8250;</button>
+        </div>
+        <div class="week-strip" id="finWeekStrip"></div>
+        <div id="finWeekBalance" class="fin-cal-balance"></div>
+        <div id="finWeekList" class="tx-list"></div>
+      </div>
+
+      <!-- FIN MONTH VIEW -->
+      <div id="fview-month" style="display:none">
+        <div class="month-nav">
+          <button class="month-nav-btn" onclick="shiftFinMonth(-1)">&#8249;</button>
+          <div class="month-nav-label" id="finMonthNavLabel"></div>
+          <button class="month-nav-btn" onclick="shiftFinMonth(1)">&#8250;</button>
+        </div>
+        <div class="month-grid" id="finMonthGrid"></div>
+        <div id="finMonthBalance" class="fin-cal-balance"></div>
+        <div id="finMonthList" class="tx-list"></div>
+      </div>
+
+      <!-- FIN FUTURE / PLANNER VIEW -->
+      <div id="fview-future" style="display:none">
+        <div class="section-title" style="padding-top:8px">🔮 Planejamento — próximos 90 dias</div>
+        <div id="futurePlanner"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TAREFAS -->
+  <div id="taskPage" style="display:none">
+
+    <!-- FORM colapsável -->
+    <div class="task-form">
+      <div class="quick-add-title" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="toggleTaskForm()">
+        <span>📌 Nova Tarefa</span>
+        <span id="taskFormArrow" style="font-size:18px;color:var(--text3);transition:transform .2s">▾</span>
+      </div>
+      <div id="taskFormBody">
+        <div style="margin:12px 0 8px">
+          <div class="field-label">Descrição</div>
+          <input type="text" id="taskDesc" placeholder="Ex: Pedir certidão no cartório..." maxlength="80">
+        </div>
+        <div class="input-row">
+          <div>
+            <div class="field-label">Tipo</div>
+            <select id="taskType">
+              <option value="personal">👤 Pessoal</option>
+              <option value="work">💼 Profissional</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Prazo</div>
+            <input type="date" id="taskDeadline">
+          </div>
+        </div>
+        <div class="input-row">
+          <div>
+            <div class="field-label">Valor (opcional)</div>
+            <div class="value-input-wrap">
+              <input type="number" id="taskValue" placeholder="0,00" step="0.01" min="0" inputmode="decimal">
+            </div>
+          </div>
+          <div>
+            <div class="field-label">Status</div>
+            <select id="taskStatus">
+              <option value="pending">⏳ Pendente</option>
+              <option value="progress">🔄 Em andamento</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-add" id="btnAddTask" onclick="addTask()">Criar Tarefa ✓</button>
+      </div>
+    </div>
+
+    <!-- VIEW TOGGLE -->
+    <div class="task-view-toggle">
+      <button class="tvt-btn active" id="tvt-list"  onclick="setTaskView('list')">📋 Lista</button>
+      <button class="tvt-btn"        id="tvt-day"   onclick="setTaskView('day')">📅 Dia</button>
+      <button class="tvt-btn"        id="tvt-week"  onclick="setTaskView('week')">🗓 Semana</button>
+      <button class="tvt-btn"        id="tvt-month" onclick="setTaskView('month')">📆 Mês</button>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div id="view-list">
+      <div class="task-list" id="taskListOpen"></div>
+      <div class="section-title mt8">Concluídas</div>
+      <div class="task-list" id="taskListDone"></div>
+    </div>
+
+    <!-- DAY VIEW -->
+    <div id="view-day" style="display:none">
+      <div class="day-nav">
+        <button class="day-nav-btn" onclick="shiftDay(-1)">&#8249;</button>
+        <div class="day-nav-label">
+          <div class="day-nav-date" id="dayNavDate"></div>
+          <div class="day-nav-weekday" id="dayNavWeekday"></div>
+        </div>
+        <button class="day-nav-btn" onclick="shiftDay(1)">&#8250;</button>
+      </div>
+      <div id="dayTaskList" class="task-list"></div>
+    </div>
+
+    <!-- WEEK VIEW -->
+    <div id="view-week" style="display:none">
+      <div class="week-nav">
+        <button class="week-nav-btn" onclick="shiftWeek(-1)">&#8249; Anterior</button>
+        <div class="week-nav-label" id="weekNavLabel"></div>
+        <button class="week-nav-btn" onclick="shiftWeek(1)">Próxima &#8250;</button>
+      </div>
+      <div class="week-strip" id="weekStrip"></div>
+      <div id="weekTaskList" class="task-list"></div>
+    </div>
+
+    <!-- MONTH VIEW -->
+    <div id="view-month" style="display:none">
+      <div class="month-nav">
+        <button class="month-nav-btn" onclick="shiftMonth(-1)">&#8249;</button>
+        <div class="month-nav-label" id="monthNavLabel"></div>
+        <button class="month-nav-btn" onclick="shiftMonth(1)">&#8250;</button>
+      </div>
+      <div class="month-grid" id="monthGrid"></div>
+      <div id="monthTaskList" class="task-list"></div>
+    </div>
+
+  </div>
+
+</div><!-- /content -->
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav" id="mainNav" style="display:none">
+  <button class="nav-btn active" id="nav-finance" onclick="switchSection('finance')">
+    <span class="nav-icon">💳</span>Finanças
+  </button>
+  <button class="nav-btn" id="nav-tasks" onclick="switchSection('tasks')">
+    <span class="nav-icon">✅</span>Tarefas
+  </button>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+//  CONFIG & STATE
+// ═══════════════════════════════════════
+let API_URL = localStorage.getItem('ff_api_url') || '';
+let transactions = JSON.parse(localStorage.getItem('ff_tx_cache') || '[]');
+let tasks = JSON.parse(localStorage.getItem('ff_task_cache') || '[]');
+let currentType = 'expense';
+let currentTab = 'add';
+let currentSection = 'finance';
+let selectedMonthFilter = null;
+let isOnline = navigator.onLine;
+
+// ═══════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════
+window.addEventListener('online',  () => { isOnline = true;  updateOfflineBadge(); });
+window.addEventListener('offline', () => { isOnline = false; updateOfflineBadge(); });
+
+function updateOfflineBadge() {
+  document.getElementById('offlineBadge').style.display = isOnline ? 'none' : 'flex';
+}
+
+function saveSetup() {
+  const url = document.getElementById('setupUrl').value.trim();
+  if (!url.startsWith('https://script.google.com')) {
+    showToast('⚠️ URL inválida — verifique', 'error'); return;
+  }
+  API_URL = url;
+  localStorage.setItem('ff_api_url', url);
+  document.getElementById('setupScreen').style.display = 'none';
+  startApp();
+}
+
+async function startApp() {
+  const now = new Date();
+  document.getElementById('currentMonth').textContent =
+    now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  document.getElementById('summaryMonth').textContent =
+    now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  const today = now.toISOString().split('T')[0];
+  document.getElementById('txDate').value = today;
+  document.getElementById('taskDeadline').value = today;
+
+  selectedMonthFilter = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  document.getElementById('mainHeader').style.display = 'block';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('mainNav').style.display = 'flex';
+
+  // Load from cache first (instant), then sync
+  renderAll();
+  await syncAll();
+}
+
+// ═══════════════════════════════════════
+//  API
+// ═══════════════════════════════════════
+async function api(action, body = null) {
+  const url = `${API_URL}?action=${action}`;
+  const opts = body
+    ? { method: 'POST', body: JSON.stringify(body) }
+    : { method: 'GET' };
+
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'Erro desconhecido');
+  return data;
+}
+
+async function syncAll() {
+  if (!isOnline) { showToast('📵 Sem conexão — usando cache', 'error'); return; }
+  setLoading(true, 'Sincronizando...');
+  const btn = document.getElementById('syncBtn');
+  btn.classList.add('syncing');
+  try {
+    const [txRes, taskRes] = await Promise.all([
+      api('getTransactions'),
+      api('getTasks')
+    ]);
+    transactions = txRes.data;
+    tasks = taskRes.data;
+    localStorage.setItem('ff_tx_cache', JSON.stringify(transactions));
+    localStorage.setItem('ff_task_cache', JSON.stringify(tasks));
+    renderAll();
+    showToast('✅ Dados sincronizados!', 'success');
+  } catch(e) {
+    showToast('⚠️ Erro ao sincronizar', 'error');
+  } finally {
+    setLoading(false);
+    btn.classList.remove('syncing');
+  }
+}
+
+// ═══════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════
+function switchSection(section) {
+  currentSection = section;
+  document.getElementById('finPage').style.display = section === 'finance' ? 'block' : 'none';
+  document.getElementById('taskPage').style.display = section === 'tasks' ? 'block' : 'none';
+  document.getElementById('balanceCard').style.display = section === 'finance' ? 'block' : 'none';
+  document.getElementById('finTabs').style.display = section === 'finance' ? 'flex' : 'none';
+  document.getElementById('nav-finance').classList.toggle('active', section === 'finance');
+  document.getElementById('nav-tasks').classList.toggle('active', section === 'tasks');
+  if (section === 'tasks') renderTasks();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['add','history','summary','agenda'][i] === tab);
+  });
+  if (tab === 'history') renderHistory();
+  if (tab === 'summary') renderSummary();
+  if (tab === 'agenda')  { setFinView(currentFinView); }
+}
+
+// ═══════════════════════════════════════
+//  TRANSACTIONS
+// ═══════════════════════════════════════
+function setType(type) {
+  currentType = type;
+  document.getElementById('btnExpense').className = 'type-btn' + (type==='expense'?' active-expense':'');
+  document.getElementById('btnIncome').className  = 'type-btn' + (type==='income' ?' active-income':'');
+  document.getElementById('txCat').value = type === 'income' ? '💼 Salário' : '🍽️ Alimentação';
+}
+
+async function addTransaction() {
+  const desc  = document.getElementById('txDesc').value.trim();
+  const value = parseFloat(document.getElementById('txValue').value);
+  const cat   = document.getElementById('txCat').value;
+  const date  = document.getElementById('txDate').value;
+
+  if (!desc)          { showToast('⚠️ Informe a descrição', 'error'); return; }
+  if (!value || value <= 0) { showToast('⚠️ Informe o valor', 'error'); return; }
+  if (!date)          { showToast('⚠️ Informe a data', 'error'); return; }
+
+  const btn = document.getElementById('btnAddTx');
+  btn.disabled = true;
+
+  const tx = { type: currentType, desc, value, cat, date };
+
+  // Optimistic local add
+  const tempId = Date.now();
+  transactions.unshift({ ...tx, id: tempId });
+  renderAll();
+
+  try {
+    await api('addTransaction', tx);
+    await syncAll(); // refresh from server to get real IDs
+    document.getElementById('txDesc').value = '';
+    document.getElementById('txValue').value = '';
+    showToast(currentType === 'expense' ? '✅ Gasto registrado!' : '✅ Receita registrada!', 'success');
+  } catch(e) {
+    // Rollback
+    transactions = transactions.filter(t => t.id !== tempId);
+    renderAll();
+    showToast('❌ Erro ao salvar. Tente novamente.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteTransaction(id) {
+  const backup = [...transactions];
+  transactions = transactions.filter(t => String(t.id) !== String(id));
+  renderAll();
+  try {
+    await api('deleteTransaction', { id });
+    showToast('🗑️ Removido', 'success');
+  } catch(e) {
+    transactions = backup;
+    renderAll();
+    showToast('❌ Erro ao remover', 'error');
+  }
+}
+
+// ═══════════════════════════════════════
+//  TASKS
+// ═══════════════════════════════════════
+async function addTask() {
+  const desc     = document.getElementById('taskDesc').value.trim();
+  const type     = document.getElementById('taskType').value;
+  const deadline = document.getElementById('taskDeadline').value;
+  const value    = parseFloat(document.getElementById('taskValue').value) || null;
+  const status   = document.getElementById('taskStatus').value;
+
+  if (!desc) { showToast('⚠️ Informe a descrição', 'error'); return; }
+
+  const btn = document.getElementById('btnAddTask');
+  btn.disabled = true;
+
+  const task = { desc, type, deadline, value, status };
+  const tempId = Date.now();
+  tasks.unshift({ ...task, id: tempId });
+  renderTasks();
+
+  try {
+    await api('addTask', task);
+    await syncAll();
+    document.getElementById('taskDesc').value = '';
+    document.getElementById('taskValue').value = '';
+    document.getElementById('taskStatus').value = 'pending';
+    showToast('📌 Tarefa criada!', 'success');
+  } catch(e) {
+    tasks = tasks.filter(t => t.id !== tempId);
+    renderTasks();
+    showToast('❌ Erro ao criar tarefa', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleTask(id) {
+  const task = tasks.find(t => String(t.id) === String(id));
+  if (!task) return;
+  const newStatus = task.status === 'done' ? 'pending' : 'done';
+  task.status = newStatus;
+  renderTasks();
+  try {
+    await api('updateTask', { id, status: newStatus });
+    showToast(newStatus === 'done' ? '✅ Concluída!' : '🔄 Reaberta', 'success');
+  } catch(e) {
+    task.status = newStatus === 'done' ? 'pending' : 'done';
+    renderTasks();
+    showToast('❌ Erro ao atualizar', 'error');
+  }
+}
+
+async function changeTaskStatus(id, status) {
+  const task = tasks.find(t => String(t.id) === String(id));
+  if (!task) return;
+  const old = task.status;
+  task.status = status;
+  renderTasks();
+  try {
+    await api('updateTask', { id, status });
+  } catch(e) {
+    task.status = old;
+    renderTasks();
+    showToast('❌ Erro ao atualizar', 'error');
+  }
+}
+
+async function deleteTask(id) {
+  const backup = [...tasks];
+  tasks = tasks.filter(t => String(t.id) !== String(id));
+  renderTasks();
+  try {
+    await api('deleteTask', { id });
+    showToast('🗑️ Tarefa removida', 'success');
+  } catch(e) {
+    tasks = backup;
+    renderTasks();
+    showToast('❌ Erro ao remover', 'error');
+  }
+}
+
+// ═══════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════
+function renderAll() {
+  renderBalance();
+  if (currentTab === 'history') renderHistory();
+  if (currentTab === 'summary') renderSummary();
+  if (currentTab === 'agenda')  renderFinView();
+}
+
+function getFilteredTx() {
+  if (!selectedMonthFilter) return transactions;
+  return transactions.filter(t => String(t.date).startsWith(selectedMonthFilter));
+}
+
+function renderBalance() {
+  const tx = getFilteredTx();
+  const income  = tx.filter(t=>t.type==='income').reduce((s,t)=>s+parseFloat(t.value||0),0);
+  const expense = tx.filter(t=>t.type==='expense').reduce((s,t)=>s+parseFloat(t.value||0),0);
+  const balance = income - expense;
+  document.getElementById('totalIncome').textContent  = fmt(income);
+  document.getElementById('totalExpense').textContent = fmt(expense);
+  const bv = document.getElementById('balanceValue');
+  bv.textContent = fmt(balance);
+  bv.className   = 'balance-value' + (balance < 0 ? ' negative' : '');
+}
+
+function renderHistory() {
+  const months = [...new Set(transactions.map(t=>String(t.date).substring(0,7)))].sort().reverse();
+  const mf = document.getElementById('monthFilter');
+  mf.innerHTML = months.map(m => {
+    const [y,mo] = m.split('-');
+    const label  = new Date(y,parseInt(mo)-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
+    return `<button class="filter-chip ${m===selectedMonthFilter?'active':''}" onclick="filterMonth('${m}')">${label}</button>`;
+  }).join('');
+
+  const tx = getFilteredTx();
+  const list = document.getElementById('txList');
+  if (tx.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">Nenhum lançamento</div><div class="empty-desc">Nenhum registro neste período</div></div>`;
+    return;
+  }
+  list.innerHTML = tx.map(t => `
+    <div class="tx-item">
+      <div class="tx-icon ${t.type}">${t.type==='expense'?'🔴':'🟢'}</div>
+      <div class="tx-info">
+        <div class="tx-desc">${esc(t.desc)}</div>
+        <div class="tx-meta"><span class="tx-cat">${t.cat}</span><span>${formatDate(t.date)}</span></div>
+      </div>
+      <div class="tx-value ${t.type}">${t.type==='expense'?'-':'+'}${fmt(parseFloat(t.value))}</div>
+      <button class="tx-delete" onclick="deleteTransaction('${t.id}')">🗑️</button>
+    </div>`).join('');
+}
+
+function renderSummary() {
+  const tx = getFilteredTx().filter(t=>t.type==='expense');
+  const grid = document.getElementById('catGrid');
+  if (tx.length === 0) {
+    grid.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">Sem gastos neste período</div></div>`;
+    return;
+  }
+  const byCat = {};
+  tx.forEach(t => { byCat[t.cat] = (byCat[t.cat]||0) + parseFloat(t.value||0); });
+  const total  = Object.values(byCat).reduce((a,b)=>a+b,0);
+  const sorted = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  grid.innerHTML = sorted.map(([cat,val]) => {
+    const pct = Math.round((val/total)*100);
+    return `<div class="cat-item">
+      <div class="cat-header"><div class="cat-name">${cat}</div><div class="cat-amount">-${fmt(val)}</div></div>
+      <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  TASK VIEW STATE
+// ═══════════════════════════════════════
+let currentTaskView = 'list';
+let taskFormOpen = true;
+
+// Day view
+let dayViewDate = new Date();
+dayViewDate.setHours(0,0,0,0);
+
+// Week view
+let weekViewStart = getWeekStart(new Date());
+
+// Month view
+let monthViewDate = new Date();
+
+function getWeekStart(d) {
+  const dt = new Date(d);
+  const day = dt.getDay(); // 0=sun
+  const diff = day === 0 ? -6 : 1 - day; // Monday start
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+
+function toYMD(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function toggleTaskForm() {
+  taskFormOpen = !taskFormOpen;
+  document.getElementById('taskFormBody').style.display = taskFormOpen ? 'block' : 'none';
+  document.getElementById('taskFormArrow').style.transform = taskFormOpen ? '' : 'rotate(-90deg)';
+}
+
+function setTaskView(view) {
+  currentTaskView = view;
+  ['list','day','week','month'].forEach(v => {
+    document.getElementById('view-'+v).style.display = v === view ? 'block' : 'none';
+    document.getElementById('tvt-'+v).classList.toggle('active', v === view);
+  });
+  renderTasks();
+}
+
+// ─── RENDER DISPATCHER ────────────────
+function renderTasks() {
+  if (currentTaskView === 'list')  renderListView();
+  if (currentTaskView === 'day')   renderDayView();
+  if (currentTaskView === 'week')  renderWeekView();
+  if (currentTaskView === 'month') renderMonthView();
+}
+
+// ─── LIST VIEW ────────────────────────
+function renderListView() {
+  const today = toYMD(new Date());
+
+  // Group: overdue, today, this week, later, no deadline, done
+  const open = tasks.filter(t => t.status !== 'done');
+  const done = tasks.filter(t => t.status === 'done');
+
+  const overdue = open.filter(t => t.deadline && t.deadline < today);
+  const todayT  = open.filter(t => t.deadline === today);
+  const soonT   = open.filter(t => t.deadline && t.deadline > today);
+  const noDead  = open.filter(t => !t.deadline);
+
+  let html = '';
+
+  if (overdue.length) {
+    html += `<div class="task-group-label tgl-urgent">⚠️ Atrasadas <span class="tgl-badge">${overdue.length}</span></div>`;
+    html += overdue.map(t => taskCard(t, 'overdue-task')).join('');
+  }
+  if (todayT.length) {
+    html += `<div class="task-group-label tgl-today">☀️ Hoje <span class="tgl-badge">${todayT.length}</span></div>`;
+    html += todayT.map(t => taskCard(t, 'today-task')).join('');
+  }
+  if (soonT.length) {
+    html += `<div class="task-group-label tgl-soon">📅 Próximas <span class="tgl-badge">${soonT.length}</span></div>`;
+    html += soonT.map(t => taskCard(t)).join('');
+  }
+  if (noDead.length) {
+    html += `<div class="task-group-label tgl-later">📌 Sem prazo <span class="tgl-badge">${noDead.length}</span></div>`;
+    html += noDead.map(t => taskCard(t)).join('');
+  }
+  if (!open.length) {
+    html = `<div class="empty"><div class="empty-icon">🎉</div><div class="empty-title">Tudo em dia!</div><div class="empty-desc">Nenhuma tarefa em aberto</div></div>`;
+  }
+
+  document.getElementById('taskListOpen').innerHTML = html;
+
+  const doneEl = document.getElementById('taskListDone');
+  doneEl.innerHTML = done.length
+    ? done.slice(0,10).map(t => taskCard(t)).join('')
+    : `<div class="empty" style="padding:16px 0"><div class="empty-desc">Nenhuma concluída ainda</div></div>`;
+}
+
+// ─── DAY VIEW ─────────────────────────
+function renderDayView() {
+  const ymd   = toYMD(dayViewDate);
+  const today = toYMD(new Date());
+  const isToday = ymd === today;
+
+  document.getElementById('dayNavDate').textContent =
+    isToday ? 'Hoje, ' + dayViewDate.toLocaleDateString('pt-BR',{day:'numeric',month:'long'})
+             : dayViewDate.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('dayNavWeekday').textContent =
+    isToday ? '☀️ hoje' : dayViewDate.toLocaleDateString('pt-BR',{weekday:'long'});
+
+  const dayTasks = tasks.filter(t => t.deadline === ymd);
+  const el = document.getElementById('dayTaskList');
+
+  if (!dayTasks.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">✨</div><div class="empty-title">Nenhuma tarefa neste dia</div><div class="empty-desc">Adicione uma tarefa com prazo em ${formatDate(ymd)}</div></div>`;
+    return;
+  }
+  el.innerHTML = dayTasks.map(t => taskCard(t)).join('');
+}
+
+function shiftDay(delta) {
+  dayViewDate.setDate(dayViewDate.getDate() + delta);
+  renderDayView();
+}
+
+// ─── WEEK VIEW ────────────────────────
+function renderWeekView() {
+  const strip = document.getElementById('weekStrip');
+  const days  = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  const today = toYMD(new Date());
+
+  // Week label
+  const weekEnd = new Date(weekViewStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  document.getElementById('weekNavLabel').textContent =
+    `${weekViewStart.toLocaleDateString('pt-BR',{day:'numeric',month:'short'})} – ${weekEnd.toLocaleDateString('pt-BR',{day:'numeric',month:'short'})}`;
+
+  // Build 7 day columns
+  let stripHtml = '';
+  let allWeekSelected = null;
+  const weekDates = [];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekViewStart);
+    d.setDate(d.getDate() + i);
+    const ymd = toYMD(d);
+    weekDates.push(ymd);
+    const hasTasks = tasks.some(t => t.deadline === ymd);
+    const isToday  = ymd === today;
+    stripHtml += `
+      <div class="week-day-col">
+        <div class="week-day-label">${days[i]}</div>
+        <div class="week-day-num ${isToday?'today':''}" onclick="selectWeekDay('${ymd}')" id="wdc-${ymd}">${d.getDate()}</div>
+        <div class="week-day-dot ${hasTasks?'visible':''}"></div>
+      </div>`;
+  }
+  strip.innerHTML = stripHtml;
+
+  // Show all tasks for the week, grouped by day
+  const el = document.getElementById('weekTaskList');
+  let html = '';
+  let total = 0;
+
+  weekDates.forEach(ymd => {
+    const dayTasks = tasks.filter(t => t.deadline === ymd);
+    if (dayTasks.length) {
+      total += dayTasks.length;
+      const [y,m,dd] = ymd.split('-');
+      const dLabel = new Date(y,parseInt(m)-1,dd).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+      const isToday = ymd === today;
+      html += `<div class="task-group-label ${isToday?'tgl-today':'tgl-soon'}">${isToday?'☀️':''} ${dLabel} <span class="tgl-badge">${dayTasks.length}</span></div>`;
+      html += dayTasks.map(t => taskCard(t)).join('');
+    }
+  });
+
+  if (!total) {
+    html = `<div class="empty"><div class="empty-icon">📅</div><div class="empty-title">Semana livre!</div><div class="empty-desc">Nenhuma tarefa com prazo nesta semana</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function shiftWeek(delta) {
+  weekViewStart.setDate(weekViewStart.getDate() + delta * 7);
+  renderWeekView();
+}
+
+function selectWeekDay(ymd) {
+  dayViewDate = new Date(ymd + 'T00:00:00');
+  setTaskView('day');
+}
+
+// ─── MONTH VIEW ───────────────────────
+function renderMonthView() {
+  const year  = monthViewDate.getFullYear();
+  const month = monthViewDate.getMonth();
+  const today = toYMD(new Date());
+
+  document.getElementById('monthNavLabel').textContent =
+    monthViewDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+
+  // Day headers Mon–Sun
+  const dayHeaders = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  let gridHtml = dayHeaders.map(d => `<div class="month-day-head">${d}</div>`).join('');
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month+1, 0);
+
+  // Monday offset
+  let startOffset = firstDay.getDay() - 1;
+  if (startOffset < 0) startOffset = 6;
+
+  // Fill grid
+  const totalCells = startOffset + lastDay.getDate();
+  const rows = Math.ceil(totalCells / 7);
+
+  for (let i = 0; i < rows * 7; i++) {
+    const dayNum = i - startOffset + 1;
+    if (dayNum < 1 || dayNum > lastDay.getDate()) {
+      gridHtml += `<div class="month-day-cell other-month"><div class="mdc-num"></div></div>`;
+      continue;
+    }
+    const d   = new Date(year, month, dayNum);
+    const ymd = toYMD(d);
+    const isToday    = ymd === today;
+    const dayTasks   = tasks.filter(t => t.deadline === ymd && t.status !== 'done');
+    const dots = dayTasks.slice(0,3).map(t => `<div class="mdc-dot ${t.status}"></div>`).join('');
+
+    gridHtml += `<div class="month-day-cell ${isToday?'today':''}" onclick="monthDayClick('${ymd}')">
+      <div class="mdc-num">${dayNum}</div>
+      <div class="mdc-dots">${dots}</div>
+    </div>`;
+  }
+
+  document.getElementById('monthGrid').innerHTML = gridHtml;
+
+  // Below: list all tasks this month grouped by week
+  const el = document.getElementById('monthTaskList');
+  const monthStr = `${year}-${String(month+1).padStart(2,'0')}`;
+  const monthTasks = tasks.filter(t => t.deadline && t.deadline.startsWith(monthStr) && t.status !== 'done')
+    .sort((a,b) => a.deadline.localeCompare(b.deadline));
+
+  if (!monthTasks.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📆</div><div class="empty-title">Nenhuma tarefa neste mês</div></div>`;
+    return;
+  }
+
+  // Group by week number within month
+  const byWeek = {};
+  monthTasks.forEach(t => {
+    const d = new Date(t.deadline + 'T00:00:00');
+    const weekOfMonth = Math.ceil((d.getDate() + firstDay.getDay() - 1) / 7);
+    if (!byWeek[weekOfMonth]) byWeek[weekOfMonth] = [];
+    byWeek[weekOfMonth].push(t);
+  });
+
+  let html = '';
+  Object.entries(byWeek).forEach(([week, list]) => {
+    html += `<div class="task-group-label tgl-soon">Semana ${week} <span class="tgl-badge">${list.length}</span></div>`;
+    html += list.map(t => taskCard(t)).join('');
+  });
+  el.innerHTML = html;
+}
+
+function shiftMonth(delta) {
+  monthViewDate.setMonth(monthViewDate.getMonth() + delta);
+  renderMonthView();
+}
+
+function monthDayClick(ymd) {
+  dayViewDate = new Date(ymd + 'T00:00:00');
+  setTaskView('day');
+}
+
+// ─── TASK CARD (shared) ───────────────
+function taskCard(t, wrapClass='') {
+  const isDone = t.status === 'done';
+  const statusTag = isDone
+    ? `<span class="task-tag tag-done">✅ Concluído</span>`
+    : t.status === 'progress'
+    ? `<span class="task-tag tag-progress">🔄 Em andamento</span>`
+    : `<span class="task-tag tag-pending">⏳ Pendente</span>`;
+  const typeTag = t.type === 'work'
+    ? `<span class="task-tag tag-work">💼 Profissional</span>`
+    : `<span class="task-tag tag-personal">👤 Pessoal</span>`;
+
+  const today = toYMD(new Date());
+  const isOverdue = t.deadline && t.deadline < today && !isDone;
+  const deadlineDisplay = t.deadline
+    ? `<span style="${isOverdue?'color:var(--red)':''}">📅 ${formatDate(t.deadline)}${isOverdue?' ⚠️':''}</span>`
+    : '';
+
+  return `<div class="${wrapClass}"><div class="task-item">
+    <div class="task-header">
+      <div class="task-check ${isDone?'done':''}" onclick="toggleTask('${t.id}')">${isDone?'✓':''}</div>
+      <div class="task-title-text ${isDone?'done-text':''}">${esc(t.desc)}</div>
+      <button class="task-delete" onclick="deleteTask('${t.id}')">🗑️</button>
+    </div>
+    <div class="task-meta-row">${statusTag}${typeTag}</div>
+    <div class="task-detail">
+      ${deadlineDisplay}
+      ${t.value?`<span>💰 ${fmt(parseFloat(t.value))}</span>`:''}
+      ${!isDone?`<select class="status-select" onchange="changeTaskStatus('${t.id}',this.value)">
+        <option value="pending" ${t.status==='pending'?'selected':''}>⏳ Pendente</option>
+        <option value="progress" ${t.status==='progress'?'selected':''}>🔄 Em andamento</option>
+        <option value="done">✅ Concluído</option>
+      </select>`:''}
+    </div>
+  </div></div>`;
+}
+
+function filterMonth(m) {
+  selectedMonthFilter = m;
+  const [y,mo] = m.split('-');
+  document.getElementById('summaryMonth').textContent =
+    new Date(y,parseInt(mo)-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  renderAll();
+  if (currentTab !== 'history') switchTab('history');
+}
+
+// ═══════════════════════════════════════
+//  FINANCE CALENDAR VIEWS
+// ═══════════════════════════════════════
+let currentFinView = 'day';
+let finDayDate  = new Date(); finDayDate.setHours(0,0,0,0);
+let finWeekStart = getWeekStart(new Date());
+let finMonthDate = new Date();
+
+function setFinView(view) {
+  currentFinView = view;
+  ['day','week','month','future'].forEach(v => {
+    document.getElementById('fview-'+v).style.display = v===view ? 'block' : 'none';
+    document.getElementById('fvt-'+v).classList.toggle('active', v===view);
+  });
+  renderFinView();
+}
+
+function renderFinView() {
+  if (currentFinView === 'day')    renderFinDay();
+  if (currentFinView === 'week')   renderFinWeek();
+  if (currentFinView === 'month')  renderFinMonth();
+  if (currentFinView === 'future') renderFinFuture();
+}
+
+// ─── helpers ──────────────────────────
+function txsForDate(ymd) {
+  return transactions.filter(t => String(t.date) === ymd);
+}
+function txsInRange(from, to) {
+  return transactions.filter(t => String(t.date) >= from && String(t.date) <= to);
+}
+function balanceSummary(txList) {
+  const inc = txList.filter(t=>t.type==='income').reduce((s,t)=>s+parseFloat(t.value||0),0);
+  const exp = txList.filter(t=>t.type==='expense').reduce((s,t)=>s+parseFloat(t.value||0),0);
+  return {inc, exp, bal: inc-exp};
+}
+function balanceWidget(containerId, b) {
+  document.getElementById(containerId).innerHTML = `
+    <div class="fcb-item"><div class="fcb-label income">↑ Receitas</div><div class="fcb-value pos">${fmt(b.inc)}</div></div>
+    <div class="fcb-item"><div class="fcb-label expense">↓ Gastos</div><div class="fcb-value neg">${fmt(b.exp)}</div></div>
+    <div class="fcb-item"><div class="fcb-label balance">= Saldo</div><div class="fcb-value ${b.bal>=0?'pos':'neg'}">${fmt(b.bal)}</div></div>`;
+}
+function txCard(t) {
+  return `<div class="tx-item">
+    <div class="tx-icon ${t.type}">${t.type==='expense'?'🔴':'🟢'}</div>
+    <div class="tx-info">
+      <div class="tx-desc">${esc(t.desc)}</div>
+      <div class="tx-meta"><span class="tx-cat">${t.cat}</span></div>
+    </div>
+    <div class="tx-value ${t.type}">${t.type==='expense'?'-':'+'}${fmt(parseFloat(t.value))}</div>
+    <button class="tx-delete" onclick="deleteTransaction('${t.id}')">🗑️</button>
+  </div>`;
+}
+function groupedTxHtml(txList) {
+  if (!txList.length) return `<div class="empty"><div class="empty-icon">💸</div><div class="empty-title">Nenhum lançamento</div><div class="empty-desc">Nenhuma transação neste período</div></div>`;
+  const byDate = {};
+  txList.forEach(t => {
+    const d = String(t.date);
+    if (!byDate[d]) byDate[d] = [];
+    byDate[d].push(t);
+  });
+  const today = toYMD(new Date());
+  return Object.keys(byDate).sort().reverse().map(d => {
+    const isToday = d === today;
+    const [y,m,dd] = d.split('-');
+    const label = new Date(y,parseInt(m)-1,dd).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
+    return `<div class="tx-cal-group">
+      <div class="tx-cal-date-label ${isToday?'is-today':''}">${isToday?'☀️ Hoje, ':''} ${label} <span class="tgl-badge">${byDate[d].length}</span></div>
+      ${byDate[d].map(txCard).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ─── DAY ──────────────────────────────
+function renderFinDay() {
+  const ymd   = toYMD(finDayDate);
+  const today = toYMD(new Date());
+  const isToday = ymd === today;
+  document.getElementById('finDayNavDate').textContent =
+    isToday ? 'Hoje, ' + finDayDate.toLocaleDateString('pt-BR',{day:'numeric',month:'long'})
+            : finDayDate.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('finDayNavSub').textContent =
+    isToday ? '☀️ hoje' : finDayDate.toLocaleDateString('pt-BR',{year:'numeric'});
+
+  const txs = txsForDate(ymd);
+  const b = balanceSummary(txs);
+  balanceWidget('finDayBalance', b);
+  document.getElementById('finDayList').innerHTML = txs.length
+    ? txs.map(txCard).join('')
+    : `<div class="empty"><div class="empty-icon">💸</div><div class="empty-title">Nenhum lançamento neste dia</div></div>`;
+}
+function shiftFinDay(d) { finDayDate.setDate(finDayDate.getDate()+d); renderFinDay(); }
+
+// ─── WEEK ─────────────────────────────
+function renderFinWeek() {
+  const days = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  const today = toYMD(new Date());
+  const weekEnd = new Date(finWeekStart); weekEnd.setDate(weekEnd.getDate()+6);
+
+  document.getElementById('finWeekNavLabel').textContent =
+    `${finWeekStart.toLocaleDateString('pt-BR',{day:'numeric',month:'short'})} – ${weekEnd.toLocaleDateString('pt-BR',{day:'numeric',month:'short'})}`;
+
+  let stripHtml = '';
+  const weekDates = [];
+  for (let i=0; i<7; i++) {
+    const d = new Date(finWeekStart); d.setDate(d.getDate()+i);
+    const ymd = toYMD(d);
+    weekDates.push(ymd);
+    const dayTxs = txsForDate(ymd);
+    const hasInc = dayTxs.some(t=>t.type==='income');
+    const hasExp = dayTxs.some(t=>t.type==='expense');
+    const isToday = ymd===today;
+    // dots: green for income, red for expense
+    const dots = [
+      hasInc ? `<div class="mdc-dot" style="background:var(--green)"></div>` : '',
+      hasExp ? `<div class="mdc-dot" style="background:var(--red)"></div>`   : '',
+    ].join('');
+    stripHtml += `<div class="week-day-col">
+      <div class="week-day-label">${days[i]}</div>
+      <div class="week-day-num ${isToday?'today':''}" onclick="finWeekDayClick('${ymd}')">${d.getDate()}</div>
+      <div class="mdc-dots" style="margin-top:2px">${dots}</div>
+    </div>`;
+  }
+  document.getElementById('finWeekStrip').innerHTML = stripHtml;
+
+  const allTxs = txsInRange(weekDates[0], weekDates[6]);
+  const b = balanceSummary(allTxs);
+  balanceWidget('finWeekBalance', b);
+  document.getElementById('finWeekList').innerHTML = groupedTxHtml(allTxs);
+}
+function shiftFinWeek(d) { finWeekStart.setDate(finWeekStart.getDate()+d*7); renderFinWeek(); }
+function finWeekDayClick(ymd) { finDayDate=new Date(ymd+'T00:00:00'); setFinView('day'); }
+
+// ─── MONTH ────────────────────────────
+function renderFinMonth() {
+  const year  = finMonthDate.getFullYear();
+  const month = finMonthDate.getMonth();
+  const today = toYMD(new Date());
+
+  document.getElementById('finMonthNavLabel').textContent =
+    finMonthDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+
+  const dayHeaders = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  let gridHtml = dayHeaders.map(d=>`<div class="month-day-head">${d}</div>`).join('');
+
+  const firstDay = new Date(year,month,1);
+  const lastDay  = new Date(year,month+1,0);
+  let startOffset = firstDay.getDay()-1;
+  if (startOffset<0) startOffset=6;
+  const rows = Math.ceil((startOffset+lastDay.getDate())/7);
+
+  for (let i=0; i<rows*7; i++) {
+    const dayNum = i-startOffset+1;
+    if (dayNum<1 || dayNum>lastDay.getDate()) {
+      gridHtml += `<div class="month-day-cell other-month"><div class="mdc-num"></div></div>`;
+      continue;
+    }
+    const d   = new Date(year,month,dayNum);
+    const ymd = toYMD(d);
+    const isToday = ymd===today;
+    const dayTxs  = txsForDate(ymd);
+    const hasInc  = dayTxs.some(t=>t.type==='income');
+    const hasExp  = dayTxs.some(t=>t.type==='expense');
+    const dots = [
+      hasInc ? `<div class="mdc-dot" style="background:var(--green)"></div>` : '',
+      hasExp ? `<div class="mdc-dot" style="background:var(--red)"></div>`   : '',
+    ].join('');
+    gridHtml += `<div class="month-day-cell ${isToday?'today':''}" onclick="finMonthDayClick('${ymd}')">
+      <div class="mdc-num">${dayNum}</div>
+      <div class="mdc-dots">${dots}</div>
+    </div>`;
+  }
+  document.getElementById('finMonthGrid').innerHTML = gridHtml;
+
+  const monthStr = `${year}-${String(month+1).padStart(2,'0')}`;
+  const monthTxs = transactions.filter(t=>String(t.date).startsWith(monthStr))
+    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const b = balanceSummary(monthTxs);
+  balanceWidget('finMonthBalance', b);
+  document.getElementById('finMonthList').innerHTML = groupedTxHtml(monthTxs);
+}
+function shiftFinMonth(d) { finMonthDate.setMonth(finMonthDate.getMonth()+d); renderFinMonth(); }
+function finMonthDayClick(ymd) { finDayDate=new Date(ymd+'T00:00:00'); setFinView('day'); }
+
+// ─── FUTURE PLANNER ───────────────────
+function renderFinFuture() {
+  const el = document.getElementById('futurePlanner');
+  // Build next 3 months projection based on historical averages
+  const today = new Date();
+  let html = '';
+
+  for (let mOffset=0; mOffset<3; mOffset++) {
+    const d = new Date(today.getFullYear(), today.getMonth()+mOffset, 1);
+    const year  = d.getFullYear();
+    const month = d.getMonth();
+    const monthStr = `${year}-${String(month+1).padStart(2,'0')}`;
+    const isCurrentMonth = mOffset===0;
+
+    // Real txs this month
+    const monthTxs = transactions.filter(t=>String(t.date).startsWith(monthStr));
+    const b = balanceSummary(monthTxs);
+
+    // For future months, try to project from past 2 months avg
+    let projInc = 0, projExp = 0;
+    if (!isCurrentMonth) {
+      const past = [];
+      for (let p=1; p<=2; p++) {
+        const pd = new Date(today.getFullYear(), today.getMonth()-p, 1);
+        const ps = `${pd.getFullYear()}-${String(pd.getMonth()+1).padStart(2,'0')}`;
+        const ptx = transactions.filter(t=>String(t.date).startsWith(ps));
+        if (ptx.length) past.push(balanceSummary(ptx));
+      }
+      if (past.length) {
+        projInc = past.reduce((s,p)=>s+p.inc,0)/past.length;
+        projExp = past.reduce((s,p)=>s+p.exp,0)/past.length;
+      }
+    }
+
+    const monthLabel = d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    const lastDay = new Date(year,month+1,0).getDate();
+
+    // Split by weeks
+    let weeksHtml = '';
+    let weekNum = 1;
+    for (let day=1; day<=lastDay; day+=7) {
+      const wEnd = Math.min(day+6, lastDay);
+      const fromYMD = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const toYMD2  = `${year}-${String(month+1).padStart(2,'0')}-${String(wEnd).padStart(2,'0')}`;
+      const wTxs = txsInRange(fromYMD, toYMD2);
+      const wb   = balanceSummary(wTxs);
+
+      const hasData = wTxs.length > 0;
+      const dayLabel = `${String(day).padStart(2,'0')}/${String(month+1).padStart(2,'0')} – ${String(wEnd).padStart(2,'0')}/${String(month+1).padStart(2,'0')}`;
+
+      weeksHtml += `<div class="future-week-row" onclick="finMonthDayClick('${fromYMD}');setFinView('week');" style="cursor:pointer">
+        <div class="future-week-label">${dayLabel}</div>
+        <div class="future-week-amounts">
+          ${hasData
+            ? `<span class="inc">+${fmt(wb.inc)}</span><span class="exp">-${fmt(wb.exp)}</span>`
+            : `<span style="color:var(--text3);font-size:11px">sem dados</span>`}
+        </div>
+      </div>`;
+      weekNum++;
+    }
+
+    const projSaldo = isCurrentMonth ? b.bal : projInc - projExp;
+    html += `<div class="future-month-block">
+      <div class="future-month-title">
+        <span>${isCurrentMonth?'☀️ ':''} ${monthLabel}</span>
+        <span class="future-proj ${projSaldo>=0?'pos':'neg'}">${isCurrentMonth?'':'~'} ${fmt(Math.abs(projSaldo))} ${projSaldo>=0?'sobra':'déficit'}</span>
+      </div>
+      ${weeksHtml}
+    </div>`;
+  }
+
+  el.innerHTML = html || `<div class="empty"><div class="empty-icon">🔮</div><div class="empty-title">Sem dados para projetar</div><div class="empty-desc">Adicione transações para ver o planejamento futuro</div></div>`;
+}
+
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+function fmt(v){ return Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+function formatDate(d){ if(!d)return''; const[y,m,dd]=String(d).split('-'); return `${dd}/${m}/${y}`; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type}`;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function setLoading(show, msg='') {
+  const el = document.getElementById('loader');
+  el.classList.toggle('show', show);
+  if (msg) document.getElementById('loaderMsg').textContent = msg;
+}
+
+// ═══════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════
+if (API_URL) {
+  document.getElementById('setupScreen').style.display = 'none';
+  startApp();
+}
+</script>
+</body>
+</html>
