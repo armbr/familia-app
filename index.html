@@ -1420,7 +1420,7 @@ function renderTP(){
       var hasOv=wTasks.some(function(t){ return ymds(t.deadline)<ymd(now); });
 
       // cabeçalho da semana — clicável para ir para view semana
-      whtml+='<div class="fwr" onclick="taskWkFrom(''+from+'')" style="'+(hasOv?'border-color:rgba(255,107,107,.3)':'')+'">'+
+      whtml+='<div class="fwr" onclick="taskWkFrom(\'' +from+ '\')" style="'+(hasOv?'border-color:rgba(255,107,107,.3)':'')+'">'+
         '<div class="fwl">'+dayLabel+'</div>'+
         '<div class="fwa">'+
         (wTasks.length||wDone
