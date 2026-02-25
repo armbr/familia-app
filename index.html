@@ -1538,16 +1538,46 @@ function showToast(msg, type='success') {
 
 function setLoading(show, msg='') {
   const el = document.getElementById('loader');
-  el.classList.toggle('show', show);
-  if (msg) document.getElementById('loaderMsg').textContent = msg;
+  if (el) {
+    el.classList.toggle('show', show);
+    if (msg) document.getElementById('loaderMsg').textContent = msg;
+  }
 }
 
 // ═══════════════════════════════════════
-//  BOOT
+//  LÓGICA DE INICIALIZAÇÃO E BOOT
 // ═══════════════════════════════════════
-if (API_URL) {
+
+function saveSetup() {
+  const url = document.getElementById('api_url_input').value.trim();
+  if(!url.includes('script.google.com')){
+    alert('URL inválida! Cole a URL do Web App do Google Apps Script.');
+    return;
+  }
+  localStorage.setItem('familia_app_url', url);
+  location.reload();
+}
+
+function startApp() {
   document.getElementById('setupScreen').style.display = 'none';
-  startApp();
+  document.getElementById('mainHeader').style.display = 'flex';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('navBar').style.display = 'flex';
+  syncAll();
+}
+
+// Comando que faz o App acordar
+window.addEventListener('load', () => {
+  if (API_URL) {
+    startApp();
+  } else {
+    document.getElementById('setupScreen').style.display = 'flex';
+  }
+});
+
+// Registro para funcionar como App (PWA)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
 </body>
