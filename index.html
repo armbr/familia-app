@@ -7,9 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Família">
-<link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json" onerror="void(0)">
 <title>Família · Finanças & Tarefas</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- fonts loaded from system -->
 <style>
 :root {
   --bg:#0F1923; --bg2:#162030; --bg3:#1E2D40;
@@ -23,22 +23,22 @@
   --radius:18px; --radius-sm:12px;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;max-width:430px;margin:0 auto;padding-bottom:90px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;max-width:430px;margin:0 auto;padding-bottom:90px}
 ::-webkit-scrollbar{width:0}
 
 /* ── SETUP SCREEN ── */
 #setupScreen{
-  position:fixed;inset:0;background:var(--bg);z-index:1000;
+  position:fixed;inset:0;background:#0F1923;z-index:1000;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:32px 24px;text-align:center;
 }
-#setupScreen h2{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px}
-#setupScreen p{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6}
-.setup-input{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:inherit;font-size:13px;padding:13px 14px;outline:none;margin-bottom:10px;transition:border-color .2s}
-.setup-input:focus{border-color:var(--green)}
-.setup-btn{width:100%;padding:14px;border:none;border-radius:var(--radius-sm);background:var(--green);color:#0A1A12;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px}
-.setup-note{font-size:11px;color:var(--text3);line-height:1.6;background:var(--bg3);border-radius:var(--radius-sm);padding:12px 14px;text-align:left}
-.setup-note strong{color:var(--text2)}
+#setupScreen h2{font-size:22px;font-weight:800;color:#EDF2F7;margin-bottom:8px}
+#setupScreen p{font-size:13px;color:#8FA8C4;margin-bottom:24px;line-height:1.6}
+.setup-input{width:100%;background:#1E2D40;border:1.5px solid rgba(255,255,255,0.1);border-radius:12px;color:#EDF2F7;font-family:inherit;font-size:13px;padding:13px 14px;outline:none;margin-bottom:10px;transition:border-color .2s}
+.setup-input:focus{border-color:#2ECC9A}
+.setup-btn{width:100%;padding:14px;border:none;border-radius:12px;background:#2ECC9A;color:#0A1A12;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-bottom:8px}
+.setup-note{font-size:11px;color:#526680;line-height:1.6;background:#1E2D40;border-radius:12px;padding:12px 14px;text-align:left}
+.setup-note strong{color:#8FA8C4}
 
 /* ── LOADER ── */
 .loader-overlay{
@@ -210,7 +210,7 @@ select option{background:var(--bg2)}
 /* ── FUTURE PLANNER ── */
 .future-month-block{margin-bottom:20px}
 .future-month-title{
-  font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:800;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Helvetica Neue',Arial,sans-serif;font-size:13px;font-weight:800;
   color:var(--text);background:var(--card2);border:1px solid var(--border);
   border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:8px;
   display:flex;justify-content:space-between;align-items:center;
@@ -1538,46 +1538,25 @@ function showToast(msg, type='success') {
 
 function setLoading(show, msg='') {
   const el = document.getElementById('loader');
-  if (el) {
-    el.classList.toggle('show', show);
-    if (msg) document.getElementById('loaderMsg').textContent = msg;
-  }
+  el.classList.toggle('show', show);
+  if (msg) document.getElementById('loaderMsg').textContent = msg;
 }
 
 // ═══════════════════════════════════════
-//  LÓGICA DE INICIALIZAÇÃO E BOOT
+//  BOOT
 // ═══════════════════════════════════════
-
-function saveSetup() {
-  const url = document.getElementById('api_url_input').value.trim();
-  if(!url.includes('script.google.com')){
-    alert('URL inválida! Cole a URL do Web App do Google Apps Script.');
-    return;
-  }
-  localStorage.setItem('familia_app_url', url);
-  location.reload();
-}
-
-function startApp() {
-  document.getElementById('setupScreen').style.display = 'none';
-  document.getElementById('mainHeader').style.display = 'flex';
-  document.getElementById('mainContent').style.display = 'block';
-  document.getElementById('navBar').style.display = 'flex';
-  syncAll();
-}
-
-// Comando que faz o App acordar
-window.addEventListener('load', () => {
+function boot() {
   if (API_URL) {
+    document.getElementById('setupScreen').style.display = 'none';
     startApp();
-  } else {
-    document.getElementById('setupScreen').style.display = 'flex';
   }
-});
+  // setupScreen is already visible by default - no action needed if no API_URL
+}
 
-// Registro para funcionar como App (PWA)
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
 }
 </script>
 </body>
