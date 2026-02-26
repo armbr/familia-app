@@ -903,7 +903,7 @@ select option{background:#1A2A3A}
             <input id="d-group" type="text" placeholder="Ex: Imóvel, Empresa..." maxlength="30">
           </div>
         </div>
-        <button class="btn" onclick="addDoc()">Salvar Link ✓</button>
+        <button class="btn" id="btn-add-doc" onclick="addDoc()">Salvar Link ✓</button>
       </div>
     </div>
 
@@ -1103,8 +1103,17 @@ function syncAll(){
   var done=0;
   function tick(){
     done++;
-    if(done===2){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
+    if(done===3){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
   }
+  apiCall('getDocs',null,function(err,d){
+    if(!err && d.ok){
+      DOCS = d.data.map(function(x){
+        return { id:String(x.id), name:String(x.name||''), url:String(x.url||''), type:String(x.type||'link'), group:String(x.group||'Geral') };
+      });
+      localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+    }
+    tick();
+  });
   apiCall('getTransactions',null,function(err,d){
     if(!err && d.ok){
       TXS = d.data.map(function(t){
@@ -1180,6 +1189,7 @@ function renderAll(){
   if(curFinTab==='agenda') renderFinView();
   if(curSection==='task')  renderTasks();
   if(curSection==='hoje')  renderHoje();
+  if(curSection==='docs')  renderDocs();
 }
 
 // ════════════════════════════════════════
@@ -1874,24 +1884,43 @@ function addDoc(){
   if(!name){ toast('⚠️ Informe o nome','err'); return; }
   if(!url || url.indexOf('http')===-1){ toast('⚠️ Cole um link válido','err'); return; }
 
-  var doc = { id: Date.now(), name:name, url:url, type:type, group:group };
-  DOCS.unshift(doc);
+  var btn = document.getElementById('btn-add-doc'); btn.disabled=true;
+  var doc = { name:name, url:url, type:type, group:group };
+  var tmp = Date.now();
+  DOCS.unshift(Object.assign({id:tmp}, doc));
   localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+  renderDocs();
+
+  apiCall('addDoc', doc, function(err, d){
+    if(err){
+      DOCS = DOCS.filter(function(x){ return x.id !== tmp; });
+      localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+      renderDocs(); toast('❌ Erro ao salvar','err');
+    } else {
+      // Atualiza id local com o real do servidor
+      var idx = DOCS.findIndex(function(x){ return x.id === tmp; });
+      if(idx > -1 && d.id) DOCS[idx].id = String(d.id);
+      localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+      toast('✅ Documento salvo!');
+    }
+    btn.disabled = false;
+  });
 
   document.getElementById('d-name').value  = '';
   document.getElementById('d-url').value   = '';
   document.getElementById('d-group').value = '';
-
-  toast('✅ Documento salvo!');
-  renderDocs();
-  toggleDocsForm(); // fechar form após salvar
+  if(dfOpen) toggleDocsForm();
 }
 
 function delDoc(id){
+  var bk = [].concat(DOCS);
   DOCS = DOCS.filter(function(d){ return String(d.id)!==String(id); });
   localStorage.setItem('ff_docs', JSON.stringify(DOCS));
   renderDocs();
-  toast('🗑️ Removido');
+  apiCall('deleteDoc', {id:id}, function(err){
+    if(err){ DOCS=bk; localStorage.setItem('ff_docs',JSON.stringify(DOCS)); renderDocs(); toast('❌ Erro ao remover','err'); }
+    else toast('🗑️ Removido');
+  });
 }
 
 function openDoc(url){
@@ -1900,10 +1929,8 @@ function openDoc(url){
 
 function shareDoc(url, name){
   if(navigator.share){
-    navigator.share({ title: name, url: url })
-      .catch(function(){});
+    navigator.share({ title: name, url: url }).catch(function(){});
   } else {
-    // Fallback: copiar para clipboard
     navigator.clipboard && navigator.clipboard.writeText(url)
       .then(function(){ toast('📋 Link copiado!'); })
       .catch(function(){ toast('📋 ' + url.substring(0,40)+'...'); });
