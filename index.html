@@ -592,11 +592,22 @@ select option{background:#1A2A3A}
           <div>
             <div class="fl">Categoria</div>
             <select id="tx-cat">
-              <option>🍽️ Alimentação</option><option>🚗 Transporte</option>
-              <option>🏠 Casa/Moradia</option><option>💊 Saúde</option>
-              <option>📚 Educação</option><option>👗 Roupas</option>
-              <option>🎮 Lazer</option><option>💼 Salário</option>
-              <option>💰 Extra</option><option>📦 Outros</option>
+              <optgroup label="── Gastos ──">
+                <option>🍽️ Alimentação</option>
+                <option>🚗 Carro/Transporte</option>
+                <option>🏠 Casa/Moradia</option>
+                <option>💊 Saúde</option>
+                <option>📚 Educação</option>
+                <option>👗 Roupas</option>
+                <option>🎮 Lazer</option>
+                <option>💼 Empresa/Negócio</option>
+                <option>🏛️ Taxas/Impostos</option>
+                <option>📦 Outros</option>
+              </optgroup>
+              <optgroup label="── Receitas ──">
+                <option>💰 Salário</option>
+                <option>⭐ Extra</option>
+              </optgroup>
             </select>
           </div>
           <div><div class="fl">Data</div><input id="tx-date" type="date"></div>
@@ -851,7 +862,29 @@ var tmDate  = new Date(); // task month
 // ════════════════════════════════════════
 function today0(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
 function ymd(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
-function ymds(s){ /* normalise any date string to YYYY-MM-DD */ if(!s)return ''; var p=String(s).trim().split('-'); if(p.length!==3)return String(s).trim(); return p[0]+'-'+pad(parseInt(p[1]))+'-'+pad(parseInt(p[2])); }
+function ymds(s){
+  // Normaliza qualquer formato de data para YYYY-MM-DD
+  if(!s) return '';
+  var str = String(s).trim();
+  // ISO com T: "2026-02-15T03:00:00.000Z" → pega só a parte da data
+  if(str.indexOf('T') !== -1) str = str.split('T')[0];
+  // Já é YYYY-MM-DD (com possíveis zeros faltando)
+  if(/^\d{4}-\d{1,2}-\d{1,2}$/.test(str)){
+    var p=str.split('-');
+    return p[0]+'-'+pad(parseInt(p[1]))+'-'+pad(parseInt(p[2]));
+  }
+  // Formato DD/MM/YYYY
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(str)){
+    var p=str.split('/');
+    return p[2]+'-'+pad(parseInt(p[1]))+'-'+pad(parseInt(p[0]));
+  }
+  // Tenta converter como Date (último recurso)
+  try{
+    var d=new Date(str);
+    if(!isNaN(d.getTime())) return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  }catch(e){}
+  return str;
+}
 function pad(n){ return String(n).padStart(2,'0'); }
 function weekStart(d){
   var dt=new Date(d); var day=dt.getDay();
@@ -978,10 +1011,35 @@ function syncAll(){
     if(done===2){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
   }
   apiCall('getTransactions',null,function(err,d){
-    if(!err && d.ok){ TXS=d.data; save(); } tick();
+    if(!err && d.ok){
+      TXS = d.data.map(function(t){
+        return Object.assign({}, t, {
+          date:  ymds(t.date),
+          desc:  String(t.desc  || t.description || ''),
+          value: parseFloat(t.value || t.amount || t.valor || 0),
+          cat:   String(t.cat   || t.category   || t.categoria || '📦 Outros'),
+          type:  String(t.type  || t.tipo || 'exp'),
+          id:    String(t.id    || t.ID  || Date.now())
+        });
+      });
+      save();
+    }
+    tick();
   });
   apiCall('getTasks',null,function(err,d){
-    if(!err && d.ok){ TASKS=d.data; save(); } tick();
+    if(!err && d.ok){
+      TASKS = d.data.map(function(t){
+        return Object.assign({}, t, {
+          deadline: ymds(t.deadline || t.prazo || t.due || ''),
+          desc:     String(t.desc || t.description || t.descricao || ''),
+          status:   String(t.status || 'pend'),
+          type:     String(t.type   || t.tipo || 'pers'),
+          id:       String(t.id     || t.ID   || Date.now())
+        });
+      });
+      save();
+    }
+    tick();
   });
 }
 
