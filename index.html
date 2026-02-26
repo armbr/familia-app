@@ -98,7 +98,7 @@ html,body{
 #hdr{
   position:sticky;top:0;z-index:100;
   background:var(--bg2);
-  padding:16px 16px 12px;
+  padding:14px 16px 14px;
   border-bottom:1px solid var(--border);
 }
 #hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -384,6 +384,68 @@ select option{background:#1A2A3A}
   cursor:pointer;width:auto;
 }
 
+/* ════════════════════════════════
+   HOJE SCREEN
+════════════════════════════════ */
+.hoje-header{
+  background:linear-gradient(135deg,#0F2438,#1E3A5F);
+  border:1px solid rgba(91,155,213,.2);
+  border-radius:var(--r,16px);padding:18px;margin:12px 0 14px;
+}
+.hoje-greeting{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8FA8C4;margin-bottom:4px}
+.hoje-date{font-size:17px;font-weight:800;color:#EDF2F7;margin-bottom:14px;text-transform:capitalize}
+.hoje-counters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hoje-counter{background:rgba(255,255,255,.06);border-radius:10px;padding:10px 8px;text-align:center}
+.hoje-counter .hc-num{font-size:22px;font-weight:800;line-height:1}
+.hoje-counter .hc-lbl{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-top:4px}
+.hc-num.alert{color:#FF6B6B}
+.hc-num.warn{color:#FFD166}
+.hc-num.ok{color:#2ECC9A}
+
+.hoje-section{margin-bottom:18px}
+.hoje-section-title{
+  font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:#526680;padding:10px 0 8px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.hoje-section-title .hst-badge{
+  background:#1E2D40;color:#8FA8C4;
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;
+}
+
+/* cartão de pagamento */
+.pgto-card{
+  background:#1A2A3A;border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:13px 14px;margin-bottom:7px;
+  display:flex;align-items:center;gap:12px;
+  animation:up .2s ease both;
+}
+.pgto-card.pago{opacity:.5}
+.pgto-icon{
+  width:40px;height:40px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;
+}
+.pgto-icon.exp{background:rgba(255,107,107,.15)}
+.pgto-icon.inc{background:rgba(46,204,154,.15)}
+.pgto-info{flex:1;min-width:0}
+.pgto-desc{font-size:14px;font-weight:600;color:#EDF2F7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.pgto-meta{font-size:11px;color:#526680;display:flex;gap:6px;align-items:center}
+.pgto-cat{background:#1E2D40;padding:1px 6px;border-radius:4px;font-weight:600}
+.pgto-val{font-size:15px;font-weight:800;flex-shrink:0}
+.pgto-val.exp{color:#FF6B6B}
+.pgto-val.inc{color:#2ECC9A}
+.pgto-chk{
+  width:24px;height:24px;border-radius:7px;border:2px solid rgba(255,255,255,.12);
+  flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;background:transparent;font-size:12px;font-weight:800;color:#0A1A12;
+}
+.pgto-chk.pago{background:#2ECC9A;border-color:#2ECC9A}
+
+.hoje-empty{text-align:center;padding:24px 12px;color:#526680}
+.hoje-empty .he-icon{font-size:32px;margin-bottom:8px}
+.hoje-empty .he-txt{font-size:13px;font-weight:600;color:#8FA8C4}
+
 /* future planner */
 .fmb{margin-bottom:18px}
 .fmb-title{
@@ -482,30 +544,29 @@ select option{background:#1A2A3A}
 <!-- ══ HEADER ══ -->
 <div id="hdr" style="display:none">
   <div id="hdr-top">
-    <div class="logo" onclick="if(confirm('Trocar URL do servidor?'))resetSetup();" style="cursor:pointer" title="Toque 3x para configurar">💰 Família</div>
+    <div class="logo" onclick="if(confirm('Trocar URL do servidor?'))resetSetup();" style="cursor:pointer">🏠 Família</div>
     <div class="right">
       <span id="offline-badge">● offline</span>
-      <div id="month-chip">—</div>
-      <button id="sync-btn" onclick="syncAll()">↻</button>
+      <button id="sync-btn" onclick="syncAll()">↻ Sync</button>
     </div>
   </div>
 
-  <!-- balance (finance only) -->
-  <div id="bal">
-    <div class="lbl">Saldo do Mês</div>
-    <div id="bal-val">R$ 0,00</div>
-    <div id="bal-row">
-      <div class="bal-cell"><div class="bl inc">↑ Receitas</div><div class="bv" id="bi">R$ 0,00</div></div>
-      <div class="bal-cell"><div class="bl exp">↓ Gastos</div><div class="bv" id="be">R$ 0,00</div></div>
+  <!-- balance + fin tabs: só aparece na aba Finanças -->
+  <div id="fin-header-extra" style="display:none">
+    <div id="bal" style="margin-bottom:12px">
+      <div class="lbl">Saldo do Mês — <span id="month-chip">—</span></div>
+      <div id="bal-val">R$ 0,00</div>
+      <div id="bal-row">
+        <div class="bal-cell"><div class="bl inc">↑ Receitas</div><div class="bv" id="bi">R$ 0,00</div></div>
+        <div class="bal-cell"><div class="bl exp">↓ Gastos</div><div class="bv" id="be">R$ 0,00</div></div>
+      </div>
     </div>
-  </div>
-
-  <!-- fin tabs -->
-  <div id="fin-tabs">
-    <button class="ftab on" onclick="ftab('add')">➕</button>
-    <button class="ftab" onclick="ftab('hist')">📋</button>
-    <button class="ftab" onclick="ftab('cat')">📊</button>
-    <button class="ftab" onclick="ftab('agenda')">📅</button>
+    <div id="fin-tabs">
+      <button class="ftab on" onclick="ftab('add')">➕ Registrar</button>
+      <button class="ftab" onclick="ftab('hist')">📋 Histórico</button>
+      <button class="ftab" onclick="ftab('cat')">📊 Resumo</button>
+      <button class="ftab" onclick="ftab('agenda')">📅 Agenda</button>
+    </div>
   </div>
 </div>
 
@@ -685,11 +746,73 @@ select option{background:#1A2A3A}
 
   </div><!-- /sec-task -->
 
+  <!-- ══ HOJE ══ -->
+  <div id="sec-hoje" style="display:none">
+
+    <!-- cabeçalho com data e contadores -->
+    <div class="hoje-header">
+      <div class="hoje-greeting">☀️ Bom dia! Seu resumo de hoje</div>
+      <div class="hoje-date" id="hoje-date-lbl">—</div>
+      <div class="hoje-counters">
+        <div class="hoje-counter">
+          <div class="hc-num alert" id="hc-pgto">0</div>
+          <div class="hc-lbl" style="color:#FF6B6B">Pagamentos</div>
+        </div>
+        <div class="hoje-counter">
+          <div class="hc-num warn" id="hc-task">0</div>
+          <div class="hc-lbl" style="color:#FFD166">Tarefas</div>
+        </div>
+        <div class="hoje-counter">
+          <div class="hc-num ok" id="hc-rec">0</div>
+          <div class="hc-lbl" style="color:#2ECC9A">Recebimentos</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- gastos do dia -->
+    <div class="hoje-section" id="hs-pgto">
+      <div class="hoje-section-title">
+        💸 Pagamentos de hoje
+        <span class="hst-badge" id="hb-pgto">0</span>
+      </div>
+      <div id="hoje-pgto-list"></div>
+    </div>
+
+    <!-- recebimentos do dia -->
+    <div class="hoje-section" id="hs-rec">
+      <div class="hoje-section-title">
+        💰 Recebimentos de hoje
+        <span class="hst-badge" id="hb-rec">0</span>
+      </div>
+      <div id="hoje-rec-list"></div>
+    </div>
+
+    <!-- tarefas do dia -->
+    <div class="hoje-section" id="hs-task">
+      <div class="hoje-section-title">
+        ✅ Tarefas de hoje
+        <span class="hst-badge" id="hb-task">0</span>
+      </div>
+      <div id="hoje-task-list"></div>
+    </div>
+
+    <!-- atrasados -->
+    <div class="hoje-section" id="hs-atrasado">
+      <div class="hoje-section-title" style="color:#FF6B6B">
+        ⚠️ Atrasados (dias anteriores)
+        <span class="hst-badge" id="hb-atrasado">0</span>
+      </div>
+      <div id="hoje-atrasado-list"></div>
+    </div>
+
+  </div><!-- /sec-hoje -->
+
 </div><!-- /content -->
 
 <!-- ══ BOTTOM NAV ══ -->
 <div id="nav" style="display:none">
-  <button class="nb on" id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
+  <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
+  <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
   <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">✅</span>Tarefas</button>
 </div>
 
@@ -811,6 +934,8 @@ function boot(){
   document.getElementById('content').style.display='block';
   document.getElementById('nav').style.display='flex';
 
+  // Abre na tela Hoje por padrão
+  setSection('hoje');
   renderAll();
   syncAll();
 }
@@ -865,13 +990,15 @@ function syncAll(){
 // ════════════════════════════════════════
 function setSection(s){
   curSection=s;
-  document.getElementById('sec-fin').style.display  = s==='fin'  ? 'block':'none';
-  document.getElementById('sec-task').style.display = s==='task' ? 'block':'none';
-  document.getElementById('bal').style.display      = s==='fin'  ? 'block':'none';
-  document.getElementById('fin-tabs').style.display = s==='fin'  ? 'flex' :'none';
+  document.getElementById('sec-fin').style.display        = s==='fin'  ? 'block':'none';
+  document.getElementById('sec-task').style.display       = s==='task' ? 'block':'none';
+  document.getElementById('sec-hoje').style.display       = s==='hoje' ? 'block':'none';
+  document.getElementById('fin-header-extra').style.display = s==='fin' ? 'block':'none';
   document.getElementById('nb-fin').classList.toggle('on',  s==='fin');
   document.getElementById('nb-task').classList.toggle('on', s==='task');
+  document.getElementById('nb-hoje').classList.toggle('on', s==='hoje');
   if(s==='task') renderTasks();
+  if(s==='hoje') renderHoje();
 }
 
 function ftab(t){
@@ -896,6 +1023,7 @@ function renderAll(){
   if(curFinTab==='cat')    renderCat();
   if(curFinTab==='agenda') renderFinView();
   if(curSection==='task')  renderTasks();
+  if(curSection==='hoje')  renderHoje();
 }
 
 // ════════════════════════════════════════
@@ -1462,6 +1590,103 @@ function taskWkFrom(from){
 // ════════════════════════════════════════
 //  EMPTY HTML
 // ════════════════════════════════════════
+// ════════════════════════════════════════
+//  HOJE — painel matinal
+// ════════════════════════════════════════
+function renderHoje(){
+  var tod = ymd(new Date());
+  var now = new Date(); now.setHours(0,0,0,0);
+
+  // Transações de hoje
+  var todTxs = TXS.filter(function(t){ return ymds(t.date) === tod; });
+  var pgtos  = todTxs.filter(function(t){ return t.type === 'exp'; });
+  var recs   = todTxs.filter(function(t){ return t.type === 'inc'; });
+
+  // Tarefas de hoje (não concluídas)
+  var todTasks = TASKS.filter(function(t){
+    return ymds(t.deadline) === tod && t.status !== 'done';
+  });
+
+  // Atrasados: transações e tarefas de dias anteriores não "concluídas"
+  // Para finanças: gastos futuros com data passada (não marcados como pagos)
+  // Para tarefas: deadline passou e status != done
+  var atrasadoTasks = TASKS.filter(function(t){
+    return t.deadline && ymds(t.deadline) < tod && t.status !== 'done';
+  });
+  // Gastos atrasados = transações com data no passado que foram marcadas com status 'pending'
+  // Como transações não têm status de "pago", usamos só tarefas como atrasadas
+  // (O usuário pode registrar pagamentos como transações normais no dia que pagar)
+
+  // Atualizar cabeçalho
+  var now2 = new Date();
+  var h = now2.getHours();
+  var greeting = h < 12 ? '☀️ Bom dia!' : h < 18 ? '🌤️ Boa tarde!' : '🌙 Boa noite!';
+  var gEl = document.getElementById('hoje-greeting');
+  if(gEl) gEl.textContent = greeting + ' Seu resumo de hoje';
+  document.getElementById('hoje-date-lbl').textContent =
+    now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // Contadores
+  document.getElementById('hc-pgto').textContent = pgtos.length;
+  document.getElementById('hc-task').textContent = todTasks.length;
+  document.getElementById('hc-rec').textContent  = recs.length;
+
+  // Badges
+  document.getElementById('hb-pgto').textContent = pgtos.length;
+  document.getElementById('hb-rec').textContent  = recs.length;
+  document.getElementById('hb-task').textContent = todTasks.length;
+  document.getElementById('hb-atrasado').textContent = atrasadoTasks.length;
+
+  // Mostrar/ocultar seções vazias
+  document.getElementById('hs-pgto').style.display    = pgtos.length    ? 'block':'none';
+  document.getElementById('hs-rec').style.display     = recs.length     ? 'block':'none';
+  document.getElementById('hs-task').style.display    = todTasks.length ? 'block':'none';
+  document.getElementById('hs-atrasado').style.display = atrasadoTasks.length ? 'block':'none';
+
+  // Render pagamentos
+  document.getElementById('hoje-pgto-list').innerHTML = pgtos.length
+    ? pgtos.map(function(t){ return pgtoCard(t); }).join('')
+    : '';
+
+  // Render recebimentos
+  document.getElementById('hoje-rec-list').innerHTML = recs.length
+    ? recs.map(function(t){ return pgtoCard(t); }).join('')
+    : '';
+
+  // Render tarefas de hoje
+  document.getElementById('hoje-task-list').innerHTML = todTasks.length
+    ? todTasks.map(function(t){ return taskCard(t); }).join('')
+    : '';
+
+  // Render atrasados
+  document.getElementById('hoje-atrasado-list').innerHTML = atrasadoTasks.length
+    ? atrasadoTasks.map(function(t){ return taskCard(t); }).join('')
+    : '';
+
+  // Se tudo vazio, mostrar mensagem de parabéns
+  if(!pgtos.length && !recs.length && !todTasks.length && !atrasadoTasks.length){
+    document.getElementById('hs-pgto').style.display = 'block';
+    document.getElementById('hoje-pgto-list').innerHTML =
+      '<div class="hoje-empty"><div class="he-icon">🎉</div><div class="he-txt">Dia livre! Nenhum compromisso hoje.</div></div>';
+  }
+}
+
+function pgtoCard(t){
+  // Card de transação estilo "a pagar/receber hoje"
+  return '<div class="pgto-card">'+
+    '<div class="pgto-icon '+ t.type +'">'+ (t.type==='exp'?'💸':'💰') +'</div>'+
+    '<div class="pgto-info">'+
+      '<div class="pgto-desc">'+ esc(t.desc) +'</div>'+
+      '<div class="pgto-meta"><span class="pgto-cat">'+ esc(t.cat) +'</span></div>'+
+    '</div>'+
+    '<div class="pgto-val '+ t.type +'">'+ (t.type==='exp'?'-':'+') + fmtBRL(parseFloat(t.value)) +'</div>'+
+  '</div>';
+}
+
+function hojePgtoToggle(id){
+  // Futura expansão: marcar pagamento como efetuado
+}
+
 function emptyHTML(icon,title,desc){
   return '<div class="empty">'+(icon?'<div class="ei">'+icon+'</div>':'')+
     (title?'<div class="et">'+title+'</div>':'')+
