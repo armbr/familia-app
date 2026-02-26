@@ -506,6 +506,59 @@ select option{background:#1A2A3A}
 #toast.err{background:var(--red);color:#fff}
 #toast.show{transform:translateX(-50%) translateY(0)}
 
+/* ════════════════════════════════
+   DOCS SECTION
+════════════════════════════════ */
+.docs-add{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r,16px);padding:15px;margin:12px 0 8px;
+}
+.docs-add .coll-hdr{margin-bottom:0}
+.docs-form{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.docs-form .row2{margin-bottom:0}
+
+.doc-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:13px 14px;margin-bottom:7px;
+  display:flex;align-items:center;gap:12px;
+  cursor:pointer;transition:border-color .2s,transform .1s;
+  text-decoration:none;
+}
+.doc-card:active{transform:scale(.98);border-color:var(--green)}
+.doc-ico{
+  width:42px;height:42px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;flex-shrink:0;
+}
+.doc-info{flex:1;min-width:0}
+.doc-name{font-size:14px;font-weight:700;color:var(--t1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px}
+.doc-meta{font-size:11px;color:var(--t3);display:flex;gap:6px;align-items:center}
+.doc-type-tag{
+  font-size:10px;font-weight:700;padding:1px 7px;
+  border-radius:100px;background:var(--bg3);color:var(--t2);
+}
+.doc-actions{display:flex;gap:6px;flex-shrink:0}
+.doc-btn{
+  background:none;border:1px solid var(--border);color:var(--t2);
+  font-size:11px;font-weight:700;padding:5px 9px;border-radius:7px;
+  cursor:pointer;transition:all .2s;font-family:inherit;
+}
+.doc-btn:active{background:var(--bg3)}
+.doc-btn.del{color:var(--red);border-color:transparent}
+
+.docs-group-title{
+  font-size:10px;font-weight:700;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--t3);
+  padding:14px 0 7px;display:flex;align-items:center;justify-content:space-between;
+}
+.docs-empty{
+  text-align:center;padding:40px 16px;
+}
+.docs-empty .de-ico{font-size:40px;margin-bottom:12px}
+.docs-empty .de-title{font-size:15px;font-weight:700;color:var(--t2);margin-bottom:6px}
+.docs-empty .de-sub{font-size:12px;color:var(--t3);line-height:1.6}
+
 /* loader */
 #loader{
   position:fixed;inset:0;background:rgba(15,25,35,.8);
@@ -818,6 +871,47 @@ select option{background:#1A2A3A}
 
   </div><!-- /sec-hoje -->
 
+  <!-- ══ DOCS ══ -->
+  <div id="sec-docs" style="display:none">
+
+    <!-- form adicionar link -->
+    <div class="docs-add">
+      <div class="coll-hdr card-title" onclick="toggleDocsForm()">
+        <span>🔗 Adicionar documento</span>
+        <span class="coll-arrow" id="df-arrow">▾</span>
+      </div>
+      <div class="docs-form" id="df-body">
+        <div><div class="fl">Nome do documento</div>
+          <input id="d-name" type="text" placeholder="Ex: Contrato de Locação..." maxlength="60">
+        </div>
+        <div><div class="fl">Link (URL do Google Drive)</div>
+          <input id="d-url" type="url" placeholder="https://drive.google.com/...">
+        </div>
+        <div class="row2">
+          <div><div class="fl">Tipo</div>
+            <select id="d-type">
+              <option value="sheet">📊 Planilha</option>
+              <option value="doc">📄 Documento</option>
+              <option value="pdf">📕 PDF</option>
+              <option value="slide">📑 Apresentação</option>
+              <option value="form">📋 Formulário</option>
+              <option value="folder">📁 Pasta</option>
+              <option value="link">🔗 Link</option>
+            </select>
+          </div>
+          <div><div class="fl">Grupo (opcional)</div>
+            <input id="d-group" type="text" placeholder="Ex: Imóvel, Empresa..." maxlength="30">
+          </div>
+        </div>
+        <button class="btn" onclick="addDoc()">Salvar Link ✓</button>
+      </div>
+    </div>
+
+    <!-- lista de documentos -->
+    <div id="docs-list"></div>
+
+  </div><!-- /sec-docs -->
+
 </div><!-- /content -->
 
 <!-- ══ BOTTOM NAV ══ -->
@@ -825,6 +919,7 @@ select option{background:#1A2A3A}
   <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
   <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">✅</span>Tarefas</button>
+  <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
 </div>
 
 <!-- ══ TOAST ══ -->
@@ -1051,12 +1146,15 @@ function setSection(s){
   document.getElementById('sec-fin').style.display        = s==='fin'  ? 'block':'none';
   document.getElementById('sec-task').style.display       = s==='task' ? 'block':'none';
   document.getElementById('sec-hoje').style.display       = s==='hoje' ? 'block':'none';
+  document.getElementById('sec-docs').style.display       = s==='docs' ? 'block':'none';
   document.getElementById('fin-header-extra').style.display = s==='fin' ? 'block':'none';
   document.getElementById('nb-fin').classList.toggle('on',  s==='fin');
   document.getElementById('nb-task').classList.toggle('on', s==='task');
   document.getElementById('nb-hoje').classList.toggle('on', s==='hoje');
+  document.getElementById('nb-docs').classList.toggle('on', s==='docs');
   if(s==='task') renderTasks();
   if(s==='hoje') renderHoje();
+  if(s==='docs') renderDocs();
 }
 
 function ftab(t){
@@ -1743,6 +1841,141 @@ function pgtoCard(t){
 
 function hojePgtoToggle(id){
   // Futura expansão: marcar pagamento como efetuado
+}
+
+// ════════════════════════════════════════
+//  DOCS — links para Google Drive
+// ════════════════════════════════════════
+var DOCS = JSON.parse(localStorage.getItem('ff_docs') || '[]');
+var dfOpen = true;
+
+var DOC_ICONS = {
+  sheet:  {ico:'📊', bg:'rgba(52,168,83,.15)',  label:'Planilha'},
+  doc:    {ico:'📄', bg:'rgba(66,133,244,.15)', label:'Documento'},
+  pdf:    {ico:'📕', bg:'rgba(234,67,53,.15)',  label:'PDF'},
+  slide:  {ico:'📑', bg:'rgba(251,188,4,.15)',  label:'Apresentação'},
+  form:   {ico:'📋', bg:'rgba(103,58,183,.15)', label:'Formulário'},
+  folder: {ico:'📁', bg:'rgba(255,160,0,.15)',  label:'Pasta'},
+  link:   {ico:'🔗', bg:'rgba(143,168,196,.15)',label:'Link'},
+};
+
+function toggleDocsForm(){
+  dfOpen=!dfOpen;
+  document.getElementById('df-body').style.display = dfOpen?'flex':'none';
+  document.getElementById('df-arrow').style.transform = dfOpen?'':'rotate(-90deg)';
+}
+
+function addDoc(){
+  var name  = document.getElementById('d-name').value.trim();
+  var url   = document.getElementById('d-url').value.trim();
+  var type  = document.getElementById('d-type').value;
+  var group = document.getElementById('d-group').value.trim() || 'Geral';
+
+  if(!name){ toast('⚠️ Informe o nome','err'); return; }
+  if(!url || url.indexOf('http')===-1){ toast('⚠️ Cole um link válido','err'); return; }
+
+  var doc = { id: Date.now(), name:name, url:url, type:type, group:group };
+  DOCS.unshift(doc);
+  localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+
+  document.getElementById('d-name').value  = '';
+  document.getElementById('d-url').value   = '';
+  document.getElementById('d-group').value = '';
+
+  toast('✅ Documento salvo!');
+  renderDocs();
+  toggleDocsForm(); // fechar form após salvar
+}
+
+function delDoc(id){
+  DOCS = DOCS.filter(function(d){ return String(d.id)!==String(id); });
+  localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+  renderDocs();
+  toast('🗑️ Removido');
+}
+
+function openDoc(url){
+  window.open(url, '_blank');
+}
+
+function shareDoc(url, name){
+  if(navigator.share){
+    navigator.share({ title: name, url: url })
+      .catch(function(){});
+  } else {
+    // Fallback: copiar para clipboard
+    navigator.clipboard && navigator.clipboard.writeText(url)
+      .then(function(){ toast('📋 Link copiado!'); })
+      .catch(function(){ toast('📋 ' + url.substring(0,40)+'...'); });
+  }
+}
+
+function renderDocs(){
+  var el = document.getElementById('docs-list');
+  if(!DOCS.length){
+    el.innerHTML = '<div class="docs-empty">'+
+      '<div class="de-ico">📁</div>'+
+      '<div class="de-title">Nenhum documento salvo</div>'+
+      '<div class="de-sub">Adicione links de planilhas, documentos<br>e pastas do Google Drive para acesso rápido.</div>'+
+      '</div>';
+    return;
+  }
+
+  // Agrupar por grupo
+  var groups = {};
+  DOCS.forEach(function(d){
+    var g = d.group || 'Geral';
+    if(!groups[g]) groups[g] = [];
+    groups[g].push(d);
+  });
+
+  var html = '';
+  Object.keys(groups).sort().forEach(function(g){
+    html += '<div class="docs-group-title">'+
+      '<span>'+esc(g)+'</span>'+
+      '<span style="background:var(--bg3);color:var(--t2);font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px">'+groups[g].length+'</span>'+
+      '</div>';
+
+    groups[g].forEach(function(d){
+      var meta = DOC_ICONS[d.type] || DOC_ICONS.link;
+      var safeId = String(d.id);
+      html += '<div class="doc-card" data-url="'+esc(d.url)+'" data-id="'+safeId+'">'+
+        '<div class="doc-ico" style="background:'+meta.bg+'">'+meta.ico+'</div>'+
+        '<div class="doc-info">'+
+          '<div class="doc-name">'+esc(d.name)+'</div>'+
+          '<div class="doc-meta">'+
+            '<span class="doc-type-tag">'+meta.label+'</span>'+
+            '<span>'+esc(d.group)+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<div class="doc-actions">'+
+          '<button class="doc-btn doc-share" data-url="'+esc(d.url)+'" data-name="'+esc(d.name)+'">Compartilhar</button>'+
+          '<button class="doc-btn del doc-del" data-id="'+safeId+'">🗑️</button>'+
+        '</div>'+
+      '</div>';
+    });
+  });
+
+  el.innerHTML = html;
+
+  // Event delegation — evita conflito de aspas no onclick inline
+  el.querySelectorAll('.doc-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      openDoc(card.getAttribute('data-url'));
+    });
+  });
+  el.querySelectorAll('.doc-share').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      shareDoc(btn.getAttribute('data-url'), btn.getAttribute('data-name'));
+    });
+  });
+  el.querySelectorAll('.doc-del').forEach(function(btn){
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      delDoc(btn.getAttribute('data-id'));
+    });
+  });
 }
 
 function emptyHTML(icon,title,desc){
