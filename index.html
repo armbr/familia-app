@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Família App</title>
+<title>Fluxo App</title>
 <style>
 /* ── RESET & BASE ── */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -672,6 +672,12 @@ select option{background:#1A2A3A}
 .docs-empty .de-title{font-size:15px;font-weight:700;color:var(--t2);margin-bottom:6px}
 .docs-empty .de-sub{font-size:12px;color:var(--t3);line-height:1.6}
 
+.task-comprov-link{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:11px;font-weight:700;color:var(--green);
+  text-decoration:none;padding:3px 8px;
+  background:var(--green2);border-radius:6px;
+}
 /* loader */
 #loader{
   position:fixed;inset:0;background:rgba(15,25,35,.8);
@@ -689,7 +695,7 @@ select option{background:#1A2A3A}
 
 <!-- ══ SETUP ══ -->
 <div id="setup">
-  <div class="ico">🏠</div>
+  <div class="ico">⚡</div>
   <h2>Configurar o App</h2>
   <p>Cole a URL do seu Google Apps Script.<br>Você só precisa fazer isso uma vez.</p>
   <input id="su-url" type="url" placeholder="https://script.google.com/macros/s/...">
@@ -710,7 +716,7 @@ select option{background:#1A2A3A}
 <!-- ══ HEADER ══ -->
 <div id="hdr" style="display:none">
   <div id="hdr-top">
-    <div class="logo" onclick="if(confirm('Trocar URL do servidor?'))resetSetup();" style="cursor:pointer">🏠 Família</div>
+    <div class="logo" onclick="if(confirm('Trocar URL do servidor?'))resetSetup();" style="cursor:pointer">⚡ Fluxo</div>
     <div class="right">
       <span id="offline-badge">● offline</span>
       <button id="sync-btn" onclick="syncAll()">↻ Sync</button>
@@ -1078,6 +1084,30 @@ select option{background:#1A2A3A}
   </div><!-- /sec-docs -->
 
 </div><!-- /content -->
+
+<!-- ══ MODAL COMPROVANTE TAREFA ══ -->
+<div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;display:none;align-items:flex-end;justify-content:center">
+  <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto">
+    <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:4px">✅ Marcar como concluída</div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:16px">Deseja anexar o comprovante de pagamento?</div>
+
+    <input type="file" id="task-comprov-file" accept="image/*,application/pdf" capture="environment" style="display:none">
+    <div id="task-comprov-area" style="border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;cursor:pointer;margin-bottom:12px" onclick="document.getElementById('task-comprov-file').click()">
+      <div style="font-size:28px;margin-bottom:6px">📎</div>
+      <div style="font-size:13px;font-weight:600;color:var(--t2)">Foto ou PDF do comprovante</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:3px">opcional — pode pular</div>
+    </div>
+    <div id="task-comprov-preview" style="display:none;background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--t2)"></div>
+    <div id="task-comprov-progress" style="display:none;background:var(--bg3);border-radius:100px;height:4px;margin-bottom:12px;overflow:hidden">
+      <div id="task-comprov-bar" style="height:100%;background:var(--green);width:0%;transition:width .3s"></div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button onclick="closeComprovModal()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Pular</button>
+      <button id="task-comprov-send" onclick="sendTaskComprov()" style="flex:2;padding:12px;border-radius:10px;border:none;background:var(--green);color:#0A1A12;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Concluir ✓</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══ BOTTOM NAV ══ -->
 <div id="nav" style="display:none">
@@ -1929,6 +1959,95 @@ function toggleTask(id){
   });
 }
 
+var comprovModalTaskId = null;
+var taskComprovFile = null;
+
+function openComprovModal(id){
+  comprovModalTaskId = id;
+  taskComprovFile = null;
+  document.getElementById('task-comprov-preview').style.display='none';
+  document.getElementById('task-comprov-bar').style.width='0%';
+  document.getElementById('task-comprov-progress').style.display='none';
+  var modal = document.getElementById('comprov-modal');
+  modal.style.display = 'flex';
+
+  // bind file input
+  var inp = document.getElementById('task-comprov-file');
+  inp.value = '';
+  inp.onchange = function(){
+    taskComprovFile = inp.files[0];
+    if(!taskComprovFile) return;
+    var prev = document.getElementById('task-comprov-preview');
+    prev.style.display='block';
+    prev.textContent = (taskComprovFile.type.indexOf('pdf')!==-1?'📕':'🖼️')+' '+taskComprovFile.name+' ('+(taskComprovFile.size/1024).toFixed(1)+' KB)';
+  };
+}
+
+function closeComprovModal(){
+  // Fechar sem comprovante — só marcar como done
+  var id = comprovModalTaskId;
+  document.getElementById('comprov-modal').style.display='none';
+  if(id) chgTaskStatus(id, 'done');
+  comprovModalTaskId = null;
+}
+
+function sendTaskComprov(){
+  var id = comprovModalTaskId;
+  if(!id) return;
+  var btn = document.getElementById('task-comprov-send');
+  btn.disabled = true;
+
+  function finalize(url){
+    document.getElementById('comprov-modal').style.display='none';
+    var t = TASKS.find(function(x){ return String(x.id)===String(id); });
+    if(t && url) t.comprovUrl = url;
+    chgTaskStatus(id, 'done');
+    if(url){
+      // salvar comprovante também nos Docs
+      var t2 = TASKS.find(function(x){ return String(x.id)===String(id); });
+      var nome = (t2 ? t2.desc : 'Comprovante') + ' — ' + ymd(new Date());
+      var docEntry = {name:nome, url:url, type:'img', pasta:'Financeiro', subpasta:'Comprovantes'};
+      var tmp2 = Date.now();
+      DOCS.unshift(Object.assign({id:tmp2}, docEntry));
+      localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+      apiCall('addDoc', docEntry, function(){});
+      // salvar url na tarefa no servidor
+      apiCall('updateTask', {id:id, status:'done', comprovUrl:url}, function(){});
+      toast('✅ Concluída + comprovante salvo!');
+    } else {
+      toast('✅ Tarefa concluída!');
+    }
+    btn.disabled = false;
+    comprovModalTaskId = null;
+  }
+
+  if(!taskComprovFile){
+    finalize(null);
+    return;
+  }
+
+  // upload
+  var prog = document.getElementById('task-comprov-progress');
+  var bar  = document.getElementById('task-comprov-bar');
+  prog.style.display='block'; bar.style.width='30%';
+
+  var t3 = TASKS.find(function(x){ return String(x.id)===String(id); });
+  var fname = ymd(new Date()).replace(/-/g,'')+'_'+(t3?t3.desc:'comprovante').replace(/[^a-zA-Z0-9À-ú ]/g,'').substring(0,30).trim();
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    bar.style.width='60%';
+    var b64 = e.target.result.split(',')[1];
+    apiCall('uploadComprovante',{name:fname, mimeType:taskComprovFile.type||'application/octet-stream', data:b64}, function(err,d){
+      bar.style.width='100%';
+      setTimeout(function(){ prog.style.display='none'; },400);
+      if(err||!d||!d.ok){ toast('❌ Erro no upload — tarefa marcada sem comprovante','err'); finalize(null); return; }
+      finalize(d.url);
+    });
+  };
+  reader.readAsDataURL(taskComprovFile);
+}
+
 function chgTaskStatus(id,s){
   var t=TASKS.find(function(x){return String(x.id)===String(id);});
   if(!t)return; var old=t.status; t.status=s; renderTasks();
@@ -1961,6 +2080,27 @@ function renderTasks(){
   if(curTaskView==='week')  renderTW();
   if(curTaskView==='month') renderTM();
   if(curTaskView==='plan')  renderTP();
+  bindTaskEvents();
+}
+
+function bindTaskEvents(){
+  document.querySelectorAll('[data-chk]').forEach(function(el){
+    el.onclick = function(){ toggleTask(el.getAttribute('data-chk')); };
+  });
+  document.querySelectorAll('[data-del]').forEach(function(el){
+    el.onclick = function(){ delTask(el.getAttribute('data-del')); };
+  });
+  document.querySelectorAll('[data-status]').forEach(function(sel){
+    sel.onchange = function(){
+      var id = sel.getAttribute('data-status');
+      var s  = sel.value;
+      if(s === 'done'){
+        openComprovModal(id);
+      } else {
+        chgTaskStatus(id, s);
+      }
+    };
+  });
 }
 
 function taskCard(t,wrap){
@@ -1972,20 +2112,23 @@ function taskCard(t,wrap){
   var tod=ymd(new Date());
   var ov=t.deadline&&ymds(t.deadline)<tod&&!done;
   var dead=t.deadline?'<span class="'+(ov?'ov':'')+'">📅 '+fmtDate(t.deadline)+(ov?' ⚠️':'')+'</span>':'';
-  var html='<div class="taski'+(wrap?' '+wrap:'')+'">'+
+  var comprovHTML=t.comprovUrl
+    ?'<a href="'+esc(t.comprovUrl)+'" target="_blank" class="task-comprov-link">📎 Ver comprovante</a>':'';
+  var sid=String(t.id);
+  var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
     '<div class="taski-hdr">'+
-    '<div class="chk'+(done?' done':'')+'" onclick="toggleTask(\''+t.id+'\')">'+(done?'✓':'')+'</div>'+
+    '<div class="chk'+(done?' done':'')+'" data-chk="'+sid+'">'+(done?'✓':'')+'</div>'+
     '<div class="tname'+(done?' done':'')+'">'+esc(t.desc)+'</div>'+
-    '<button class="tdel2" onclick="delTask(\''+t.id+'\')">🗑️</button>'+
+    '<button class="tdel2" data-del="'+sid+'">🗑️</button>'+
     '</div>'+
     '<div class="tags">'+stag+ttag+'</div>'+
     '<div class="tmeta">'+dead+
     (t.value?'<span>💰 '+fmtBRL(parseFloat(t.value))+'</span>':'')+
-    (!done?'<select class="ssel" onchange="chgTaskStatus(\''+t.id+'\',this.value)">'+
+    (!done?'<select class="ssel" data-status="'+sid+'">'+
       '<option value="pend"'+(t.status==='pend'?' selected':'')+'>⏳ Pendente</option>'+
       '<option value="prog"'+(t.status==='prog'?' selected':'')+'>🔄 Em andamento</option>'+
-      '<option value="done">✅ Concluído</option>'+
-      '</select>':'')+
+      '<option value="done">✅ Concluído + comprovante</option>'+
+      '</select>':comprovHTML)+
     '</div></div>';
   return html;
 }
