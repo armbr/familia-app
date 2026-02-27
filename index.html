@@ -1200,7 +1200,11 @@ function setSection(s){
   document.getElementById('nb-docs').classList.toggle('on', s==='docs');
   if(s==='task') renderTasks();
   if(s==='hoje') renderHoje();
-  if(s==='docs') renderDocs();
+  if(s==='docs'){
+    renderDocs();
+    // Sync silencioso ao abrir aba docs para garantir dados atualizados
+    if(online) syncDocs();
+  }
 }
 
 function ftab(t){
@@ -1226,7 +1230,7 @@ function renderAll(){
   if(curFinTab==='agenda') renderFinView();
   if(curSection==='task')  renderTasks();
   if(curSection==='hoje')  renderHoje();
-  if(curSection==='docs')  renderDocs();
+  renderDocs(); // sempre atualiza, independente da aba visível
 }
 
 // ════════════════════════════════════════
@@ -1999,6 +2003,25 @@ function shareDoc(url, name){
       .then(function(){ toast('📋 Link copiado!'); })
       .catch(function(){ toast('📋 ' + url.substring(0,40)+'...'); });
   }
+}
+
+function syncDocs(){
+  apiCall('getDocs', null, function(err, d){
+    if(!err && d.ok){
+      DOCS = d.data.map(function(x){
+        return {
+          id:       String(x.id       || Date.now()),
+          name:     String(x.name     || ''),
+          url:      String(x.url      || ''),
+          type:     String(x.type     || 'doc'),
+          pasta:    String(x.pasta    || x.group || 'Outros'),
+          subpasta: String(x.subpasta || '')
+        };
+      });
+      localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+      renderDocs();
+    }
+  });
 }
 
 function renderDocs(){
