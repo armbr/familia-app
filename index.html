@@ -1109,25 +1109,48 @@ window.addEventListener('offline', function(){ online=false; document.getElement
 //  API
 // ════════════════════════════════════════
 function apiCall(action, body, cb){
-  // Google Apps Script CORS: always use GET with params to avoid preflight
   var url = API + '?action=' + action;
   if(body){
     url += '&payload=' + encodeURIComponent(JSON.stringify(body));
   }
-  fetch(url, {method:'GET'})
-    .then(function(r){
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.text();
-    })
-    .then(function(txt){
+
+  // Google Apps Script faz redirect para script.googleusercontent.com
+  // Precisamos seguir o redirect explicitamente
+  fetch(url, {
+    method: 'GET',
+    redirect: 'follow',
+    headers: { 'Accept': 'application/json, text/plain, */*' }
+  })
+  .then(function(r){ return r.text(); })
+  .then(function(txt){
+    // GAS às vezes retorna HTML de login quando sessão expira
+    if(txt.indexOf('<html') !== -1 || txt.indexOf('<!DOCTYPE') !== -1){
+      throw new Error('Servidor retornou HTML — verifique se o Apps Script está publicado como "Qualquer pessoa"');
+    }
+    try{
+      var d = JSON.parse(txt);
+      cb(null, d);
+    } catch(e){
+      cb(new Error('JSON inválido: ' + txt.substring(0,120)));
+    }
+  })
+  .catch(function(e){
+    // Fallback: tentar com XMLHttpRequest (mais compatível em alguns celulares)
+    dbg && dbg('fetch falhou, tentando XHR: ' + e.message);
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
+    xhr.onload = function(){
       try{
-        var d = JSON.parse(txt);
+        var d = JSON.parse(xhr.responseText);
         cb(null, d);
-      } catch(e){
-        cb(new Error('Resposta inválida: '+txt.substring(0,100)));
+      } catch(ex){
+        cb(new Error('XHR JSON inválido: ' + xhr.responseText.substring(0,120)));
       }
-    })
-    .catch(function(e){ cb(e); });
+    };
+    xhr.onerror = function(){ cb(new Error('XHR também falhou — sem conexão ou URL incorreta')); };
+    xhr.send();
+  });
 }
 
 function syncAll(){
