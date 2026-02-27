@@ -937,6 +937,10 @@ select option{background:#1A2A3A}
       </div>
     </div>
 
+    <!-- DEBUG — remover após resolver -->
+    <div id="debug-box" style="display:none;background:#1a1a2e;border:1px solid #ff6b6b;border-radius:10px;padding:12px;margin:8px 0;font-size:11px;font-family:monospace;color:#ff9999;word-break:break-all;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
+    <button onclick="runDocTest()" style="width:100%;margin-bottom:8px;padding:10px;background:#162030;border:1px dashed #526680;border-radius:10px;color:#8FA8C4;font-size:12px;cursor:pointer">🔍 Testar conexão com servidor</button>
+
     <!-- lista de documentos -->
     <div id="docs-list"></div>
 
@@ -2115,6 +2119,56 @@ function renderDocs(){
       e.stopPropagation();
       delDoc(btn.getAttribute('data-id'));
     });
+  });
+}
+
+function dbg(msg){
+  var box = document.getElementById('debug-box');
+  if(!box) return;
+  box.style.display = 'block';
+  box.textContent += new Date().toLocaleTimeString('pt-BR') + ' — ' + msg + '\n';
+  box.scrollTop = box.scrollHeight;
+}
+
+function runDocTest(){
+  var box = document.getElementById('debug-box');
+  if(box){ box.textContent=''; box.style.display='block'; }
+
+  dbg('API URL: ' + (API ? API.substring(0,60)+'...' : 'NÃO DEFINIDA'));
+  dbg('Online: ' + online);
+  dbg('DOCS em memória: ' + DOCS.length);
+  dbg('DOCS no localStorage: ' + (localStorage.getItem('ff_docs')||'[]').substring(0,80));
+  dbg('Chamando getDocs...');
+
+  apiCall('getDocs', null, function(err, d){
+    if(err){
+      dbg('ERRO: ' + (err.message || String(err)));
+    } else {
+      dbg('Resposta ok: ' + JSON.stringify(d).substring(0,200));
+      if(d && d.ok){
+        dbg('Total docs no servidor: ' + (d.data ? d.data.length : 0));
+        if(d.data && d.data.length){
+          dbg('Primeiro doc: ' + JSON.stringify(d.data[0]).substring(0,150));
+        }
+      } else {
+        dbg('Resposta sem ok=true: ' + JSON.stringify(d));
+      }
+    }
+  });
+
+  dbg('Testando addDoc...');
+  apiCall('addDoc', {name:'__teste__',url:'https://test.com',type:'doc',pasta:'Outros',subpasta:''}, function(err, d){
+    if(err){
+      dbg('addDoc ERRO: ' + (err.message || String(err)));
+    } else {
+      dbg('addDoc resposta: ' + JSON.stringify(d));
+      if(d && d.ok && d.id){
+        dbg('Limpando doc de teste id=' + d.id);
+        apiCall('deleteDoc', {id: d.id}, function(e2, d2){
+          dbg('deleteDoc: ' + (e2 ? 'ERRO: '+e2.message : JSON.stringify(d2)));
+        });
+      }
+    }
   });
 }
 
