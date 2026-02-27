@@ -359,13 +359,14 @@ select option{background:#1A2A3A}
 }
 .taski-hdr{display:flex;align-items:flex-start;gap:9px;margin-bottom:8px}
 .chk{
-  width:20px;height:20px;border-radius:6px;
-  border:2px solid var(--border);flex-shrink:0;
+  width:28px;height:28px;border-radius:8px;
+  border:2.5px solid var(--t3);flex-shrink:0;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
-  transition:all .2s;background:transparent;font-size:11px;font-weight:800;color:#0A1A12;
+  transition:all .2s;background:transparent;font-size:14px;font-weight:900;color:#0A1A12;
   margin-top:1px;
 }
-.chk.done{background:var(--green);border-color:var(--green)}
+.chk:active{transform:scale(.9)}
+.chk.done{background:var(--green);border-color:var(--green);box-shadow:0 0 0 3px var(--green2)}
 .tname{font-size:14px;font-weight:600;flex:1;line-height:1.4}
 .tname.done{text-decoration:line-through;color:var(--t3)}
 .tdel2{background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px 4px;border-radius:6px;flex-shrink:0}
@@ -893,20 +894,20 @@ select option{background:#1A2A3A}
     <!-- form -->
     <div class="card" style="margin-top:12px">
       <div class="coll-hdr card-title" onclick="toggleTF()">
-        <span>📌 Nova Tarefa</span>
+        <span>📌 Novo Compromisso</span>
         <span class="coll-arrow" id="tf-arrow">▾</span>
       </div>
       <div class="coll-body" id="tf-body">
-        <div style="margin-bottom:8px"><div class="fl">Descrição</div><input id="t-desc" type="text" placeholder="Ex: Certidão no cartório..." maxlength="80"></div>
+        <div style="margin-bottom:8px"><div class="fl">Descrição</div><input id="t-desc" type="text" placeholder="Ex: Pagar aluguel, Dentista..." maxlength="80"></div>
         <div class="row2">
           <div><div class="fl">Tipo</div><select id="t-type"><option value="pers">👤 Pessoal</option><option value="work">💼 Profissional</option></select></div>
-          <div><div class="fl">Prazo</div><input id="t-dead" type="date"></div>
+          <div><div class="fl">Data / Prazo</div><input id="t-dead" type="date"></div>
         </div>
-        <div class="row2">
-          <div><div class="fl">Valor (opcional)</div><div class="r-wrap"><input id="t-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
-          <div><div class="fl">Status</div><select id="t-status"><option value="pend">⏳ Pendente</option><option value="prog">🔄 Em andamento</option></select></div>
+        <div style="margin-bottom:8px">
+          <div class="fl">Valor <span style="color:var(--t3);font-weight:400">(se for pagamento)</span></div>
+          <div class="r-wrap"><input id="t-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
         </div>
-        <button class="btn" id="btn-add-task" onclick="addTask()">Criar Tarefa ✓</button>
+        <button class="btn" id="btn-add-task" onclick="addTask()">Adicionar ✓</button>
       </div>
     </div>
 
@@ -980,7 +981,7 @@ select option{background:#1A2A3A}
         </div>
         <div class="hoje-counter">
           <div class="hc-num warn" id="hc-task">0</div>
-          <div class="hc-lbl" style="color:#FFD166">Tarefas</div>
+          <div class="hc-lbl" style="color:#FFD166">Agenda</div>
         </div>
         <div class="hoje-counter">
           <div class="hc-num ok" id="hc-rec">0</div>
@@ -1010,7 +1011,7 @@ select option{background:#1A2A3A}
     <!-- tarefas do dia -->
     <div class="hoje-section" id="hs-task">
       <div class="hoje-section-title">
-        ✅ Tarefas de hoje
+        📅 Agenda de hoje
         <span class="hst-badge" id="hb-task">0</span>
       </div>
       <div id="hoje-task-list"></div>
@@ -1113,7 +1114,7 @@ select option{background:#1A2A3A}
 <div id="nav" style="display:none">
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
   <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
-  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">✅</span>Tarefas</button>
+  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Agenda</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
 </div>
 
@@ -1933,30 +1934,42 @@ function addTask(){
   var type=document.getElementById('t-type').value;
   var dead=document.getElementById('t-dead').value;
   var val =parseFloat(document.getElementById('t-val').value)||null;
-  var stat=document.getElementById('t-status').value;
   if(!desc){toast('⚠️ Informe a descrição','err');return;}
   var btn=document.getElementById('btn-add-task'); btn.disabled=true;
-  var task={desc:desc,type:type,deadline:dead,value:val,status:stat};
+  var task={desc:desc,type:type,deadline:dead,value:val,status:'pend'};
   var tmp=Date.now(); TASKS.unshift(Object.assign({id:tmp},task)); renderTasks();
   apiCall('addTask',task,function(err){
     if(err){TASKS=TASKS.filter(function(t){return t.id!==tmp;});renderTasks();toast('❌ Erro ao criar','err');}
-    else{syncAll();toast('📌 Tarefa criada!');}
+    else{syncAll();toast('📌 Compromisso criado!');}
     btn.disabled=false;
   });
   document.getElementById('t-desc').value='';
   document.getElementById('t-val').value='';
-  document.getElementById('t-status').value='pend';
 }
 
 function toggleTask(id){
   var t=TASKS.find(function(x){return String(x.id)===String(id);});
   if(!t)return;
-  var ns=t.status==='done'?'pend':'done';
-  t.status=ns; renderTasks();
-  apiCall('updateTask',{id:id,status:ns},function(err){
-    if(err){t.status=ns==='done'?'pend':'done';renderTasks();toast('❌ Erro','err');}
-    else toast(ns==='done'?'✅ Concluída!':'🔄 Reaberta');
-  });
+  // Reabrir: volta para pendente
+  if(t.status==='done'){
+    t.status='pend'; renderTasks();
+    apiCall('updateTask',{id:id,status:'pend'},function(err){
+      if(err){t.status='done';renderTasks();toast('❌ Erro','err');}
+      else toast('🔄 Reaberto');
+    });
+    return;
+  }
+  // Concluir: se tem valor → abre modal de comprovante
+  if(t.value && parseFloat(t.value)>0){
+    openComprovModal(id);
+  } else {
+    // Sem valor: conclui direto
+    t.status='done'; renderTasks();
+    apiCall('updateTask',{id:id,status:'done'},function(err){
+      if(err){t.status='pend';renderTasks();toast('❌ Erro','err');}
+      else toast('✅ Concluído!');
+    });
+  }
 }
 
 var comprovModalTaskId = null;
@@ -2000,22 +2013,45 @@ function sendTaskComprov(){
   function finalize(url){
     document.getElementById('comprov-modal').style.display='none';
     var t = TASKS.find(function(x){ return String(x.id)===String(id); });
-    if(t && url) t.comprovUrl = url;
-    chgTaskStatus(id, 'done');
+    if(!t){ btn.disabled=false; return; }
+    if(url) t.comprovUrl = url;
+    t.status = 'done';
+    renderTasks();
+
+    // Salvar status + comprovUrl no servidor
+    apiCall('updateTask', {id:id, status:'done', comprovUrl:url||''}, function(){});
+
+    // Se tem valor → lançar automaticamente em Finanças
+    if(t.value && parseFloat(t.value)>0){
+      var tx = {
+        type:  'exp',
+        desc:  t.desc,
+        value: parseFloat(t.value),
+        cat:   t.type==='work'?'💼 Empresa/Negócio':'📦 Outros',
+        date:  ymd(new Date()),
+        fromAgenda: true
+      };
+      var tmpTx = Date.now();
+      TXS.unshift(Object.assign({id:tmpTx}, tx));
+      localStorage.setItem('ff_txs', JSON.stringify(TXS));
+      apiCall('addTransaction', tx, function(err){
+        if(err) TXS = TXS.filter(function(x){ return x.id!==tmpTx; });
+        else localStorage.setItem('ff_txs', JSON.stringify(TXS));
+        renderAll();
+      });
+    }
+
+    // Salvar comprovante nos Docs se houver URL
     if(url){
-      // salvar comprovante também nos Docs
-      var t2 = TASKS.find(function(x){ return String(x.id)===String(id); });
-      var nome = (t2 ? t2.desc : 'Comprovante') + ' — ' + ymd(new Date());
+      var nome = t.desc + ' — ' + ymd(new Date());
       var docEntry = {name:nome, url:url, type:'img', pasta:'Financeiro', subpasta:'Comprovantes'};
       var tmp2 = Date.now();
       DOCS.unshift(Object.assign({id:tmp2}, docEntry));
       localStorage.setItem('ff_docs', JSON.stringify(DOCS));
       apiCall('addDoc', docEntry, function(){});
-      // salvar url na tarefa no servidor
-      apiCall('updateTask', {id:id, status:'done', comprovUrl:url}, function(){});
-      toast('✅ Concluída + comprovante salvo!');
+      toast('✅ Concluído + comprovante + lançado em Finanças!');
     } else {
-      toast('✅ Tarefa concluída!');
+      toast(t.value && parseFloat(t.value)>0 ? '✅ Concluído + lançado em Finanças!' : '✅ Concluído!');
     }
     btn.disabled = false;
     comprovModalTaskId = null;
@@ -2061,7 +2097,7 @@ function delTask(id){
   TASKS=TASKS.filter(function(t){return String(t.id)!==String(id);}); renderTasks();
   apiCall('deleteTask',{id:id},function(err){
     if(err){TASKS=bk;renderTasks();toast('❌ Erro','err');}
-    else toast('🗑️ Removida');
+    else toast('🗑️ Removido');
   });
 }
 
@@ -2090,24 +2126,12 @@ function bindTaskEvents(){
   document.querySelectorAll('[data-del]').forEach(function(el){
     el.onclick = function(){ delTask(el.getAttribute('data-del')); };
   });
-  document.querySelectorAll('[data-status]').forEach(function(sel){
-    sel.onchange = function(){
-      var id = sel.getAttribute('data-status');
-      var s  = sel.value;
-      if(s === 'done'){
-        openComprovModal(id);
-      } else {
-        chgTaskStatus(id, s);
-      }
-    };
-  });
+  // status alterado só pelo toggleTask via data-chk
 }
 
 function taskCard(t,wrap){
   var done=t.status==='done';
-  var stag=done?'<span class="tag done">✅ Concluído</span>'
-    :t.status==='prog'?'<span class="tag prog">🔄 Em andamento</span>'
-    :'<span class="tag pend">⏳ Pendente</span>';
+  // status só como classe visual no chk, não como tag extra
   var ttag=t.type==='work'?'<span class="tag work">💼 Profissional</span>':'<span class="tag pers">👤 Pessoal</span>';
   var tod=ymd(new Date());
   var ov=t.deadline&&ymds(t.deadline)<tod&&!done;
@@ -2121,7 +2145,7 @@ function taskCard(t,wrap){
     '<div class="tname'+(done?' done':'')+'">'+esc(t.desc)+'</div>'+
     '<button class="tdel2" data-del="'+sid+'">🗑️</button>'+
     '</div>'+
-    '<div class="tags">'+stag+ttag+'</div>'+
+    '<div class="tags">'+ttag+'</div>'+
     '<div class="tmeta">'+dead+
     (t.value?'<span>💰 '+fmtBRL(parseFloat(t.value))+'</span>':'')+
     (!done?'<select class="ssel" data-status="'+sid+'">'+
@@ -2147,7 +2171,7 @@ function renderTL(){
   if(tdy.length)  h+='<div class="glbl g-today">☀️ Hoje <span class="gbadge">'+tdy.length+'</span></div>'+tdy.map(function(t){return taskCard(t);}).join('');
   if(soon.length) h+='<div class="glbl g-soon">📅 Próximas <span class="gbadge">'+soon.length+'</span></div>'+soon.map(function(t){return taskCard(t);}).join('');
   if(nd.length)   h+='<div class="glbl">📌 Sem prazo <span class="gbadge">'+nd.length+'</span></div>'+nd.map(function(t){return taskCard(t);}).join('');
-  if(!open.length)h=emptyHTML('🎉','Tudo em dia!','Nenhuma tarefa em aberto');
+  if(!open.length)h=emptyHTML('🎉','Tudo em dia!','Nenhum compromisso em aberto');
   document.getElementById('task-open').innerHTML=h;
   document.getElementById('task-done').innerHTML=done.length
     ?done.slice(0,10).map(function(t){return taskCard(t);}).join('')
@@ -2164,7 +2188,7 @@ function renderTD(){
   var tasks=TASKS.filter(function(t){return ymds(t.deadline)===d;});
   document.getElementById('td-list').innerHTML=tasks.length
     ?tasks.map(function(t){return taskCard(t);}).join('')
-    :emptyHTML('✨','Nenhuma tarefa neste dia','Crie uma tarefa com prazo em '+fmtDate(d));
+    :emptyHTML('✨','Nenhum compromisso neste dia','Crie uma tarefa com prazo em '+fmtDate(d));
 }
 function shiftTD(n){ tdDate.setDate(tdDate.getDate()+n); renderTD(); }
 
@@ -2195,7 +2219,7 @@ function renderTW(){
     var isT=dy===tod;
     h+='<div class="glbl'+(isT?' g-today':'')+'">'+( isT?'☀️ ':'')+lbl+' <span class="gbadge">'+dt.length+'</span></div>'+dt.map(function(t){return taskCard(t);}).join('');
   });
-  if(!total) h=emptyHTML('📅','Semana livre!','Nenhuma tarefa com prazo nesta semana');
+  if(!total) h=emptyHTML('📅','Semana livre!','Nenhum compromisso nesta semana');
   document.getElementById('tw-list').innerHTML=h;
 }
 function shiftTW(n){ twStart.setDate(twStart.getDate()+n*7); renderTW(); }
@@ -2242,7 +2266,7 @@ function renderTM(){
       h+='<div class="glbl g-soon">Semana '+e[0]+' <span class="gbadge">'+e[1].length+'</span></div>'+e[1].map(function(t){return taskCard(t);}).join('');
     });
   } else {
-    h=emptyHTML('📆','Nenhuma tarefa neste mês','');
+    h=emptyHTML('📆','Nenhum compromisso neste mês','');
   }
   document.getElementById('tm-list').innerHTML=h;
 }
@@ -2325,7 +2349,7 @@ function renderTP(){
   }
 
   document.getElementById('tp-body').innerHTML = html ||
-    emptyHTML('🔮','Sem tarefas planejadas','Crie tarefas com prazo para ver o planejamento');
+    emptyHTML('🔮','Sem compromissos planejados','Adicione compromissos com prazo para ver o planejamento');
 }
 
 function taskWkFrom(from){
