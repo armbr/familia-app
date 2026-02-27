@@ -376,8 +376,9 @@ select option{background:#1A2A3A}
 .tag.pend{background:var(--yellow2);color:var(--yellow)}
 .tag.prog{background:var(--blue2);color:var(--blue)}
 .tag.done{background:var(--green2);color:var(--green)}
-.tag.pers{background:rgba(180,130,255,.12);color:#B482FF}
-.tag.work{background:var(--blue2);color:var(--blue)}
+.tag.texp{background:rgba(255,107,107,.13);color:var(--red)}
+.tag.tinc{background:rgba(46,204,154,.13);color:var(--green)}
+.tag.ttask{background:rgba(100,160,255,.13);color:#64A0FF}
 .tmeta{font-size:11px;color:var(--t3);display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center;margin-top:4px}
 .tmeta .ov{color:var(--red)}
 .ssel{
@@ -894,7 +895,7 @@ select option{background:#1A2A3A}
       <div class="coll-body" id="tf-body">
         <div style="margin-bottom:8px"><div class="fl">Descrição</div><input id="t-desc" type="text" placeholder="Ex: Pagar aluguel, Dentista..." maxlength="80"></div>
         <div class="row2">
-          <div><div class="fl">Tipo</div><select id="t-type"><option value="pers">👤 Pessoal</option><option value="work">💼 Profissional</option></select></div>
+          <div><div class="fl">Tipo</div><select id="t-type"><option value="exp">🔴 Despesa</option><option value="inc">🟢 Receita</option><option value="task">📌 Compromisso</option></select></div>
           <div><div class="fl">Data / Prazo</div><input id="t-dead" type="date"></div>
         </div>
         <div style="margin-bottom:8px">
@@ -981,7 +982,7 @@ select option{background:#1A2A3A}
         </div>
         <div class="hoje-counter">
           <div class="hc-num warn" id="hc-task">0</div>
-          <div class="hc-lbl" style="color:#FFD166">Agenda</div>
+          <div class="hc-lbl" style="color:#FFD166">Compromissos</div>
         </div>
         <div class="hoje-counter">
           <div class="hc-num ok" id="hc-rec">0</div>
@@ -1011,7 +1012,7 @@ select option{background:#1A2A3A}
     <!-- tarefas do dia -->
     <div class="hoje-section" id="hs-task">
       <div class="hoje-section-title">
-        📅 Agenda de hoje
+        📅 Compromissos de hoje
         <span class="hst-badge" id="hb-task">0</span>
       </div>
       <div id="hoje-task-list"></div>
@@ -1114,7 +1115,7 @@ select option{background:#1A2A3A}
 <div id="nav" style="display:none">
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
   <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
-  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Agenda</button>
+  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Compromissos</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
 </div>
 
@@ -1279,43 +1280,55 @@ function apiCall(action, body, cb){
   if(body){
     url += '&payload=' + encodeURIComponent(JSON.stringify(body));
   }
+  fetch(url, { method:'GET', redirect:'follow', headers:{'Accept':'application/json, text/plain, */*'} })
+  .then(function(r){ return r.text(); })
+  .then(function(txt){
+    if(txt.indexOf('<html')!==-1||txt.indexOf('<!DOCTYPE')!==-1)
+      throw new Error('Servidor retornou HTML — verifique publicação do Apps Script');
+    try{ cb(null, JSON.parse(txt)); }
+    catch(e){ cb(new Error('JSON inválido: '+txt.substring(0,120))); }
+  })
+  .catch(function(e){
+    var xhr=new XMLHttpRequest();
+    xhr.open('GET',url,true);
+    xhr.setRequestHeader('Accept','application/json, text/plain, */*');
+    xhr.onload=function(){
+      try{ cb(null,JSON.parse(xhr.responseText)); }
+      catch(ex){ cb(new Error('XHR JSON inválido: '+xhr.responseText.substring(0,120))); }
+    };
+    xhr.onerror=function(){ cb(new Error('Sem conexão ou URL incorreta')); };
+    xhr.send();
+  });
+}
 
-  // Google Apps Script faz redirect para script.googleusercontent.com
-  // Precisamos seguir o redirect explicitamente
+// Para uploads (base64) — usa POST para evitar limite de URL
+function apiPost(action, body, cb){
+  var url = API + '?action=' + action;
   fetch(url, {
-    method: 'GET',
+    method: 'POST',
     redirect: 'follow',
-    headers: { 'Accept': 'application/json, text/plain, */*' }
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' },
+    body: JSON.stringify(body)
   })
   .then(function(r){ return r.text(); })
   .then(function(txt){
-    // GAS às vezes retorna HTML de login quando sessão expira
-    if(txt.indexOf('<html') !== -1 || txt.indexOf('<!DOCTYPE') !== -1){
-      throw new Error('Servidor retornou HTML — verifique se o Apps Script está publicado como "Qualquer pessoa"');
-    }
-    try{
-      var d = JSON.parse(txt);
-      cb(null, d);
-    } catch(e){
-      cb(new Error('JSON inválido: ' + txt.substring(0,120)));
-    }
+    if(txt.indexOf('<html')!==-1||txt.indexOf('<!DOCTYPE')!==-1)
+      throw new Error('Servidor retornou HTML — verifique publicação do Apps Script');
+    try{ cb(null, JSON.parse(txt)); }
+    catch(e){ cb(new Error('JSON inválido: '+txt.substring(0,120))); }
   })
   .catch(function(e){
-    // Fallback: tentar com XMLHttpRequest (mais compatível em alguns celulares)
-    dbg && dbg('fetch falhou, tentando XHR: ' + e.message);
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
-    xhr.onload = function(){
-      try{
-        var d = JSON.parse(xhr.responseText);
-        cb(null, d);
-      } catch(ex){
-        cb(new Error('XHR JSON inválido: ' + xhr.responseText.substring(0,120)));
-      }
+    // Fallback XHR POST
+    var xhr=new XMLHttpRequest();
+    xhr.open('POST',url,true);
+    xhr.setRequestHeader('Content-Type','application/json');
+    xhr.setRequestHeader('Accept','application/json, text/plain, */*');
+    xhr.onload=function(){
+      try{ cb(null,JSON.parse(xhr.responseText)); }
+      catch(ex){ cb(new Error('XHR JSON inválido: '+xhr.responseText.substring(0,120))); }
     };
-    xhr.onerror = function(){ cb(new Error('XHR também falhou — sem conexão ou URL incorreta')); };
-    xhr.send();
+    xhr.onerror=function(){ cb(new Error('Erro de rede no upload')); };
+    xhr.send(JSON.stringify(body));
   });
 }
 
@@ -1378,7 +1391,7 @@ function syncAll(){
           deadline: ymds(t.deadline || t.prazo || t.due || ''),
           desc:     String(t.desc || t.description || t.descricao || ''),
           status:   String(t.status || 'pend'),
-          type:     String(t.type   || t.tipo || 'pers'),
+          type:     String(t.type   || t.tipo || 'exp'),
           id:       String(t.id     || t.ID   || Date.now())
         });
       });
@@ -1496,7 +1509,7 @@ function prepareFileB64(file, cb){
   var img = new Image();
   var objUrl = URL.createObjectURL(file);
   img.onload = function(){
-    var MAX = 1200;
+    var MAX = 800;
     var w = img.width, h = img.height;
     if(w > MAX){ h = Math.round(h * MAX / w); w = MAX; }
     if(h > MAX){ w = Math.round(w * MAX / h); h = MAX; }
@@ -1504,7 +1517,7 @@ function prepareFileB64(file, cb){
     canvas.width = w; canvas.height = h;
     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
     URL.revokeObjectURL(objUrl);
-    var dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.60);
     cb(dataUrl.split(',')[1], 'image/jpeg');
   };
   img.src = objUrl;
@@ -1524,7 +1537,7 @@ function uploadComprov(){
 
   prepareFileB64(comprovFile, function(b64, mime){
     bar.style.width = '50%';
-    apiCall('uploadComprovante', {name:fname, mimeType:mime, data:b64}, function(err, d){
+    apiPost('uploadComprovante', {name:fname, mimeType:mime, data:b64}, function(err, d){
       if(err || !d || !d.ok){
         bar.style.width = '0%';
         prog.classList.remove('show');
@@ -2045,12 +2058,12 @@ function sendTaskComprov(){
     apiCall('updateTask', {id:id, status:'done', comprovUrl:url||''}, function(){});
 
     // Se tem valor → lançar automaticamente em Finanças
-    if(t.value && parseFloat(t.value)>0){
+    if(t.value && parseFloat(t.value)>0 && t.type !== 'task'){
       var tx = {
-        type:  'exp',
+        type:  t.type==='inc' ? 'inc' : 'exp',
         desc:  t.desc,
         value: parseFloat(t.value),
-        cat:   t.type==='work'?'💼 Empresa/Negócio':'📦 Outros',
+        cat:   t.type==='inc'?'⭐ Extra':'📦 Outros',
         date:  ymd(new Date()),
         fromAgenda: true
       };
@@ -2095,7 +2108,7 @@ function sendTaskComprov(){
 
   prepareFileB64(taskComprovFile, function(b64, mime){
     bar.style.width='60%';
-    apiCall('uploadComprovante',{name:fname, mimeType:mime, data:b64}, function(err,d){
+    apiPost('uploadComprovante',{name:fname, mimeType:mime, data:b64}, function(err,d){
       bar.style.width='100%';
       setTimeout(function(){ prog.style.display='none'; },400);
       if(err||!d||!d.ok){ toast('❌ Erro no upload: '+(err?err.message:(d&&d.error)||''),'err'); finalize(null); return; }
@@ -2155,7 +2168,9 @@ function initTaskDelegation(){
 function taskCard(t,wrap){
   var done=t.status==='done';
   var stag=done?'<span class="tag done">✅ Concluído</span>':'<span class="tag pend">⏳ Pendente</span>';
-  var ttag=t.type==='work'?'<span class="tag work">💼 Profissional</span>':'<span class="tag pers">👤 Pessoal</span>';
+  var ttag=t.type==='inc'?'<span class="tag tinc">🟢 Receita</span>'
+    :t.type==='task'?'<span class="tag ttask">📌 Compromisso</span>'
+    :'<span class="tag texp">🔴 Despesa</span>';
   var tod=ymd(new Date());
   var ov=t.deadline&&ymds(t.deadline)<tod&&!done;
   var dead=t.deadline?'<span class="'+(ov?'ov':'')+'">📅 '+fmtDate(t.deadline)+(ov?' ⚠️':'')+'</span>':'';
