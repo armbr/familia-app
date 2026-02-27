@@ -547,6 +547,22 @@ select option{background:#1A2A3A}
 .doc-btn:active{background:var(--bg3)}
 .doc-btn.del{color:var(--red);border-color:transparent}
 
+.docs-pasta-block{ margin-bottom:6px; }
+.docs-pasta-title{
+  font-size:13px;font-weight:800;color:var(--t1);
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:10px;padding:11px 14px;margin:10px 0 6px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.docs-sub-title{
+  font-size:11px;font-weight:700;color:var(--t2);
+  padding:8px 14px 4px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.docs-badge{
+  background:var(--bg3);color:var(--t2);
+  font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px;
+}
 .docs-group-title{
   font-size:10px;font-weight:700;letter-spacing:1.5px;
   text-transform:uppercase;color:var(--t3);
@@ -881,28 +897,42 @@ select option{background:#1A2A3A}
         <span class="coll-arrow" id="df-arrow">▾</span>
       </div>
       <div class="docs-form" id="df-body">
-        <div><div class="fl">Nome do documento</div>
-          <input id="d-name" type="text" placeholder="Ex: Contrato de Locação..." maxlength="60">
+
+        <div><div class="fl">Nome do arquivo</div>
+          <input id="d-name" type="text" placeholder="Ex: Contrato Social, RG João..." maxlength="80">
         </div>
-        <div><div class="fl">Link (URL do Google Drive)</div>
+
+        <div><div class="fl">Link (Google Drive, Docs, Sheets...)</div>
           <input id="d-url" type="url" placeholder="https://drive.google.com/...">
         </div>
+
         <div class="row2">
-          <div><div class="fl">Tipo</div>
+          <div><div class="fl">Tipo de arquivo</div>
             <select id="d-type">
-              <option value="sheet">📊 Planilha</option>
               <option value="doc">📄 Documento</option>
+              <option value="sheet">📊 Planilha</option>
               <option value="pdf">📕 PDF</option>
+              <option value="img">🖼️ Imagem</option>
               <option value="slide">📑 Apresentação</option>
-              <option value="form">📋 Formulário</option>
               <option value="folder">📁 Pasta</option>
               <option value="link">🔗 Link</option>
             </select>
           </div>
-          <div><div class="fl">Grupo (opcional)</div>
-            <input id="d-group" type="text" placeholder="Ex: Imóvel, Empresa..." maxlength="30">
+          <div><div class="fl">Pasta principal</div>
+            <select id="d-pasta" onchange="onPastaChange()">
+              <option value="Documentos Pessoais">👤 Documentos Pessoais</option>
+              <option value="Empresa">🏢 Empresa</option>
+              <option value="Imóveis e Loteamentos">🏗️ Imóveis e Loteamentos</option>
+              <option value="Financeiro">💰 Financeiro</option>
+              <option value="Outros">📦 Outros</option>
+            </select>
           </div>
         </div>
+
+        <div><div class="fl">Subpasta <span style="color:var(--t3);font-weight:400">(opcional)</span></div>
+          <input id="d-subpasta" type="text" placeholder="Ex: Empresa ABC, Loteamento XYZ, João Silva..." maxlength="50">
+        </div>
+
         <button class="btn" id="btn-add-doc" onclick="addDoc()">Salvar Link ✓</button>
       </div>
     </div>
@@ -916,8 +946,8 @@ select option{background:#1A2A3A}
 
 <!-- ══ BOTTOM NAV ══ -->
 <div id="nav" style="display:none">
-  <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
+  <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
   <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">✅</span>Tarefas</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
 </div>
@@ -1108,7 +1138,14 @@ function syncAll(){
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
       DOCS = d.data.map(function(x){
-        return { id:String(x.id), name:String(x.name||''), url:String(x.url||''), type:String(x.type||'link'), group:String(x.group||'Geral') };
+        return {
+          id:       String(x.id      || Date.now()),
+          name:     String(x.name    || ''),
+          url:      String(x.url     || ''),
+          type:     String(x.type    || 'doc'),
+          pasta:    String(x.pasta   || x.group || 'Outros'),
+          subpasta: String(x.subpasta|| '')
+        };
       });
       localStorage.setItem('ff_docs', JSON.stringify(DOCS));
     }
@@ -1857,17 +1894,25 @@ function hojePgtoToggle(id){
 //  DOCS — links para Google Drive
 // ════════════════════════════════════════
 var DOCS = JSON.parse(localStorage.getItem('ff_docs') || '[]');
-var dfOpen = true;
+var dfOpen = false;
 
 var DOC_ICONS = {
-  sheet:  {ico:'📊', bg:'rgba(52,168,83,.15)',  label:'Planilha'},
-  doc:    {ico:'📄', bg:'rgba(66,133,244,.15)', label:'Documento'},
-  pdf:    {ico:'📕', bg:'rgba(234,67,53,.15)',  label:'PDF'},
-  slide:  {ico:'📑', bg:'rgba(251,188,4,.15)',  label:'Apresentação'},
-  form:   {ico:'📋', bg:'rgba(103,58,183,.15)', label:'Formulário'},
-  folder: {ico:'📁', bg:'rgba(255,160,0,.15)',  label:'Pasta'},
-  link:   {ico:'🔗', bg:'rgba(143,168,196,.15)',label:'Link'},
+  doc:    {ico:'📄', bg:'rgba(66,133,244,.15)',  label:'Documento'},
+  sheet:  {ico:'📊', bg:'rgba(52,168,83,.15)',   label:'Planilha'},
+  pdf:    {ico:'📕', bg:'rgba(234,67,53,.15)',   label:'PDF'},
+  img:    {ico:'🖼️', bg:'rgba(255,160,0,.15)',   label:'Imagem'},
+  slide:  {ico:'📑', bg:'rgba(251,188,4,.15)',   label:'Apresentação'},
+  folder: {ico:'📁', bg:'rgba(255,160,0,.15)',   label:'Pasta'},
+  link:   {ico:'🔗', bg:'rgba(143,168,196,.15)', label:'Link'},
 };
+
+var PASTAS_PRINCIPAIS = [
+  'Documentos Pessoais',
+  'Empresa',
+  'Imóveis e Loteamentos',
+  'Financeiro',
+  'Outros'
+];
 
 function toggleDocsForm(){
   dfOpen=!dfOpen;
@@ -1875,41 +1920,60 @@ function toggleDocsForm(){
   document.getElementById('df-arrow').style.transform = dfOpen?'':'rotate(-90deg)';
 }
 
-function addDoc(){
-  var name  = document.getElementById('d-name').value.trim();
-  var url   = document.getElementById('d-url').value.trim();
-  var type  = document.getElementById('d-type').value;
-  var group = document.getElementById('d-group').value.trim() || 'Geral';
+function onPastaChange(){
+  // Limpa subpasta ao trocar pasta principal
+  var el = document.getElementById('d-subpasta');
+  if(el) el.value = '';
+}
 
-  if(!name){ toast('⚠️ Informe o nome','err'); return; }
+function addDoc(){
+  var nameEl    = document.getElementById('d-name');
+  var urlEl     = document.getElementById('d-url');
+  var typeEl    = document.getElementById('d-type');
+  var pastaEl   = document.getElementById('d-pasta');
+  var subEl     = document.getElementById('d-subpasta');
+  var btn       = document.getElementById('btn-add-doc');
+
+  if(!nameEl || !urlEl){ toast('⚠️ Formulário não encontrado','err'); return; }
+
+  var name     = nameEl.value.trim();
+  var url      = urlEl.value.trim();
+  var type     = typeEl    ? typeEl.value    : 'doc';
+  var pasta    = pastaEl   ? pastaEl.value   : 'Outros';
+  var subpasta = subEl     ? subEl.value.trim() : '';
+
+  if(!name){ toast('⚠️ Informe o nome do arquivo','err'); return; }
   if(!url || url.indexOf('http')===-1){ toast('⚠️ Cole um link válido','err'); return; }
 
-  var btn = document.getElementById('btn-add-doc'); btn.disabled=true;
-  var doc = { name:name, url:url, type:type, group:group };
+  // Limpar campos antes de tudo
+  nameEl.value = '';
+  urlEl.value  = '';
+  if(subEl) subEl.value = '';
+
+  if(btn) btn.disabled = true;
+  toast('💾 Salvando...');
+
   var tmp = Date.now();
-  DOCS.unshift(Object.assign({id:tmp}, doc));
+  var doc = { id:tmp, name:name, url:url, type:type, pasta:pasta, subpasta:subpasta };
+  DOCS.unshift(doc);
   localStorage.setItem('ff_docs', JSON.stringify(DOCS));
   renderDocs();
 
-  apiCall('addDoc', doc, function(err, d){
+  apiCall('addDoc', {name:name, url:url, type:type, pasta:pasta, subpasta:subpasta}, function(err, d){
     if(err){
       DOCS = DOCS.filter(function(x){ return x.id !== tmp; });
       localStorage.setItem('ff_docs', JSON.stringify(DOCS));
-      renderDocs(); toast('❌ Erro ao salvar','err');
+      renderDocs();
+      toast('❌ Erro ao salvar','err');
     } else {
-      // Atualiza id local com o real do servidor
-      var idx = DOCS.findIndex(function(x){ return x.id === tmp; });
-      if(idx > -1 && d.id) DOCS[idx].id = String(d.id);
+      for(var i=0; i<DOCS.length; i++){
+        if(DOCS[i].id === tmp){ if(d && d.id) DOCS[i].id = String(d.id); break; }
+      }
       localStorage.setItem('ff_docs', JSON.stringify(DOCS));
       toast('✅ Documento salvo!');
     }
-    btn.disabled = false;
+    if(btn) btn.disabled = false;
   });
-
-  document.getElementById('d-name').value  = '';
-  document.getElementById('d-url').value   = '';
-  document.getElementById('d-group').value = '';
-  if(dfOpen) toggleDocsForm();
 }
 
 function delDoc(id){
@@ -1948,48 +2012,74 @@ function renderDocs(){
     return;
   }
 
-  // Agrupar por grupo
-  var groups = {};
+  // Estrutura 3 níveis: pasta > subpasta > [docs]
+  var tree = {};
   DOCS.forEach(function(d){
-    var g = d.group || 'Geral';
-    if(!groups[g]) groups[g] = [];
-    groups[g].push(d);
+    var pasta    = d.pasta    || d.group || 'Outros';
+    var subpasta = d.subpasta || d.group || '';
+    if(!tree[pasta]) tree[pasta] = {};
+    if(!tree[pasta][subpasta]) tree[pasta][subpasta] = [];
+    tree[pasta][subpasta].push(d);
   });
 
+  // Ordenar pastas principais seguindo a ordem definida
+  var pastaOrder = PASTAS_PRINCIPAIS;
+  var allPastas = Object.keys(tree);
+  var sorted = pastaOrder.filter(function(p){ return tree[p]; });
+  allPastas.forEach(function(p){ if(sorted.indexOf(p)===-1) sorted.push(p); });
+
   var html = '';
-  Object.keys(groups).sort().forEach(function(g){
-    html += '<div class="docs-group-title">'+
-      '<span>'+esc(g)+'</span>'+
-      '<span style="background:var(--bg3);color:var(--t2);font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px">'+groups[g].length+'</span>'+
+  sorted.forEach(function(pasta){
+    var subpastas = tree[pasta];
+    var totalDocs = 0;
+    Object.keys(subpastas).forEach(function(s){ totalDocs += subpastas[s].length; });
+
+    html += '<div class="docs-pasta-block">'+
+      '<div class="docs-pasta-title">'+
+        '<span>📂 '+esc(pasta)+'</span>'+
+        '<span class="docs-badge">'+totalDocs+'</span>'+
       '</div>';
 
-    groups[g].forEach(function(d){
-      var meta = DOC_ICONS[d.type] || DOC_ICONS.link;
-      var safeId = String(d.id);
-      html += '<div class="doc-card" data-url="'+esc(d.url)+'" data-id="'+safeId+'">'+
-        '<div class="doc-ico" style="background:'+meta.bg+'">'+meta.ico+'</div>'+
-        '<div class="doc-info">'+
-          '<div class="doc-name">'+esc(d.name)+'</div>'+
-          '<div class="doc-meta">'+
-            '<span class="doc-type-tag">'+meta.label+'</span>'+
-            '<span>'+esc(d.group)+'</span>'+
-          '</div>'+
-        '</div>'+
-        '<div class="doc-actions">'+
-          '<button class="doc-btn doc-share" data-url="'+esc(d.url)+'" data-name="'+esc(d.name)+'">Compartilhar</button>'+
-          '<button class="doc-btn del doc-del" data-id="'+safeId+'">🗑️</button>'+
-        '</div>'+
-      '</div>';
+    // Subpastas ordenadas — sem nome primeiro, depois alfabético
+    var subKeys = Object.keys(subpastas).sort(function(a,b){
+      if(!a) return -1; if(!b) return 1;
+      return a.localeCompare(b,'pt');
     });
+
+    subKeys.forEach(function(sub){
+      var docs = subpastas[sub];
+      if(sub){
+        html += '<div class="docs-sub-title">'+
+          '<span>📁 '+esc(sub)+'</span>'+
+          '<span class="docs-badge">'+docs.length+'</span>'+
+        '</div>';
+      }
+
+      docs.forEach(function(d){
+        var meta   = DOC_ICONS[d.type] || DOC_ICONS.link;
+        var safeId = String(d.id);
+        var indent = sub ? 'margin-left:14px;' : '';
+        html += '<div class="doc-card" data-url="'+esc(d.url)+'" data-id="'+safeId+'" style="'+indent+'">'+
+          '<div class="doc-ico" style="background:'+meta.bg+'">'+meta.ico+'</div>'+
+          '<div class="doc-info">'+
+            '<div class="doc-name">'+esc(d.name)+'</div>'+
+            '<div class="doc-meta"><span class="doc-type-tag">'+meta.label+'</span></div>'+
+          '</div>'+
+          '<div class="doc-actions">'+
+            '<button class="doc-btn doc-share" data-url="'+esc(d.url)+'" data-name="'+esc(d.name)+'">⬆️</button>'+
+            '<button class="doc-btn del doc-del" data-id="'+safeId+'">🗑️</button>'+
+          '</div>'+
+        '</div>';
+      });
+    });
+
+    html += '</div>'; // /docs-pasta-block
   });
 
   el.innerHTML = html;
 
-  // Event delegation — evita conflito de aspas no onclick inline
   el.querySelectorAll('.doc-card').forEach(function(card){
-    card.addEventListener('click', function(){
-      openDoc(card.getAttribute('data-url'));
-    });
+    card.addEventListener('click', function(){ openDoc(card.getAttribute('data-url')); });
   });
   el.querySelectorAll('.doc-share').forEach(function(btn){
     btn.addEventListener('click', function(e){
