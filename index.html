@@ -385,6 +385,103 @@ select option{background:#1A2A3A}
 }
 
 /* ════════════════════════════════
+   RECORRÊNCIA
+════════════════════════════════ */
+.recur-toggle{
+  display:flex;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:11px 14px;margin-top:8px;cursor:pointer;
+  transition:border-color .2s;
+}
+.recur-toggle.on{border-color:var(--green);background:var(--green2);}
+.recur-toggle-dot{
+  width:22px;height:22px;border-radius:6px;border:2px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;flex-shrink:0;transition:all .2s;
+}
+.recur-toggle.on .recur-toggle-dot{background:var(--green);border-color:var(--green);color:#0A1A12;}
+.recur-toggle-lbl{font-size:13px;font-weight:600;color:var(--t2);}
+.recur-toggle.on .recur-toggle-lbl{color:var(--green);}
+.recur-badge{
+  margin-left:auto;font-size:10px;font-weight:700;
+  background:var(--bg3);color:var(--t3);padding:2px 7px;border-radius:100px;
+}
+.recur-toggle.on .recur-badge{background:rgba(46,204,154,.2);color:var(--green);}
+
+.recur-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-bottom:7px;
+  display:flex;align-items:center;gap:12px;
+}
+.recur-info{flex:1;min-width:0}
+.recur-name{font-size:14px;font-weight:600;color:var(--t1);margin-bottom:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.recur-meta{font-size:11px;color:var(--t3);display:flex;gap:8px;flex-wrap:wrap;}
+.recur-val{font-size:14px;font-weight:800;flex-shrink:0;}
+.recur-val.exp{color:var(--red)}.recur-val.inc{color:var(--green)}
+.recur-del{background:none;border:none;color:var(--t3);font-size:15px;cursor:pointer;padding:4px;}
+
+/* ════════════════════════════════
+   COMPROVANTES
+════════════════════════════════ */
+.comprov-btn{
+  display:flex;align-items:center;gap:8px;
+  width:100%;padding:11px 14px;margin-top:6px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;color:var(--t2);font-size:13px;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:border-color .2s;
+}
+.comprov-btn:active{border-color:var(--green)}
+.comprov-picker{display:none;margin-top:6px;}
+.comprov-picker input[type=file]{display:none}
+.comprov-file-area{
+  border:2px dashed var(--border);border-radius:10px;
+  padding:20px;text-align:center;cursor:pointer;
+  transition:border-color .2s;
+}
+.comprov-file-area:active{border-color:var(--green)}
+.comprov-file-icon{font-size:32px;margin-bottom:8px}
+.comprov-file-lbl{font-size:13px;color:var(--t2);font-weight:600;margin-bottom:4px}
+.comprov-file-sub{font-size:11px;color:var(--t3)}
+.comprov-preview{
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:10px;padding:12px 14px;margin-top:8px;
+  display:none;align-items:center;gap:10px;
+}
+.comprov-preview.show{display:flex}
+.comprov-preview-info{flex:1;min-width:0}
+.comprov-preview-name{font-size:13px;font-weight:600;color:var(--t1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.comprov-preview-size{font-size:11px;color:var(--t3);margin-top:2px}
+.comprov-upload-btn{
+  padding:8px 14px;border-radius:8px;border:none;
+  background:var(--green);color:#0A1A12;font-size:12px;
+  font-weight:800;cursor:pointer;font-family:inherit;flex-shrink:0;
+}
+.comprov-progress{
+  margin-top:8px;background:var(--bg3);border-radius:100px;
+  height:4px;overflow:hidden;display:none;
+}
+.comprov-progress.show{display:block}
+.comprov-progress-bar{
+  height:100%;background:var(--green);border-radius:100px;
+  width:0%;transition:width .3s;
+}
+.comprov-link{
+  margin-top:8px;padding:10px 14px;background:var(--green2);
+  border:1px solid var(--green);border-radius:10px;
+  display:none;align-items:center;gap:8px;
+}
+.comprov-link.show{display:flex}
+.comprov-link-url{flex:1;font-size:11px;color:var(--green);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.comprov-link-copy{
+  padding:5px 10px;background:var(--green);color:#0A1A12;
+  border:none;border-radius:6px;font-size:11px;font-weight:800;
+  cursor:pointer;font-family:inherit;flex-shrink:0;
+}
+
+/* ════════════════════════════════
    HOJE SCREEN
 ════════════════════════════════ */
 .hoje-header{
@@ -681,8 +778,45 @@ select option{background:#1A2A3A}
           </div>
           <div><div class="fl">Data</div><input id="tx-date" type="date"></div>
         </div>
+        <div class="recur-toggle" id="recur-toggle" onclick="toggleRecur()">
+          <div class="recur-toggle-dot" id="recur-dot"></div>
+          <div class="recur-toggle-lbl">Repetir todo mês</div>
+          <span class="recur-badge" id="recur-badge">inativo</span>
+        </div>
         <button class="btn" id="btn-add-tx" onclick="addTx()">Registrar ✓</button>
+
+        <!-- Comprovante -->
+        <button class="comprov-btn" onclick="toggleComprov()">
+          📎 <span>Anexar comprovante</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--t3)" id="comprov-badge"></span>
+        </button>
+        <div class="comprov-picker" id="comprov-picker">
+          <input type="file" id="comprov-file" accept="image/*,application/pdf" capture="environment">
+          <div class="comprov-file-area" onclick="document.getElementById('comprov-file').click()">
+            <div class="comprov-file-icon">📷</div>
+            <div class="comprov-file-lbl">Foto, imagem ou PDF</div>
+            <div class="comprov-file-sub">Toque para escolher ou tirar foto</div>
+          </div>
+          <div class="comprov-preview" id="comprov-preview">
+            <div style="font-size:24px" id="comprov-ico">📄</div>
+            <div class="comprov-preview-info">
+              <div class="comprov-preview-name" id="comprov-fname"></div>
+              <div class="comprov-preview-size" id="comprov-fsize"></div>
+            </div>
+            <button class="comprov-upload-btn" onclick="uploadComprov()">Enviar ↑</button>
+          </div>
+          <div class="comprov-progress" id="comprov-progress">
+            <div class="comprov-progress-bar" id="comprov-bar"></div>
+          </div>
+          <div class="comprov-link" id="comprov-link">
+            <span style="font-size:16px">✅</span>
+            <span class="comprov-link-url" id="comprov-link-url"></span>
+            <button class="comprov-link-copy" onclick="copyComprovLink()">Copiar link</button>
+          </div>
+        </div>
       </div>
+      <!-- lista inline de fixos -->
+      <div id="fixos-inline" style="display:none;margin-top:4px"></div>
     </div>
 
     <!-- HISTORY -->
@@ -965,6 +1099,8 @@ select option{background:#1A2A3A}
 var API = ''; // will be loaded in init() after DOM ready
 var TXS   = JSON.parse(localStorage.getItem('ff_txs')   || '[]');
 var TASKS = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
+var RECUR = JSON.parse(localStorage.getItem('ff_recur') || '[]');
+var curRecur = false; // toggle do form
 
 var curSection  = 'fin';
 var curFinTab   = 'add';
@@ -1157,8 +1293,19 @@ function syncAll(){
   var done=0;
   function tick(){
     done++;
-    if(done===3){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
+    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
   }
+  apiCall('getRecur',null,function(err,d){
+    if(!err && d && d.ok && d.data){
+      // Merge: manter locais que não estão no servidor
+      var serverIds = d.data.map(function(r){ return String(r.id); });
+      var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1; });
+      RECUR = d.data.concat(localOnly);
+      saveRecur();
+    }
+    processRecur();
+    tick();
+  });
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
       DOCS = d.data.map(function(x){
@@ -1254,7 +1401,8 @@ function renderAll(){
   if(curFinTab==='agenda') renderFinView();
   if(curSection==='task')  renderTasks();
   if(curSection==='hoje')  renderHoje();
-  renderDocs(); // sempre atualiza, independente da aba visível
+  renderDocs();  // sempre atualiza, independente da aba visível
+  renderFixos(); // sempre atualiza lista inline de fixos
 }
 
 // ════════════════════════════════════════
@@ -1265,6 +1413,217 @@ function setTxType(t){
   document.getElementById('bt-exp').className='ttype'+(t==='exp'?' exp':'');
   document.getElementById('bt-inc').className='ttype'+(t==='inc'?' inc':'');
   document.getElementById('tx-cat').value = t==='inc' ? '💼 Salário':'🍽️ Alimentação';
+}
+
+// ════════════════════════════════════════
+//  RECORRÊNCIA
+// ════════════════════════════════════════
+// ════════════════════════════════════════
+//  COMPROVANTES
+// ════════════════════════════════════════
+var comprovOpen = false;
+var comprovFile = null;
+var comprovLink = '';
+
+function toggleComprov(){
+  comprovOpen = !comprovOpen;
+  document.getElementById('comprov-picker').style.display = comprovOpen ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  var inp = document.getElementById('comprov-file');
+  if(inp) inp.addEventListener('change', function(){
+    comprovFile = inp.files[0];
+    if(!comprovFile) return;
+    var prev = document.getElementById('comprov-preview');
+    prev.classList.add('show');
+    document.getElementById('comprov-fname').textContent = comprovFile.name;
+    document.getElementById('comprov-fsize').textContent = (comprovFile.size/1024).toFixed(1)+' KB';
+    document.getElementById('comprov-ico').textContent =
+      comprovFile.type.indexOf('pdf') !== -1 ? '📕' :
+      comprovFile.type.indexOf('image') !== -1 ? '🖼️' : '📄';
+    // Limpar link anterior
+    document.getElementById('comprov-link').classList.remove('show');
+    document.getElementById('comprov-bar').style.width = '0%';
+    comprovLink = '';
+    document.getElementById('comprov-badge').textContent = '';
+  });
+});
+
+function uploadComprov(){
+  if(!comprovFile){ toast('⚠️ Escolha um arquivo primeiro','err'); return; }
+
+  var desc  = document.getElementById('tx-desc').value.trim() || 'Comprovante';
+  var date  = document.getElementById('tx-date').value || ymd(new Date());
+  var fname = date.replace(/-/g,'') + '_' + desc.replace(/[^a-zA-Z0-9À-ú ]/g,'').substring(0,30).trim();
+
+  var prog = document.getElementById('comprov-progress');
+  var bar  = document.getElementById('comprov-bar');
+  prog.classList.add('show');
+  bar.style.width = '20%';
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    bar.style.width = '50%';
+    var b64 = e.target.result.split(',')[1];
+    var mime = comprovFile.type || 'application/octet-stream';
+
+    apiCall('uploadComprovante', {
+      name:     fname,
+      mimeType: mime,
+      data:     b64
+    }, function(err, d){
+      if(err || !d || !d.ok){
+        bar.style.width = '0%';
+        prog.classList.remove('show');
+        toast('❌ Erro ao enviar: ' + (err ? err.message : (d && d.error)||''), 'err');
+        return;
+      }
+      bar.style.width = '100%';
+      setTimeout(function(){ prog.classList.remove('show'); }, 600);
+
+      comprovLink = d.url;
+      document.getElementById('comprov-link-url').textContent = d.url;
+      document.getElementById('comprov-link').classList.add('show');
+      document.getElementById('comprov-badge').textContent = '✅ pronto';
+      toast('✅ Comprovante enviado!');
+
+      // Auto-adicionar na aba Docs
+      var docEntry = {
+        name:     fname,
+        url:      d.url,
+        type:     comprovFile.type.indexOf('pdf')!==-1 ? 'pdf' : 'img',
+        pasta:    'Financeiro',
+        subpasta: 'Comprovantes'
+      };
+      var tmp2 = Date.now();
+      DOCS.unshift(Object.assign({id:tmp2}, docEntry));
+      localStorage.setItem('ff_docs', JSON.stringify(DOCS));
+      apiCall('addDoc', docEntry, function(){});
+      renderDocs();
+    });
+  };
+  reader.readAsDataURL(comprovFile);
+}
+
+function copyComprovLink(){
+  if(!comprovLink) return;
+  navigator.clipboard && navigator.clipboard.writeText(comprovLink)
+    .then(function(){ toast('📋 Link copiado!'); })
+    .catch(function(){ toast('Link: '+comprovLink.substring(0,50)+'...'); });
+}
+
+function toggleRecur(){
+  curRecur = !curRecur;
+  var tog = document.getElementById('recur-toggle');
+  var dot = document.getElementById('recur-dot');
+  var badge = document.getElementById('recur-badge');
+  tog.classList.toggle('on', curRecur);
+  dot.textContent = curRecur ? '✓' : '';
+  badge.textContent = curRecur ? 'mensal' : 'inativo';
+}
+
+function saveRecur(){
+  localStorage.setItem('ff_recur', JSON.stringify(RECUR));
+}
+
+function renderFixos(){
+  // Renderiza lista inline no formulário de registro
+  var el = document.getElementById('fixos-inline');
+  if(!el) return;
+  if(!RECUR.length){
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  var html = '<div class="slbl" style="padding-top:8px">🔁 Fixos ativos <span style="background:var(--bg3);color:var(--t2);font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px">'+RECUR.length+'</span></div>';
+  html += RECUR.map(function(r){
+    var isExp = r.type==='exp';
+    return '<div class="recur-card">'+
+      '<div style="width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;background:'+(isExp?'rgba(255,107,107,.15)':'rgba(46,204,154,.15)')+'">'+
+        (isExp?'🔴':'🟢')+
+      '</div>'+
+      '<div class="recur-info">'+
+        '<div class="recur-name">'+esc(r.desc)+'</div>'+
+        '<div class="recur-meta">'+
+          '<span>'+esc(r.cat)+'</span>'+
+          '<span>dia '+pad(new Date(r.date+'T12:00:00').getDate())+'/mês</span>'+
+        '</div>'+
+      '</div>'+
+      '<div class="recur-val '+(isExp?'exp':'inc')+'">'+(isExp?'-':'+')+fmtBRL(parseFloat(r.value))+'</div>'+
+      '<button class="recur-del recur-del-btn" data-id="'+String(r.id)+'">🗑️</button>'+
+    '</div>';
+  }).join('');
+  el.innerHTML = html;
+  el.querySelectorAll('.recur-del-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      delRecur(btn.getAttribute('data-id'));
+    });
+  });
+}
+
+function delRecur(id){
+  if(!confirm('Cancelar este lançamento fixo? Os registros já criados permanecem.')) return;
+  RECUR = RECUR.filter(function(r){ return String(r.id) !== String(id); });
+  saveRecur();
+  apiCall('deleteRecur', {id:id}, function(){});
+  renderFixos();
+  toast('🗑️ Recorrência cancelada');
+}
+
+// Chamado no syncAll — cria lançamento deste mês se ainda não existe
+function processRecur(){
+  if(!RECUR.length) return;
+  var now = new Date();
+  var thisMo = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var created = 0;
+
+  RECUR.forEach(function(r){
+    // Pegar o dia original do lançamento
+    var origDay = new Date(r.date+'T12:00:00').getDate();
+    var targetDate = thisMo+'-'+pad(origDay);
+
+    // Verificar se já existe um lançamento com este recurId neste mês
+    var exists = TXS.some(function(t){
+      return String(t.recurId) === String(r.id) &&
+             ymds(t.date).substring(0,7) === thisMo;
+    });
+
+    if(!exists){
+      var tx = {
+        type:    r.type,
+        desc:    r.desc,
+        value:   r.value,
+        cat:     r.cat,
+        date:    targetDate,
+        recurId: r.id
+      };
+      // Otimista: adicionar localmente já
+      var tmp = Date.now() + Math.random();
+      TXS.unshift(Object.assign({id:tmp}, tx));
+      created++;
+      apiCall('addTransaction', tx, function(err){
+        if(err){
+          TXS = TXS.filter(function(t){ return t.id !== tmp; });
+        }
+      });
+    }
+  });
+
+  if(created > 0){
+    localStorage.setItem('ff_txs', JSON.stringify(TXS));
+    renderAll();
+    toast('🔁 '+created+' lançamento'+(created>1?'s fixos gerados':'fixo gerado')+'!');
+  }
+}
+
+function addRecur(tx){
+  var r = Object.assign({ id: Date.now() }, tx);
+  RECUR.unshift(r);
+  saveRecur();
+  apiCall('addRecur', r, function(err){
+    if(err) toast('⚠️ Recorrência salva só localmente','err');
+  });
 }
 
 function addTx(){
@@ -1278,9 +1637,22 @@ function addTx(){
   var btn=document.getElementById('btn-add-tx'); btn.disabled=true;
   var tx={type:curTxType,desc:desc,value:val,cat:cat,date:date};
   var tmp=Date.now(); TXS.unshift(Object.assign({id:tmp},tx)); renderAll();
+
+  // Se recorrência ativa, registrar nas fixas
+  if(curRecur){
+    addRecur(tx);
+    curRecur=false; // resetar toggle
+    var tog=document.getElementById('recur-toggle');
+    var dot=document.getElementById('recur-dot');
+    var badge=document.getElementById('recur-badge');
+    if(tog) tog.classList.remove('on');
+    if(dot) dot.textContent='';
+    if(badge) badge.textContent='inativo';
+  }
+
   apiCall('addTransaction',tx,function(err){
     if(err){ TXS=TXS.filter(function(t){return t.id!==tmp;}); renderAll(); toast('❌ Erro ao salvar','err'); }
-    else{ syncAll(); toast(curTxType==='exp'?'✅ Gasto registrado!':'✅ Receita registrada!'); }
+    else{ syncAll(); toast(curRecur?'✅ Registrado + recorrência ativada!':curTxType==='exp'?'✅ Gasto registrado!':'✅ Receita registrada!'); }
     btn.disabled=false;
   });
   document.getElementById('tx-desc').value='';
