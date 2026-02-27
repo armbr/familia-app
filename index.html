@@ -342,7 +342,7 @@ select option{background:#1A2A3A}
 .g-soon   .glbl{color:var(--yellow)}
 
 /* bal mini */
-.balmini{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:10px}
+.balmini{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px}
 .bmc{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 10px;text-align:center}
 .bmc-l{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
 .bmc-l.i{color:var(--green)}.bmc-l.e{color:var(--red)}.bmc-l.b{color:var(--blue)}
@@ -938,9 +938,6 @@ select option{background:#1A2A3A}
     </div>
 
     <!-- DEBUG — remover após resolver -->
-    <div id="debug-box" style="display:none;background:#1a1a2e;border:1px solid #ff6b6b;border-radius:10px;padding:12px;margin:8px 0;font-size:11px;font-family:monospace;color:#ff9999;word-break:break-all;white-space:pre-wrap;max-height:200px;overflow-y:auto"></div>
-    <button onclick="runDocTest()" style="width:100%;margin-bottom:8px;padding:10px;background:#162030;border:1px dashed #526680;border-radius:10px;color:#8FA8C4;font-size:12px;cursor:pointer">🔍 Testar conexão com servidor</button>
-
     <!-- lista de documentos -->
     <div id="docs-list"></div>
 
@@ -1306,7 +1303,8 @@ function filteredTxs(){
 function renderBal(){
   var b=balOf(filteredTxs());
   var v=document.getElementById('bal-val');
-  v.textContent=fmtBRL(b.b);
+  // Mostra valor absoluto (sem sinal de menos), vermelho se negativo
+  v.textContent=fmtBRL(Math.abs(b.b));
   v.className=b.b<0?'neg':'';
   document.getElementById('bi').textContent=fmtBRL(b.i);
   document.getElementById('be').textContent=fmtBRL(b.e);
@@ -1378,8 +1376,7 @@ function txsIn(from,to){ return TXS.filter(function(t){var d=ymds(t.date);return
 function balMini(id,b){
   document.getElementById(id).innerHTML=
     '<div class="bmc"><div class="bmc-l i">↑ Receitas</div><div class="bmc-v pos">'+fmtBRL(b.i)+'</div></div>'+
-    '<div class="bmc"><div class="bmc-l e">↓ Gastos</div><div class="bmc-v neg">'+fmtBRL(b.e)+'</div></div>'+
-    '<div class="bmc"><div class="bmc-l b">= Saldo</div><div class="bmc-v '+(b.b>=0?'pos':'neg')+'">'+fmtBRL(b.b)+'</div></div>';
+    '<div class="bmc"><div class="bmc-l e">↓ Gastos</div><div class="bmc-v neg">'+fmtBRL(b.e)+'</div></div>';
 }
 
 function groupedTxHTML(txs){
@@ -1937,6 +1934,16 @@ var DOC_ICONS = {
   link:   {ico:'🔗', bg:'rgba(143,168,196,.15)', label:'Link'},
 };
 
+function normKey(s){
+  // Remove acentos, trim, Title Case — evita "Joao" e "João" virarem grupos diferentes
+  if(!s) return '';
+  var r = s.trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'') // remove acentos
+    .toLowerCase()
+    .replace(/(?:^|\s)\S/g, function(a){ return a.toUpperCase(); }); // Title Case
+  return r;
+}
+
 var PASTAS_PRINCIPAIS = [
   'Documentos Pessoais',
   'Empresa',
@@ -2065,15 +2072,15 @@ function renderDocs(){
   // Estrutura 3 níveis: pasta > subpasta > [docs]
   var tree = {};
   DOCS.forEach(function(d){
-    var pasta    = d.pasta    || d.group || 'Outros';
-    var subpasta = d.subpasta || d.group || '';
+    var pasta    = normKey(d.pasta    || d.group || 'Outros');
+    var subpasta = normKey(d.subpasta || '');
     if(!tree[pasta]) tree[pasta] = {};
     if(!tree[pasta][subpasta]) tree[pasta][subpasta] = [];
     tree[pasta][subpasta].push(d);
   });
 
   // Ordenar pastas principais seguindo a ordem definida
-  var pastaOrder = PASTAS_PRINCIPAIS;
+  var pastaOrder = PASTAS_PRINCIPAIS.map(normKey);
   var allPastas = Object.keys(tree);
   var sorted = pastaOrder.filter(function(p){ return tree[p]; });
   allPastas.forEach(function(p){ if(sorted.indexOf(p)===-1) sorted.push(p); });
@@ -2142,56 +2149,6 @@ function renderDocs(){
       e.stopPropagation();
       delDoc(btn.getAttribute('data-id'));
     });
-  });
-}
-
-function dbg(msg){
-  var box = document.getElementById('debug-box');
-  if(!box) return;
-  box.style.display = 'block';
-  box.textContent += new Date().toLocaleTimeString('pt-BR') + ' — ' + msg + '\n';
-  box.scrollTop = box.scrollHeight;
-}
-
-function runDocTest(){
-  var box = document.getElementById('debug-box');
-  if(box){ box.textContent=''; box.style.display='block'; }
-
-  dbg('API URL: ' + (API ? API.substring(0,60)+'...' : 'NÃO DEFINIDA'));
-  dbg('Online: ' + online);
-  dbg('DOCS em memória: ' + DOCS.length);
-  dbg('DOCS no localStorage: ' + (localStorage.getItem('ff_docs')||'[]').substring(0,80));
-  dbg('Chamando getDocs...');
-
-  apiCall('getDocs', null, function(err, d){
-    if(err){
-      dbg('ERRO: ' + (err.message || String(err)));
-    } else {
-      dbg('Resposta ok: ' + JSON.stringify(d).substring(0,200));
-      if(d && d.ok){
-        dbg('Total docs no servidor: ' + (d.data ? d.data.length : 0));
-        if(d.data && d.data.length){
-          dbg('Primeiro doc: ' + JSON.stringify(d.data[0]).substring(0,150));
-        }
-      } else {
-        dbg('Resposta sem ok=true: ' + JSON.stringify(d));
-      }
-    }
-  });
-
-  dbg('Testando addDoc...');
-  apiCall('addDoc', {name:'__teste__',url:'https://test.com',type:'doc',pasta:'Outros',subpasta:''}, function(err, d){
-    if(err){
-      dbg('addDoc ERRO: ' + (err.message || String(err)));
-    } else {
-      dbg('addDoc resposta: ' + JSON.stringify(d));
-      if(d && d.ok && d.id){
-        dbg('Limpando doc de teste id=' + d.id);
-        apiCall('deleteDoc', {id: d.id}, function(e2, d2){
-          dbg('deleteDoc: ' + (e2 ? 'ERRO: '+e2.message : JSON.stringify(d2)));
-        });
-      }
-    }
   });
 }
 
