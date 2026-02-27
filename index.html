@@ -731,7 +731,7 @@ select option{background:#1A2A3A}
       <div id="bal-val">R$ 0,00</div>
       <div id="bal-row">
         <div class="bal-cell"><div class="bl inc">↑ Receitas</div><div class="bv" id="bi">R$ 0,00</div></div>
-        <div class="bal-cell"><div class="bl exp">↓ Gastos</div><div class="bv" id="be">R$ 0,00</div></div>
+        <div class="bal-cell"><div class="bl exp">↓ Despesas</div><div class="bv" id="be">R$ 0,00</div></div>
       </div>
     </div>
     <div id="fin-tabs">
@@ -754,7 +754,7 @@ select option{background:#1A2A3A}
       <div class="card" style="margin-top:12px">
         <div class="card-title">⚡ Registro rápido</div>
         <div class="type-row">
-          <button class="ttype exp" id="bt-exp" onclick="setTxType('exp')">🔴 Gasto</button>
+          <button class="ttype exp" id="bt-exp" onclick="setTxType('exp')">🔴 Despesa</button>
           <button class="ttype" id="bt-inc" onclick="setTxType('inc')">🟢 Receita</button>
         </div>
         <div class="row2">
@@ -784,11 +784,6 @@ select option{background:#1A2A3A}
             </select>
           </div>
           <div><div class="fl">Data</div><input id="tx-date" type="date"></div>
-        </div>
-        <div class="recur-toggle" id="recur-toggle" onclick="toggleRecur()">
-          <div class="recur-toggle-dot" id="recur-dot"></div>
-          <div class="recur-toggle-lbl">Repetir todo mês</div>
-          <span class="recur-badge" id="recur-badge">inativo</span>
         </div>
         <button class="btn" id="btn-add-tx" onclick="addTx()">Registrar ✓</button>
 
@@ -822,8 +817,6 @@ select option{background:#1A2A3A}
           </div>
         </div>
       </div>
-      <!-- lista inline de fixos -->
-      <div id="fixos-inline" style="display:none;margin-top:4px"></div>
     </div>
 
     <!-- HISTORY -->
@@ -835,7 +828,7 @@ select option{background:#1A2A3A}
 
     <!-- CATEGORIES -->
     <div class="pg" id="fp-cat">
-      <div class="slbl">Gastos por Categoria — <span id="cat-month-lbl"></span></div>
+      <div class="slbl">Despesas por Categoria — <span id="cat-month-lbl"></span></div>
       <div class="catl" id="cat-list"></div>
     </div>
 
@@ -907,8 +900,14 @@ select option{background:#1A2A3A}
           <div class="fl">Valor <span style="color:var(--t3);font-weight:400">(se for pagamento)</span></div>
           <div class="r-wrap"><input id="t-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
         </div>
+        <div class="recur-toggle" id="recur-toggle" onclick="toggleRecur()">
+          <div class="recur-toggle-dot" id="recur-dot"></div>
+          <div class="recur-toggle-lbl">Repetir todo mês</div>
+          <span class="recur-badge" id="recur-badge">inativo</span>
+        </div>
         <button class="btn" id="btn-add-task" onclick="addTask()">Adicionar ✓</button>
       </div>
+      <div id="fixos-inline" style="display:none;margin-top:4px"></div>
     </div>
 
     <!-- view toggle -->
@@ -1669,21 +1668,9 @@ function addTx(){
   var tx={type:curTxType,desc:desc,value:val,cat:cat,date:date};
   var tmp=Date.now(); TXS.unshift(Object.assign({id:tmp},tx)); renderAll();
 
-  // Se recorrência ativa, registrar nas fixas
-  if(curRecur){
-    addRecur(tx);
-    curRecur=false; // resetar toggle
-    var tog=document.getElementById('recur-toggle');
-    var dot=document.getElementById('recur-dot');
-    var badge=document.getElementById('recur-badge');
-    if(tog) tog.classList.remove('on');
-    if(dot) dot.textContent='';
-    if(badge) badge.textContent='inativo';
-  }
-
   apiCall('addTransaction',tx,function(err){
     if(err){ TXS=TXS.filter(function(t){return t.id!==tmp;}); renderAll(); toast('❌ Erro ao salvar','err'); }
-    else{ syncAll(); toast(curRecur?'✅ Registrado + recorrência ativada!':curTxType==='exp'?'✅ Gasto registrado!':'✅ Receita registrada!'); }
+    else{ syncAll(); toast(curTxType==='exp'?'✅ Despesa registrada!':'✅ Receita registrada!'); }
     btn.disabled=false;
   });
   document.getElementById('tx-desc').value='';
@@ -1739,7 +1726,7 @@ function selMon(m){
 function renderCat(){
   var txs=filteredTxs().filter(function(t){return t.type==='exp';});
   var el=document.getElementById('cat-list');
-  if(!txs.length){el.innerHTML=emptyHTML('📊','Sem gastos','Adicione gastos para ver o resumo');return;}
+  if(!txs.length){el.innerHTML=emptyHTML('📊','Sem despesas','Adicione despesas para ver o resumo');return;}
   var bc={};
   txs.forEach(function(t){bc[t.cat]=(bc[t.cat]||0)+parseFloat(t.value||0);});
   var total=Object.values(bc).reduce(function(a,b){return a+b;},0);
@@ -1779,7 +1766,7 @@ function txsIn(from,to){ return TXS.filter(function(t){var d=ymds(t.date);return
 function balMini(id,b){
   document.getElementById(id).innerHTML=
     '<div class="bmc"><div class="bmc-l i">↑ Receitas</div><div class="bmc-v pos">'+fmtBRL(b.i)+'</div></div>'+
-    '<div class="bmc"><div class="bmc-l e">↓ Gastos</div><div class="bmc-v neg">'+fmtBRL(b.e)+'</div></div>';
+    '<div class="bmc"><div class="bmc-l e">↓ Despesas</div><div class="bmc-v neg">'+fmtBRL(b.e)+'</div></div>';
 }
 
 function groupedTxHTML(txs){
@@ -1938,6 +1925,16 @@ function addTask(){
   var btn=document.getElementById('btn-add-task'); btn.disabled=true;
   var task={desc:desc,type:type,deadline:dead,value:val,status:'pend'};
   var tmp=Date.now(); TASKS.unshift(Object.assign({id:tmp},task)); renderTasks();
+  if(curRecur){
+    addRecur({type:'task',desc:desc,value:val||0,cat:type,date:dead||ymd(new Date())});
+    curRecur=false;
+    var togR=document.getElementById('recur-toggle');
+    var dotR=document.getElementById('recur-dot');
+    var badgeR=document.getElementById('recur-badge');
+    if(togR) togR.classList.remove('on');
+    if(dotR) dotR.textContent='';
+    if(badgeR) badgeR.textContent='inativo';
+  }
   apiCall('addTask',task,function(err){
     if(err){TASKS=TASKS.filter(function(t){return t.id!==tmp;});renderTasks();toast('❌ Erro ao criar','err');}
     else{syncAll();toast('📌 Compromisso criado!');}
@@ -2131,7 +2128,7 @@ function bindTaskEvents(){
 
 function taskCard(t,wrap){
   var done=t.status==='done';
-  // status só como classe visual no chk, não como tag extra
+  var stag=done?'<span class="tag done">✅ Concluído</span>':'<span class="tag pend">⏳ Pendente</span>';
   var ttag=t.type==='work'?'<span class="tag work">💼 Profissional</span>':'<span class="tag pers">👤 Pessoal</span>';
   var tod=ymd(new Date());
   var ov=t.deadline&&ymds(t.deadline)<tod&&!done;
@@ -2145,14 +2142,10 @@ function taskCard(t,wrap){
     '<div class="tname'+(done?' done':'')+'">'+esc(t.desc)+'</div>'+
     '<button class="tdel2" data-del="'+sid+'">🗑️</button>'+
     '</div>'+
-    '<div class="tags">'+ttag+'</div>'+
+    '<div class="tags">'+stag+ttag+'</div>'+
     '<div class="tmeta">'+dead+
     (t.value?'<span>💰 '+fmtBRL(parseFloat(t.value))+'</span>':'')+
-    (!done?'<select class="ssel" data-status="'+sid+'">'+
-      '<option value="pend"'+(t.status==='pend'?' selected':'')+'>⏳ Pendente</option>'+
-      '<option value="prog"'+(t.status==='prog'?' selected':'')+'>🔄 Em andamento</option>'+
-      '<option value="done">✅ Concluído + comprovante</option>'+
-      '</select>':comprovHTML)+
+    (done?comprovHTML:'')+
     '</div></div>';
   return html;
 }
