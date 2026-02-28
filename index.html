@@ -226,7 +226,7 @@ select option{background:#1A2A3A}
   background:var(--card);border:1px solid var(--border);
   border-radius:10px;padding:12px 14px;
   display:flex;align-items:center;gap:10px;
-  animation:up .2s ease both;
+  animation:up .2s ease both;overflow:hidden;
 }
 @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .txi-ico{
@@ -236,11 +236,11 @@ select option{background:#1A2A3A}
 }
 .txi-ico.exp{background:var(--red2)}
 .txi-ico.inc{background:var(--green2)}
-.txi-info{flex:1;min-width:0}
-.txi-desc{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
-.txi-meta{font-size:11px;color:var(--t3);display:flex;gap:5px;align-items:center}
+.txi-info{flex:1;min-width:0;overflow:hidden}
+.txi-desc{font-size:14px;font-weight:600;white-space:normal;word-break:break-word;margin-bottom:3px;line-height:1.3}
+.txi-meta{font-size:11px;color:var(--t3);display:flex;gap:4px 8px;flex-wrap:wrap;align-items:center;margin-top:2px}
 .txi-cat{background:var(--bg3);padding:1px 6px;border-radius:4px;font-weight:600}
-.txi-val{font-size:15px;font-weight:800;flex-shrink:0}
+.txi-val{font-size:14px;font-weight:800;flex-shrink:0;text-align:right}
 .txi-val.exp{color:var(--red)}
 .txi-val.inc{color:var(--green)}
 .tdel{background:none;border:none;color:var(--t3);font-size:15px;cursor:pointer;padding:3px 5px;border-radius:7px;transition:color .2s}
@@ -648,6 +648,7 @@ select option{background:#1A2A3A}
 .doc-btn.del{color:var(--red);border-color:transparent}
 
 .docs-pasta-block{ margin-bottom:6px; }
+.docs-pasta-chevron{transition:transform .2s;display:inline-block;margin-left:auto;color:var(--t3);font-size:12px}
 .docs-pasta-title{
   font-size:13px;font-weight:800;color:var(--t1);
   background:var(--card2);border:1px solid var(--border);
@@ -895,13 +896,33 @@ select option{background:#1A2A3A}
       <div class="coll-body" id="tf-body">
         <div style="margin-bottom:8px"><div class="fl">Descrição</div><input id="t-desc" type="text" placeholder="Ex: Pagar aluguel, Dentista..." maxlength="80"></div>
         <div class="row2">
-          <div><div class="fl">Tipo</div><select id="t-type"><option value="exp">🔴 Despesa</option><option value="inc">🟢 Receita</option><option value="task">📌 Compromisso</option></select></div>
+          <div><div class="fl">Tipo</div><select id="t-type" onchange="onTaskTypeChange()"><option value="exp">🔴 Despesa</option><option value="inc">🟢 Receita</option><option value="task">📌 Compromisso</option></select></div>
           <div><div class="fl">Data / Prazo</div><input id="t-dead" type="date"></div>
         </div>
-        <div style="margin-bottom:8px">
-          <div class="fl">Valor <span style="color:var(--t3);font-weight:400">(se for pagamento)</span></div>
-          <div class="r-wrap"><input id="t-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+        <div class="row2" id="t-val-row">
+          <div><div class="fl">Valor</div><div class="r-wrap"><input id="t-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+          <div id="t-cat-wrap"><div class="fl">Categoria</div>
+            <select id="t-cat">
+              <optgroup label="── Despesas ──">
+                <option>🍽️ Alimentação</option>
+                <option>🚗 Carro/Transporte</option>
+                <option>🏠 Casa/Moradia</option>
+                <option>💊 Saúde</option>
+                <option>📚 Educação</option>
+                <option>👗 Roupas</option>
+                <option>🎮 Lazer</option>
+                <option>💼 Empresa/Negócio</option>
+                <option>🏛️ Taxas/Impostos</option>
+                <option>📦 Outros</option>
+              </optgroup>
+              <optgroup label="── Receitas ──">
+                <option>💰 Salário</option>
+                <option>⭐ Extra</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
+        <div id="t-task-note" style="display:none;font-size:12px;color:var(--t3);margin-bottom:8px;padding:8px 10px;background:var(--bg3);border-radius:8px">📌 Compromisso sem valor financeiro — não impacta o balanço.</div>
         <div class="recur-toggle" id="recur-toggle" onclick="toggleRecur()">
           <div class="recur-toggle-dot" id="recur-dot"></div>
           <div class="recur-toggle-lbl">Repetir todo mês</div>
@@ -1132,6 +1153,7 @@ var API = ''; // will be loaded in init() after DOM ready
 var TXS   = JSON.parse(localStorage.getItem('ff_txs')   || '[]');
 var TASKS = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
 var RECUR = JSON.parse(localStorage.getItem('ff_recur') || '[]');
+var COLLAPSED_PASTAS = JSON.parse(localStorage.getItem('ff_collapsed') || '[]');
 var curRecur = false; // toggle do form
 
 var curSection  = 'fin';
@@ -1339,7 +1361,7 @@ function syncAll(){
   var done=0;
   function tick(){
     done++;
-    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
+    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje && renderHoje(); toast('✅ Sincronizado!'); }
   }
   apiCall('getRecur',null,function(err,d){
     if(!err && d && d.ok && d.data){
@@ -1955,14 +1977,35 @@ function toggleTF(){
   document.getElementById('tf-arrow').style.transform=tfOpen?'':'rotate(-90deg)';
 }
 
+function onTaskTypeChange(){
+  var type = document.getElementById('t-type').value;
+  var valRow  = document.getElementById('t-val-row');
+  var catWrap = document.getElementById('t-cat-wrap');
+  var note    = document.getElementById('t-task-note');
+  if(type === 'task'){
+    valRow.style.display  = 'none';
+    note.style.display    = 'block';
+  } else {
+    valRow.style.display  = '';
+    note.style.display    = 'none';
+    // ajustar categoria padrão
+    var cat = document.getElementById('t-cat');
+    if(type==='inc') cat.value = '💰 Salário';
+    else             cat.value = '📦 Outros';
+  }
+}
+
 function addTask(){
   var desc=document.getElementById('t-desc').value.trim();
   var type=document.getElementById('t-type').value;
   var dead=document.getElementById('t-dead').value;
-  var val =parseFloat(document.getElementById('t-val').value)||null;
+  var valEl=document.getElementById('t-val');
+  var val =type!=='task' ? parseFloat(valEl.value)||null : null;
+  var cat = type!=='task' ? (document.getElementById('t-cat').value||'📦 Outros') : '';
   if(!desc){toast('⚠️ Informe a descrição','err');return;}
+  if(type!=='task' && (!val||val<=0)){toast('⚠️ Informe o valor para '+( type==='exp'?'despesa':'receita'),'err');return;}
   var btn=document.getElementById('btn-add-task'); btn.disabled=true;
-  var task={desc:desc,type:type,deadline:dead,value:val,status:'pend'};
+  var task={desc:desc,type:type,deadline:dead,value:val,cat:cat,status:'pend'};
   var tmp=Date.now(); TASKS.unshift(Object.assign({id:tmp},task)); renderTasks();
   if(curRecur){
     addRecur({type:'task',desc:desc,value:val||0,cat:type,date:dead||ymd(new Date())});
@@ -1981,6 +2024,7 @@ function addTask(){
   });
   document.getElementById('t-desc').value='';
   document.getElementById('t-val').value='';
+  if(document.getElementById('t-cat')) document.getElementById('t-cat').value='📦 Outros';
 }
 
 function toggleTask(id){
@@ -1988,10 +2032,10 @@ function toggleTask(id){
   if(!t)return;
   // Reabrir: volta para pendente
   if(t.status==='done'){
-    t.status='pend'; renderTasks();
+    t.status='pend'; renderAll();
     apiCall('updateTask',{id:id,status:'pend'},function(err){
-      if(err){t.status='done';renderTasks();toast('❌ Erro','err');}
-      else toast('🔄 Reaberto');
+      if(err){t.status='done';renderAll();toast('❌ Erro','err');}
+      else{ renderAll(); toast('🔄 Reaberto'); }
     });
     return;
   }
@@ -2000,10 +2044,10 @@ function toggleTask(id){
     openComprovModal(id);
   } else {
     // Sem valor: conclui direto
-    t.status='done'; renderTasks();
+    t.status='done'; renderAll();
     apiCall('updateTask',{id:id,status:'done'},function(err){
-      if(err){t.status='pend';renderTasks();toast('❌ Erro','err');}
-      else toast('✅ Concluído!');
+      if(err){t.status='pend';renderAll();toast('❌ Erro','err');}
+      else{ renderAll(); toast('✅ Concluído!'); }
     });
   }
 }
@@ -2063,7 +2107,7 @@ function sendTaskComprov(){
         type:  t.type==='inc' ? 'inc' : 'exp',
         desc:  t.desc,
         value: parseFloat(t.value),
-        cat:   t.type==='inc'?'⭐ Extra':'📦 Outros',
+        cat:   t.cat || (t.type==='inc'?'⭐ Extra':'📦 Outros'),
         date:  ymd(new Date()),
         fromAgenda: true
       };
@@ -2089,6 +2133,7 @@ function sendTaskComprov(){
     } else {
       toast(t.value && parseFloat(t.value)>0 ? '✅ Concluído + lançado em Finanças!' : '✅ Concluído!');
     }
+    renderAll();
     btn.disabled = false;
     comprovModalTaskId = null;
   }
@@ -2664,11 +2709,14 @@ function renderDocs(){
     var totalDocs = 0;
     Object.keys(subpastas).forEach(function(s){ totalDocs += subpastas[s].length; });
 
+    var isCollapsed = COLLAPSED_PASTAS.indexOf(pasta) !== -1;
     html += '<div class="docs-pasta-block">'+
-      '<div class="docs-pasta-title">'+
-        '<span>📂 '+esc(pasta)+'</span>'+
+      '<div class="docs-pasta-title" data-pasta="'+esc(pasta)+'" style="cursor:pointer">'+
+        '<span>'+( isCollapsed?'📁':'📂' )+' '+esc(pasta)+'</span>'+
         '<span class="docs-badge">'+totalDocs+'</span>'+
-      '</div>';
+        '<span class="docs-pasta-chevron" style="transform:'+(isCollapsed?'rotate(-90deg)':'')+'">▾</span>'+
+      '</div>'+
+      '<div class="docs-pasta-body" style="display:'+(isCollapsed?'none':'block')+'">';
 
     // Subpastas ordenadas — sem nome primeiro, depois alfabético
     var subKeys = Object.keys(subpastas).sort(function(a,b){
@@ -2703,10 +2751,22 @@ function renderDocs(){
       });
     });
 
-    html += '</div>'; // /docs-pasta-block
+    html += '</div></div>'; // /docs-pasta-body /docs-pasta-block
   });
 
   el.innerHTML = html;
+
+  // Toggle colapso de pastas
+  el.querySelectorAll('.docs-pasta-title').forEach(function(title){
+    title.addEventListener('click', function(){
+      var pasta = title.getAttribute('data-pasta');
+      var idx   = COLLAPSED_PASTAS.indexOf(pasta);
+      if(idx===-1) COLLAPSED_PASTAS.push(pasta);
+      else         COLLAPSED_PASTAS.splice(idx,1);
+      localStorage.setItem('ff_collapsed', JSON.stringify(COLLAPSED_PASTAS));
+      renderDocs();
+    });
+  });
 
   el.querySelectorAll('.doc-card').forEach(function(card){
     card.addEventListener('click', function(){ openDoc(card.getAttribute('data-url')); });
