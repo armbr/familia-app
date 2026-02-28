@@ -379,6 +379,7 @@ select option{background:#1A2A3A}
 .tag.texp{background:rgba(255,107,107,.13);color:var(--red)}
 .tag.tinc{background:rgba(46,204,154,.13);color:var(--green)}
 .tag.ttask{background:rgba(100,160,255,.13);color:#64A0FF}
+.tag.trecur{background:rgba(255,200,50,.13);color:#FFCC33;letter-spacing:.2px}
 .tmeta{font-size:11px;color:var(--t3);display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center;margin-top:4px}
 .tmeta .ov{color:var(--red)}
 .ssel{
@@ -930,7 +931,6 @@ select option{background:#1A2A3A}
         </div>
         <button class="btn" id="btn-add-task" onclick="addTask()">Adicionar ✓</button>
       </div>
-      <div id="fixos-inline" style="display:none;margin-top:4px"></div>
     </div>
 
     <!-- view toggle -->
@@ -1619,38 +1619,9 @@ function saveRecur(){
 }
 
 function renderFixos(){
-  // Renderiza lista inline no formulário de registro
+  // Lista removida — ícone 🔁 aparece direto no card da tarefa
   var el = document.getElementById('fixos-inline');
-  if(!el) return;
-  if(!RECUR.length){
-    el.style.display = 'none';
-    return;
-  }
-  el.style.display = 'block';
-  var html = '<div class="slbl" style="padding-top:8px">🔁 Fixos ativos <span style="background:var(--bg3);color:var(--t2);font-size:10px;font-weight:700;padding:1px 7px;border-radius:100px">'+RECUR.length+'</span></div>';
-  html += RECUR.map(function(r){
-    var isExp = r.type==='exp';
-    return '<div class="recur-card">'+
-      '<div style="width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;background:'+(isExp?'rgba(255,107,107,.15)':'rgba(46,204,154,.15)')+'">'+
-        (isExp?'🔴':'🟢')+
-      '</div>'+
-      '<div class="recur-info">'+
-        '<div class="recur-name">'+esc(r.desc)+'</div>'+
-        '<div class="recur-meta">'+
-          '<span>'+esc(r.cat)+'</span>'+
-          '<span>dia '+pad(new Date(r.date+'T12:00:00').getDate())+'/mês</span>'+
-        '</div>'+
-      '</div>'+
-      '<div class="recur-val '+(isExp?'exp':'inc')+'">'+(isExp?'-':'+')+fmtBRL(parseFloat(r.value))+'</div>'+
-      '<button class="recur-del recur-del-btn" data-id="'+String(r.id)+'">🗑️</button>'+
-    '</div>';
-  }).join('');
-  el.innerHTML = html;
-  el.querySelectorAll('.recur-del-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      delRecur(btn.getAttribute('data-id'));
-    });
-  });
+  if(el) el.style.display = 'none';
 }
 
 function delRecur(id){
@@ -2221,6 +2192,9 @@ function taskCard(t,wrap){
   var dead=t.deadline?'<span class="'+(ov?'ov':'')+'">📅 '+fmtDate(t.deadline)+(ov?' ⚠️':'')+'</span>':'';
   var comprovHTML=t.comprovUrl
     ?'<a href="'+esc(t.comprovUrl)+'" target="_blank" class="task-comprov-link">📎 Ver comprovante</a>':'';
+  // Ícone de recorrência se esta tarefa tem uma entrada no RECUR
+  var isRecur = RECUR.some(function(r){ return r.desc===t.desc && String(r.recurId||r.id)===String(t.recurId||'__none__') || (t.recurId && String(r.id)===String(t.recurId)); });
+  var recurTag = isRecur ? '<span class="tag trecur" title="Recorrente mensal">🔁 Mensal</span>' : '';
   var sid=String(t.id);
   var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
     '<div class="taski-hdr">'+
@@ -2228,7 +2202,7 @@ function taskCard(t,wrap){
     '<div class="tname'+(done?' done':'')+'">'+esc(t.desc)+'</div>'+
     '<button class="tdel2" data-del="'+sid+'">🗑️</button>'+
     '</div>'+
-    '<div class="tags">'+stag+ttag+'</div>'+
+    '<div class="tags">'+stag+ttag+recurTag+'</div>'+
     '<div class="tmeta">'+dead+
     (t.value?'<span>💰 '+fmtBRL(parseFloat(t.value))+'</span>':'')+
     (done?comprovHTML:'')+
