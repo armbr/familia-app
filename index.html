@@ -379,7 +379,10 @@ select option{background:#1A2A3A}
 .tag.texp{background:rgba(255,107,107,.13);color:var(--red)}
 .tag.tinc{background:rgba(46,204,154,.13);color:var(--green)}
 .tag.ttask{background:rgba(100,160,255,.13);color:#64A0FF}
-.tag.trecur{background:rgba(255,200,50,.13);color:#FFCC33;letter-spacing:.2px}
+.tag.trecur{background:rgba(255,200,50,.13);color:#FFCC33;letter-spacing:.2px;
+  cursor:pointer;border:none;font-family:inherit;font-size:10px;font-weight:700;
+  padding:2px 8px;border-radius:100px;transition:background .15s}
+.tag.trecur:active{background:rgba(255,200,50,.28)}
 .tmeta{font-size:11px;color:var(--t3);display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center;margin-top:4px}
 .tmeta .ov{color:var(--red)}
 .ssel{
@@ -1132,6 +1135,41 @@ select option{background:#1A2A3A}
   </div>
 </div>
 
+<!-- ══ MODAL RECORRÊNCIA ══ -->
+<div id="recur-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:flex-end;justify-content:center;padding:0">
+  <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:22px 20px 32px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span style="font-size:20px">🔁</span>
+      <div>
+        <div style="font-size:15px;font-weight:800;color:var(--t1)" id="rm-title">Recorrência mensal</div>
+        <div style="font-size:11px;color:var(--t3)" id="rm-sub">Todo mês na mesma data</div>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div class="fl">Valor dos próximos meses</div>
+      <div class="r-wrap"><input id="rm-val" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" style="font-size:18px;font-weight:800"></div>
+    </div>
+    <div style="margin-bottom:18px">
+      <div class="fl">Categoria</div>
+      <select id="rm-cat">
+        <optgroup label="── Despesas ──">
+          <option>🍽️ Alimentação</option><option>🚗 Carro/Transporte</option>
+          <option>🏠 Casa/Moradia</option><option>💊 Saúde</option>
+          <option>📚 Educação</option><option>👗 Roupas</option>
+          <option>🎮 Lazer</option><option>💼 Empresa/Negócio</option>
+          <option>🏛️ Taxas/Impostos</option><option>📦 Outros</option>
+        </optgroup>
+        <optgroup label="── Receitas ──">
+          <option>💰 Salário</option><option>⭐ Extra</option>
+        </optgroup>
+      </select>
+    </div>
+    <button onclick="saveRecurEdit()" style="width:100%;padding:13px;border-radius:10px;border:none;background:var(--green);color:#0A1A12;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:10px">Salvar alterações ✓</button>
+    <button onclick="cancelRecurFromModal()" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--red);background:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">🗑️ Cancelar recorrência</button>
+    <button onclick="closeRecurModal()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--t3);font-size:12px;cursor:pointer;font-family:inherit">Fechar</button>
+  </div>
+</div>
+
 <!-- ══ BOTTOM NAV ══ -->
 <div id="nav" style="display:none">
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
@@ -1624,12 +1662,53 @@ function renderFixos(){
   if(el) el.style.display = 'none';
 }
 
+var recurModalId = null;
+
+function openRecurModal(rid){
+  var r = RECUR.find(function(x){ return String(x.id)===String(rid); });
+  if(!r) return;
+  recurModalId = String(rid);
+  document.getElementById('rm-title').textContent = r.desc;
+  document.getElementById('rm-sub').textContent   = 'Todo dia '+pad(new Date((r.date||'2000-01-01')+'T12:00:00').getDate())+' de cada mês';
+  document.getElementById('rm-val').value = r.value || '';
+  var catEl = document.getElementById('rm-cat');
+  catEl.value = r.cat || '📦 Outros';
+  var modal = document.getElementById('recur-modal');
+  modal.style.display = 'flex';
+}
+
+function closeRecurModal(){
+  document.getElementById('recur-modal').style.display = 'none';
+  recurModalId = null;
+}
+
+function saveRecurEdit(){
+  if(!recurModalId) return;
+  var r = RECUR.find(function(x){ return String(x.id)===String(recurModalId); });
+  if(!r){ closeRecurModal(); return; }
+  var newVal = parseFloat(document.getElementById('rm-val').value)||0;
+  var newCat = document.getElementById('rm-cat').value;
+  r.value = newVal;
+  r.cat   = newCat;
+  saveRecur();
+  apiCall('addRecur', r, function(){}); // upsert no servidor
+  closeRecurModal();
+  renderTasks();
+  toast('✅ Recorrência atualizada!');
+}
+
+function cancelRecurFromModal(){
+  if(!recurModalId) return;
+  if(!confirm('Cancelar esta recorrência? Os lançamentos já gerados permanecem.')) return;
+  delRecur(recurModalId);
+  closeRecurModal();
+}
+
 function delRecur(id){
-  if(!confirm('Cancelar este lançamento fixo? Os registros já criados permanecem.')) return;
   RECUR = RECUR.filter(function(r){ return String(r.id) !== String(id); });
   saveRecur();
   apiCall('deleteRecur', {id:id}, function(){});
-  renderFixos();
+  renderTasks();
   toast('🗑️ Recorrência cancelada');
 }
 
@@ -1979,7 +2058,9 @@ function addTask(){
   var task={desc:desc,type:type,deadline:dead,value:val,cat:cat,status:'pend'};
   var tmp=Date.now(); TASKS.unshift(Object.assign({id:tmp},task)); renderTasks();
   if(curRecur){
-    addRecur({type:'task',desc:desc,value:val||0,cat:type,date:dead||ymd(new Date())});
+    var newRecurId = Date.now();
+    addRecur({id:newRecurId,type:type,desc:desc,value:val||0,cat:cat||'',date:dead||ymd(new Date())});
+    task.recurId = newRecurId; // salvar referência na tarefa
     curRecur=false;
     var togR=document.getElementById('recur-toggle');
     var dotR=document.getElementById('recur-dot');
@@ -2174,6 +2255,9 @@ function bindTaskEvents(){
 
 function initTaskDelegation(){
   document.addEventListener('click', function(e){
+    // Botão de recorrência — antes de checar chk
+    var rmBtn = e.target.closest('.recur-manage-btn');
+    if(rmBtn){ e.stopPropagation(); openRecurModal(rmBtn.getAttribute('data-rid')); return; }
     var chk = e.target.closest('[data-chk]');
     if(chk){ toggleTask(chk.getAttribute('data-chk')); return; }
     var del = e.target.closest('[data-del]');
@@ -2192,9 +2276,17 @@ function taskCard(t,wrap){
   var dead=t.deadline?'<span class="'+(ov?'ov':'')+'">📅 '+fmtDate(t.deadline)+(ov?' ⚠️':'')+'</span>':'';
   var comprovHTML=t.comprovUrl
     ?'<a href="'+esc(t.comprovUrl)+'" target="_blank" class="task-comprov-link">📎 Ver comprovante</a>':'';
-  // Ícone de recorrência se esta tarefa tem uma entrada no RECUR
-  var isRecur = RECUR.some(function(r){ return r.desc===t.desc && String(r.recurId||r.id)===String(t.recurId||'__none__') || (t.recurId && String(r.id)===String(t.recurId)); });
-  var recurTag = isRecur ? '<span class="tag trecur" title="Recorrente mensal">🔁 Mensal</span>' : '';
+  // Ícone de recorrência — por recurId ou por desc (fallback)
+  var recurEntry = null;
+  if(t.recurId){
+    recurEntry = RECUR.find(function(r){ return String(r.id)===String(t.recurId); });
+  }
+  if(!recurEntry){
+    recurEntry = RECUR.find(function(r){ return r.desc===t.desc; });
+  }
+  var recurTag = recurEntry
+    ? '<button class="tag trecur recur-manage-btn" data-rid="'+String(recurEntry.id)+'" title="Recorrente mensal — clique para gerenciar">🔁 Mensal</button>'
+    : '';
   var sid=String(t.id);
   var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
     '<div class="taski-hdr">'+
