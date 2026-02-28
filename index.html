@@ -1281,7 +1281,9 @@ function save(){
 function balOf(list){
   var i=0,e=0;
   list.forEach(function(t){
+    if(t.type!=='inc' && t.type!=='exp') return; // ignorar inválidos
     var v=parseFloat(t.value||0);
+    if(isNaN(v)||v<=0) return; // ignorar zeros/NaN
     if(t.type==='inc') i+=v; else e+=v;
   });
   return {i:i,e:e,b:i-e};
@@ -1450,16 +1452,22 @@ function syncAll(){
 
   apiCall('getTransactions',null,function(err,d){
     if(!err && d.ok){
-      TXS = d.data.map(function(t){
-        return Object.assign({}, t, {
-          date:  ymds(t.date),
-          desc:  String(t.desc  || t.description || ''),
-          value: parseFloat(t.value || t.amount || t.valor || 0),
-          cat:   String(t.cat   || t.category   || t.categoria || '📦 Outros'),
-          type:  String(t.type  || t.tipo || 'exp'),
-          id:    String(t.id    || t.ID  || Date.now())
+      TXS = d.data
+        .map(function(t){
+          return Object.assign({}, t, {
+            date:  ymds(t.date),
+            desc:  String(t.desc  || t.description || ''),
+            value: parseFloat(t.value || t.amount || t.valor || 0),
+            cat:   String(t.cat   || t.category   || t.categoria || '📦 Outros'),
+            type:  String(t.type  || t.tipo || ''),
+            id:    String(t.id    || t.ID  || Date.now())
+          });
+        })
+        .filter(function(t){
+          // Descartar qualquer linha com type inválido
+          // (lixo gerado pela versão antiga do processRecur)
+          return t.type === 'inc' || t.type === 'exp';
         });
-      });
       save();
     }
     tick();
@@ -1834,17 +1842,29 @@ function delTx(id){
 }
 
 function filteredTxs(){
+  var today = ymd(new Date());
   return TXS.filter(function(t){
     if(!ymds(t.date).startsWith(selMonth)) return false;
-    var tp = t.type;
-    if(tp !== 'inc' && tp !== 'exp') return false;
+    if(t.type !== 'inc' && t.type !== 'exp') return false;
+    // Saldo só computa transações com data <= hoje
+    // (transações futuras são projeções, não realizadas)
+    if(ymds(t.date) > today) return false;
     return true;
   });
 }
 
 function validTxs(){
+  // Todas as transações válidas (sem filtro de data — para histórico)
   return TXS.filter(function(t){
     return t.type === 'inc' || t.type === 'exp';
+  });
+}
+
+// Só transações realizadas (data <= hoje) — para saldo e resumo
+function realizedTxs(){
+  var today = ymd(new Date());
+  return TXS.filter(function(t){
+    return (t.type === 'inc' || t.type === 'exp') && ymds(t.date) <= today;
   });
 }
 
