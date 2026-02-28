@@ -1407,21 +1407,30 @@ function syncAll(){
   var btn=document.getElementById('sync-btn');
   btn.classList.add('spinning'); load(true,'Sincronizando...');
   var done=0;
+  var recurReady=false, tasksReady=false;
+
+  function tryProcessRecur(){
+    // Só rodar processRecur depois que RECUR e TASKS estiverem atualizados
+    if(recurReady && tasksReady) processRecur();
+  }
+
   function tick(){
     done++;
-    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje && renderHoje(); toast('✅ Sincronizado!'); }
+    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
   }
+
   apiCall('getRecur',null,function(err,d){
     if(!err && d && d.ok && d.data){
-      // Merge: manter locais que não estão no servidor
       var serverIds = d.data.map(function(r){ return String(r.id); });
       var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1; });
       RECUR = d.data.concat(localOnly);
       saveRecur();
     }
-    processRecur();
+    recurReady = true;
+    tryProcessRecur();
     tick();
   });
+
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
       DOCS = d.data.map(function(x){
@@ -1438,6 +1447,7 @@ function syncAll(){
     }
     tick();
   });
+
   apiCall('getTransactions',null,function(err,d){
     if(!err && d.ok){
       TXS = d.data.map(function(t){
@@ -1454,19 +1464,23 @@ function syncAll(){
     }
     tick();
   });
+
   apiCall('getTasks',null,function(err,d){
     if(!err && d.ok){
       TASKS = d.data.map(function(t){
         return Object.assign({}, t, {
-          deadline: ymds(t.deadline || t.prazo || t.due || ''),
-          desc:     String(t.desc || t.description || t.descricao || ''),
-          status:   String(t.status || 'pend'),
-          type:     String(t.type   || t.tipo || 'exp'),
-          id:       String(t.id     || t.ID   || Date.now())
+          deadline:  ymds(t.deadline || t.prazo || t.due || ''),
+          desc:      String(t.desc || t.description || t.descricao || ''),
+          status:    String(t.status || 'pend'),
+          type:      String(t.type   || t.tipo || 'exp'),
+          id:        String(t.id     || t.ID   || Date.now()),
+          recurId:   t.recurId ? String(t.recurId) : ''
         });
       });
       save();
     }
+    tasksReady = true;
+    tryProcessRecur();
     tick();
   });
 }
@@ -1741,15 +1755,18 @@ function processRecur(){
       // Só criar se a data alvo for >= hoje (não gerar datas passadas)
       if(targetDate < today) return;
 
-      // Verificar se já existe tarefa pendente com este recurId neste mês
+      // Checar por recurId OU por desc (fallback) no mesmo mês
       var existsTask = TASKS.some(function(t){
-        return String(t.recurId) === String(r.id) &&
-               ymds(t.deadline||'').substring(0,7) === moStr;
+        var tMo = ymds(t.deadline||'').substring(0,7);
+        if(tMo !== moStr) return false;
+        return (t.recurId && String(t.recurId) === String(r.id)) ||
+               (t.desc === r.desc);
       });
-      // Ou já existe TXS pago (concluído) com este recurId neste mês
       var existsTx = TXS.some(function(t){
-        return String(t.recurId) === String(r.id) &&
-               ymds(t.date).substring(0,7) === moStr;
+        var tMo = ymds(t.date).substring(0,7);
+        if(tMo !== moStr) return false;
+        return (t.recurId && String(t.recurId) === String(r.id)) ||
+               (t.desc === r.desc && (t.type === r.type));
       });
 
       if(!existsTask && !existsTx){
@@ -1819,18 +1836,15 @@ function delTx(id){
 function filteredTxs(){
   return TXS.filter(function(t){
     if(!ymds(t.date).startsWith(selMonth)) return false;
-    // Normalizar type — só inc e exp são válidos
     var tp = t.type;
     if(tp !== 'inc' && tp !== 'exp') return false;
     return true;
   });
 }
 
-// Versão sem filtro de mês — para histórico e views por data
 function validTxs(){
   return TXS.filter(function(t){
-    var tp = t.type;
-    return tp === 'inc' || tp === 'exp';
+    return t.type === 'inc' || t.type === 'exp';
   });
 }
 
