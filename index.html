@@ -278,10 +278,12 @@ select option{background:#1A2A3A}
 }
 .vbtn{
   padding:7px 3px;border:none;background:transparent;
-  color:var(--t3);font-family:inherit;font-size:11px;
+  color:var(--t2);font-family:inherit;font-size:11px;
   font-weight:700;border-radius:8px;cursor:pointer;transition:all .2s;
+  opacity:.7;
 }
-.vbtn.on{background:var(--card2);color:var(--green)}
+.vbtn.on{background:var(--card2);color:var(--green);opacity:1}
+.vbtn:hover{opacity:1}
 
 /* ════════════════════════════════
    CALENDAR SHARED
@@ -1198,7 +1200,15 @@ select option{background:#1A2A3A}
 //  STATE
 // ════════════════════════════════════════
 var API = ''; // will be loaded in init() after DOM ready
-var TXS   = JSON.parse(localStorage.getItem('ff_txs')   || '[]');
+var TXS   = (function(){
+  var raw = JSON.parse(localStorage.getItem('ff_txs') || '[]');
+  // Limpar cache: remover TXS inválidas (recurId sem fromAgenda, type inválido)
+  return raw.filter(function(t){
+    if(t.type !== 'inc' && t.type !== 'exp') return false;
+    if(t.recurId && t.recurId !== '' && !t.fromAgenda) return false;
+    return true;
+  });
+})();
 var TASKS = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
 var RECUR = JSON.parse(localStorage.getItem('ff_recur') || '[]');
 var COLLAPSED_PASTAS = JSON.parse(localStorage.getItem('ff_collapsed') || '[]');
@@ -1278,6 +1288,15 @@ function load(show,msg){
 function save(){
   localStorage.setItem('ff_txs',   JSON.stringify(TXS));
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+}
+
+// Retorna true se a transação é um lançamento real (não automático/pendente)
+function txValida(t){
+  // Só aceitar tipos financeiros
+  if(t.type !== 'inc' && t.type !== 'exp') return false;
+  // Rejeitar lançamentos automáticos da recorrência antiga (têm recurId sem fromAgenda)
+  if(t.recurId && t.recurId !== '' && !t.fromAgenda) return false;
+  return true;
 }
 function balOf(list){
   var i=0,e=0;
@@ -1851,36 +1870,23 @@ function delTx(id){
 }
 
 function filteredTxs(){
-  var now       = new Date();
-  var curMonth  = now.getFullYear()+'-'+pad(now.getMonth()+1); // ex: '2026-02'
-  var today     = ymd(now);  // ex: '2026-02-28'
+  var now      = new Date();
+  var curMonth = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var today    = ymd(now);
 
   return TXS.filter(function(t){
-    var tDate = ymds(t.date);           // normaliza para YYYY-MM-DD
-    var tMonth = tDate.substring(0,7);  // ex: '2026-02'
-
-    // 1. Só do mês selecionado
-    if(tMonth !== selMonth) return false;
-
-    // 2. Só tipos válidos
-    if(t.type !== 'inc' && t.type !== 'exp') return false;
-
-    // 3. Se o mês selecionado é futuro → não mostrar nada no saldo
-    if(selMonth > curMonth) return false;
-
-    // 4. Se é o mês atual → só datas já chegadas (<= hoje)
-    if(selMonth === curMonth && tDate > today) return false;
-
-    // 5. Mês passado → mostrar tudo (já realizado)
+    if(!txValida(t)) return false;                        // só lançamentos reais
+    var tDate  = ymds(t.date);
+    var tMonth = tDate.substring(0,7);
+    if(tMonth !== selMonth) return false;                 // só mês selecionado
+    if(selMonth > curMonth) return false;                 // mês futuro: nada
+    if(selMonth === curMonth && tDate > today) return false; // mês atual: só até hoje
     return true;
   });
 }
 
 function validTxs(){
-  // Todas as transações válidas (sem filtro de data — para histórico)
-  return TXS.filter(function(t){
-    return t.type === 'inc' || t.type === 'exp';
-  });
+  return TXS.filter(txValida);
 }
 
 // Só transações realizadas (data <= hoje) — para saldo e resumo
@@ -2616,9 +2622,9 @@ function renderHoje(){
   var now = new Date(); now.setHours(0,0,0,0);
 
   // Transações de hoje — só as registradas diretamente em Finanças
-  // Excluir fromAgenda=true (essas já aparecem como tarefas)
+  // Só lançamentos reais de Finanças (txValida) registrados hoje
   var todTxs = TXS.filter(function(t){
-    return ymds(t.date) === tod && !t.fromAgenda;
+    return ymds(t.date) === tod && txValida(t) && !t.fromAgenda;
   });
   var pgtos  = todTxs.filter(function(t){ return t.type === 'exp'; });
   var recs   = todTxs.filter(function(t){ return t.type === 'inc'; });
