@@ -785,9 +785,6 @@ select option{background:#1A2A3A}
                 <option>💳 Cartão de Crédito</option>
                 <option>📈 Investimentos</option>
                 <option>🏦 Financiamentos</option>
-                <option>💳 Cartão de Crédito</option>
-                <option>📈 Investimentos</option>
-                <option>🏦 Financiamentos</option>
                 <option>📦 Outros</option>
               </optgroup>
               <optgroup label="── Receitas ──">
@@ -923,9 +920,6 @@ select option{background:#1A2A3A}
                 <option>🎮 Lazer</option>
                 <option>💼 Empresa/Negócio</option>
                 <option>🏛️ Taxas/Impostos</option>
-                <option>💳 Cartão de Crédito</option>
-                <option>📈 Investimentos</option>
-                <option>🏦 Financiamentos</option>
                 <option>💳 Cartão de Crédito</option>
                 <option>📈 Investimentos</option>
                 <option>🏦 Financiamentos</option>
@@ -1169,7 +1163,11 @@ select option{background:#1A2A3A}
           <option>🏠 Casa/Moradia</option><option>💊 Saúde</option>
           <option>📚 Educação</option><option>👗 Roupas</option>
           <option>🎮 Lazer</option><option>💼 Empresa/Negócio</option>
-          <option>🏛️ Taxas/Impostos</option><option>📦 Outros</option>
+          <option>🏛️ Taxas/Impostos</option>
+          <option>💳 Cartão de Crédito</option>
+          <option>📈 Investimentos</option>
+          <option>🏦 Financiamentos</option>
+          <option>📦 Outros</option>
         </optgroup>
         <optgroup label="── Receitas ──">
           <option>💰 Salário</option><option>⭐ Extra</option>
@@ -1727,46 +1725,55 @@ function delRecur(id){
 // Chamado no syncAll — cria lançamento deste mês se ainda não existe
 function processRecur(){
   if(!RECUR.length) return;
-  var now = new Date();
-  var thisMo = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var now    = new Date();
+  var today  = ymd(now); // YYYY-MM-DD
   var created = 0;
 
-  RECUR.forEach(function(r){
-    // Pegar o dia original do lançamento
-    var origDay = new Date(r.date+'T12:00:00').getDate();
-    var targetDate = thisMo+'-'+pad(origDay);
+  // Gerar para os próximos 3 meses a partir do mês atual
+  for(var mo = 0; mo < 3; mo++){
+    var d = new Date(now.getFullYear(), now.getMonth() + mo, 1);
+    var moStr = d.getFullYear()+'-'+pad(d.getMonth()+1);
 
-    // Verificar se já existe um lançamento com este recurId neste mês
-    var exists = TXS.some(function(t){
-      return String(t.recurId) === String(r.id) &&
-             ymds(t.date).substring(0,7) === thisMo;
-    });
+    RECUR.forEach(function(r){
+      var origDay    = new Date((r.date||today)+'T12:00:00').getDate();
+      var targetDate = moStr+'-'+pad(origDay);
 
-    if(!exists){
-      var tx = {
-        type:    r.type,
-        desc:    r.desc,
-        value:   r.value,
-        cat:     r.cat,
-        date:    targetDate,
-        recurId: r.id
-      };
-      // Otimista: adicionar localmente já
-      var tmp = Date.now() + Math.random();
-      TXS.unshift(Object.assign({id:tmp}, tx));
-      created++;
-      apiCall('addTransaction', tx, function(err){
-        if(err){
-          TXS = TXS.filter(function(t){ return t.id !== tmp; });
-        }
+      // Só criar se a data alvo for >= hoje (não gerar datas passadas)
+      if(targetDate < today) return;
+
+      // Verificar se já existe tarefa pendente com este recurId neste mês
+      var existsTask = TASKS.some(function(t){
+        return String(t.recurId) === String(r.id) &&
+               ymds(t.deadline||'').substring(0,7) === moStr;
       });
-    }
-  });
+      // Ou já existe TXS pago (concluído) com este recurId neste mês
+      var existsTx = TXS.some(function(t){
+        return String(t.recurId) === String(r.id) &&
+               ymds(t.date).substring(0,7) === moStr;
+      });
+
+      if(!existsTask && !existsTx){
+        var task = {
+          desc:     r.desc,
+          type:     r.type || 'exp',
+          deadline: targetDate,
+          value:    r.value,
+          cat:      r.cat || '',
+          status:   'pend',
+          recurId:  r.id
+        };
+        var tmp = Date.now() + Math.random();
+        TASKS.unshift(Object.assign({id:tmp}, task));
+        created++;
+        apiCall('addTask', task, function(){});
+      }
+    });
+  }
 
   if(created > 0){
-    localStorage.setItem('ff_txs', JSON.stringify(TXS));
+    localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
     renderAll();
-    toast('🔁 '+created+' lançamento'+(created>1?'s fixos gerados':'fixo gerado')+'!');
+    toast('🔁 '+created+' compromisso'+(created>1?'s recorrentes':'  recorrente')+' criado'+(created>1?'s':'')+'!');
   }
 }
 
@@ -1810,7 +1817,21 @@ function delTx(id){
 }
 
 function filteredTxs(){
-  return TXS.filter(function(t){return ymds(t.date).startsWith(selMonth);});
+  return TXS.filter(function(t){
+    if(!ymds(t.date).startsWith(selMonth)) return false;
+    // Normalizar type — só inc e exp são válidos
+    var tp = t.type;
+    if(tp !== 'inc' && tp !== 'exp') return false;
+    return true;
+  });
+}
+
+// Versão sem filtro de mês — para histórico e views por data
+function validTxs(){
+  return TXS.filter(function(t){
+    var tp = t.type;
+    return tp === 'inc' || tp === 'exp';
+  });
 }
 
 function renderBal(){
@@ -1824,7 +1845,7 @@ function renderBal(){
 }
 
 function renderHist(){
-  var months=[...new Set(TXS.map(function(t){return ymds(t.date).substring(0,7);}))].sort().reverse();
+  var months=[...new Set(validTxs().map(function(t){return ymds(t.date).substring(0,7);}))].sort().reverse();
   var mf=document.getElementById('mf-row');
   mf.innerHTML=months.map(function(m){
     var p=m.split('-');
@@ -1861,7 +1882,19 @@ function renderCat(){
 }
 
 function txCard(t){
-  return '<div class="txi"><div class="txi-ico '+t.type+'">'+(t.type==='exp'?'🔴':'🟢')+'</div><div class="txi-info"><div class="txi-desc">'+esc(t.desc)+'</div><div class="txi-meta"><span class="txi-cat">'+esc(t.cat)+'</span><span>'+fmtDate(t.date)+'</span></div></div><div class="txi-val '+t.type+'">'+(t.type==='exp'?'-':'+' )+fmtBRL(parseFloat(t.value))+'</div><button class="tdel" onclick="delTx(\''+t.id+'\')">🗑️</button></div>';
+  var tp=(t.type==='inc')?'inc':'exp';
+  var ico=tp==='exp'?'🔴':'🟢';
+  var sig=tp==='exp'?'-':'+';
+  var sid=String(t.id);
+  return '<div class="txi">'+
+    '<div class="txi-ico '+tp+'">'+ico+'</div>'+
+    '<div class="txi-info">'+
+      '<div class="txi-desc">'+esc(t.desc)+'</div>'+
+      '<div class="txi-meta"><span class="txi-cat">'+esc(t.cat||'')+'</span><span>'+fmtDate(t.date)+'</span></div>'+
+    '</div>'+
+    '<div class="txi-val '+tp+'">'+sig+fmtBRL(parseFloat(t.value||0))+'</div>'+
+    '<button class="tdel" data-txdel="'+sid+'">🗑️</button>'+
+  '</div>';
 }
 
 // ════════════════════════════════════════
@@ -1883,8 +1916,8 @@ function renderFinView(){
   if(curFinView==='future') renderFuture();
 }
 
-function txsOn(d){ var target=ymd(d); return TXS.filter(function(t){return ymds(t.date)===target;}); }
-function txsIn(from,to){ return TXS.filter(function(t){var d=ymds(t.date);return d>=from&&d<=to;}); }
+function txsOn(d){ var target=ymd(d); return validTxs().filter(function(t){return ymds(t.date)===target;}); }
+function txsIn(from,to){ return validTxs().filter(function(t){var d=ymds(t.date);return d>=from&&d<=to;}); }
 
 function balMini(id,b){
   document.getElementById(id).innerHTML=
@@ -2267,13 +2300,14 @@ function bindTaskEvents(){
 
 function initTaskDelegation(){
   document.addEventListener('click', function(e){
-    // Botão de recorrência — antes de checar chk
     var rmBtn = e.target.closest('.recur-manage-btn');
     if(rmBtn){ e.stopPropagation(); openRecurModal(rmBtn.getAttribute('data-rid')); return; }
     var chk = e.target.closest('[data-chk]');
     if(chk){ toggleTask(chk.getAttribute('data-chk')); return; }
     var del = e.target.closest('[data-del]');
     if(del){ delTask(del.getAttribute('data-del')); return; }
+    var txdel = e.target.closest('[data-txdel]');
+    if(txdel){ delTx(txdel.getAttribute('data-txdel')); return; }
   });
 }
 
