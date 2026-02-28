@@ -1251,8 +1251,9 @@ function ymds(s){
 }
 function pad(n){ return String(n).padStart(2,'0'); }
 function weekStart(d){
+  // Semana começa no Domingo (getDay()===0)
   var dt=new Date(d); var day=dt.getDay();
-  var diff = day===0 ? -6 : 1-day;
+  var diff = -day; // Dom=0→0, Seg=1→-1, ..., Sab=6→-6
   dt.setDate(dt.getDate()+diff); dt.setHours(0,0,0,0); return dt;
 }
 function fmtBRL(v){
@@ -1332,6 +1333,14 @@ function boot(){
   document.getElementById('hdr').style.display='block';
   document.getElementById('content').style.display='block';
   document.getElementById('nav').style.display='flex';
+
+  // Resetar datas de navegação sempre que a página carrega
+  tdDate  = today0();
+  twStart = weekStart(new Date());
+  tmDate  = new Date();
+  fdDate  = today0();
+  fwStart = weekStart(new Date());
+  fmDate  = new Date();
 
   // Delegação global de eventos das tarefas (feito uma vez)
   initTaskDelegation();
@@ -1842,13 +1851,27 @@ function delTx(id){
 }
 
 function filteredTxs(){
-  var today = ymd(new Date());
+  var now       = new Date();
+  var curMonth  = now.getFullYear()+'-'+pad(now.getMonth()+1); // ex: '2026-02'
+  var today     = ymd(now);  // ex: '2026-02-28'
+
   return TXS.filter(function(t){
-    if(!ymds(t.date).startsWith(selMonth)) return false;
+    var tDate = ymds(t.date);           // normaliza para YYYY-MM-DD
+    var tMonth = tDate.substring(0,7);  // ex: '2026-02'
+
+    // 1. Só do mês selecionado
+    if(tMonth !== selMonth) return false;
+
+    // 2. Só tipos válidos
     if(t.type !== 'inc' && t.type !== 'exp') return false;
-    // Saldo só computa transações com data <= hoje
-    // (transações futuras são projeções, não realizadas)
-    if(ymds(t.date) > today) return false;
+
+    // 3. Se o mês selecionado é futuro → não mostrar nada no saldo
+    if(selMonth > curMonth) return false;
+
+    // 4. Se é o mês atual → só datas já chegadas (<= hoje)
+    if(selMonth === curMonth && tDate > today) return false;
+
+    // 5. Mês passado → mostrar tudo (já realizado)
     return true;
   });
 }
@@ -1988,7 +2011,7 @@ function shiftFD(n){ fdDate.setDate(fdDate.getDate()+n); renderFD(); }
 
 // FIN WEEK
 function renderFW(){
-  var days=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  var days=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var tod=ymd(new Date());
   var we=new Date(fwStart); we.setDate(we.getDate()+6);
   document.getElementById('fw-lbl').textContent=
@@ -2020,7 +2043,7 @@ function renderFM(){
   var tod=ymd(new Date());
   document.getElementById('fm-lbl').textContent=
     fmDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-  var dh=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  var dh=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var gh=dh.map(function(d){return '<div class="mgh">'+d+'</div>';}).join('');
   var fd=new Date(yr,mo,1); var ld=new Date(yr,mo+1,0);
   var off=fd.getDay()-1; if(off<0)off=6;
@@ -2419,7 +2442,7 @@ function shiftTD(n){ tdDate.setDate(tdDate.getDate()+n); renderTD(); }
 
 // TASK WEEK
 function renderTW(){
-  var days=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  var days=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var tod=ymd(new Date());
   var we=new Date(twStart); we.setDate(we.getDate()+6);
   document.getElementById('tw-lbl').textContent=
@@ -2456,7 +2479,7 @@ function renderTM(){
   var tod=ymd(new Date());
   document.getElementById('tm-lbl').textContent=
     tmDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-  var dh=['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'];
+  var dh=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var gh=dh.map(function(d){return '<div class="mgh">'+d+'</div>';}).join('');
   var fd=new Date(yr,mo,1); var ld=new Date(yr,mo+1,0);
   var off=fd.getDay()-1; if(off<0)off=6;
@@ -2592,14 +2615,17 @@ function renderHoje(){
   var tod = ymd(new Date());
   var now = new Date(); now.setHours(0,0,0,0);
 
-  // Transações de hoje
-  var todTxs = TXS.filter(function(t){ return ymds(t.date) === tod; });
+  // Transações de hoje — só as registradas diretamente em Finanças
+  // Excluir fromAgenda=true (essas já aparecem como tarefas)
+  var todTxs = TXS.filter(function(t){
+    return ymds(t.date) === tod && !t.fromAgenda;
+  });
   var pgtos  = todTxs.filter(function(t){ return t.type === 'exp'; });
   var recs   = todTxs.filter(function(t){ return t.type === 'inc'; });
 
-  // Tarefas de hoje (não concluídas)
+  // Tarefas de hoje: TODAS (pendentes e concluídas) com prazo hoje
   var todTasks = TASKS.filter(function(t){
-    return ymds(t.deadline) === tod && t.status !== 'done';
+    return ymds(t.deadline) === tod;
   });
 
   // Atrasados: transações e tarefas de dias anteriores não "concluídas"
@@ -2621,9 +2647,10 @@ function renderHoje(){
   document.getElementById('hoje-date-lbl').textContent =
     now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-  // Contadores
+  // Contadores — só pendentes no número do cabeçalho
+  var todPend = todTasks.filter(function(t){ return t.status !== 'done'; });
   document.getElementById('hc-pgto').textContent = pgtos.length;
-  document.getElementById('hc-task').textContent = todTasks.length;
+  document.getElementById('hc-task').textContent = todPend.length;
   document.getElementById('hc-rec').textContent  = recs.length;
 
   // Badges
@@ -2635,7 +2662,7 @@ function renderHoje(){
   // Mostrar/ocultar seções vazias
   document.getElementById('hs-pgto').style.display    = pgtos.length    ? 'block':'none';
   document.getElementById('hs-rec').style.display     = recs.length     ? 'block':'none';
-  document.getElementById('hs-task').style.display    = todTasks.length ? 'block':'none';
+  document.getElementById('hs-task').style.display    = todTasks.length ? 'block':'none'; // inclui concluídas
   document.getElementById('hs-atrasado').style.display = atrasadoTasks.length ? 'block':'none';
 
   // Render pagamentos
@@ -2659,7 +2686,8 @@ function renderHoje(){
     : '';
 
   // Se tudo vazio, mostrar mensagem de parabéns
-  if(!pgtos.length && !recs.length && !todTasks.length && !atrasadoTasks.length){
+  var todPendTasks = todTasks.filter(function(t){ return t.status !== 'done'; });
+  if(!pgtos.length && !recs.length && !todPendTasks.length && !atrasadoTasks.length && !todTasks.filter(function(t){return t.status==='done';}).length){
     document.getElementById('hs-pgto').style.display = 'block';
     document.getElementById('hoje-pgto-list').innerHTML =
       '<div class="hoje-empty"><div class="he-icon">🎉</div><div class="he-txt">Dia livre! Nenhum compromisso hoje.</div></div>';
