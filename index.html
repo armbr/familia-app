@@ -1024,9 +1024,28 @@ select option{background:#1A2A3A}
     </div>
 
     <!-- gastos do dia -->
+    <!-- 1. Compromissos de hoje -->
+    <div class="hoje-section" id="hs-task">
+      <div class="hoje-section-title">
+        <span>📅 Compromissos de hoje <span class="hst-badge" id="hb-task">0</span></span>
+        <span class="hst-total" id="ht-task-total"></span>
+      </div>
+      <div id="hoje-task-list"></div>
+    </div>
+
+    <!-- 2. Atrasados -->
+    <div class="hoje-section" id="hs-atrasado">
+      <div class="hoje-section-title" style="color:#FF6B6B">
+        <span>⚠️ Atrasados (dias anteriores) <span class="hst-badge" id="hb-atrasado">0</span></span>
+        <span class="hst-total" id="ht-atrasado-total" style="color:#FF6B6B"></span>
+      </div>
+      <div id="hoje-atrasado-list"></div>
+    </div>
+
+    <!-- 3. Pagos hoje (antigo "Pagamentos de hoje") -->
     <div class="hoje-section" id="hs-pgto">
       <div class="hoje-section-title">
-        💸 Pagamentos de hoje
+        ✅ Pagos hoje
         <span class="hst-badge" id="hb-pgto">0</span>
       </div>
       <div id="hoje-pgto-list"></div>
@@ -1039,24 +1058,6 @@ select option{background:#1A2A3A}
         <span class="hst-badge" id="hb-rec">0</span>
       </div>
       <div id="hoje-rec-list"></div>
-    </div>
-
-    <!-- tarefas do dia -->
-    <div class="hoje-section" id="hs-task">
-      <div class="hoje-section-title">
-        📅 Compromissos de hoje
-        <span class="hst-badge" id="hb-task">0</span>
-      </div>
-      <div id="hoje-task-list"></div>
-    </div>
-
-    <!-- atrasados -->
-    <div class="hoje-section" id="hs-atrasado">
-      <div class="hoje-section-title" style="color:#FF6B6B">
-        ⚠️ Atrasados (dias anteriores)
-        <span class="hst-badge" id="hb-atrasado">0</span>
-      </div>
-      <div id="hoje-atrasado-list"></div>
     </div>
 
   </div><!-- /sec-hoje -->
@@ -1776,11 +1777,34 @@ function delRecur(id){
 function processRecur(){
   if(!RECUR.length) return;
   var now    = new Date();
-  var today  = ymd(now); // YYYY-MM-DD
+  var today  = ymd(now);
   var created = 0;
 
-  // Gerar para os próximos 3 meses a partir do mês atual
-  for(var mo = 0; mo < 3; mo++){
+  // Pré-indexar TASKS por "desc|mês" para lookup O(1)
+  var taskIndex = {};
+  TASKS.forEach(function(t){
+    var dl = ymds(t.deadline || '');
+    if(!dl) return;
+    var mo = dl.substring(0,7);
+    var key = t.desc.trim().toLowerCase() + '|' + mo;
+    taskIndex[key] = true;
+    // também indexar por recurId|mês
+    if(t.recurId){
+      var rkey = 'rid:'+String(t.recurId)+'|'+mo;
+      taskIndex[rkey] = true;
+    }
+  });
+
+  // Pré-indexar TXS concluídas por "desc|mês"
+  var txIndex = {};
+  TXS.forEach(function(t){
+    var mo = ymds(t.date).substring(0,7);
+    var key = t.desc.trim().toLowerCase() + '|' + mo;
+    txIndex[key] = true;
+  });
+
+  // Gerar para os próximos 2 meses a partir do mês atual
+  for(var mo = 0; mo < 2; mo++){
     var d = new Date(now.getFullYear(), now.getMonth() + mo, 1);
     var moStr = d.getFullYear()+'-'+pad(d.getMonth()+1);
 
@@ -1788,45 +1812,40 @@ function processRecur(){
       var origDay    = new Date((r.date||today)+'T12:00:00').getDate();
       var targetDate = moStr+'-'+pad(origDay);
 
-      // Só criar se a data alvo for >= hoje (não gerar datas passadas)
+      // Não gerar datas passadas
       if(targetDate < today) return;
 
-      // Checar por recurId OU por desc (fallback) no mesmo mês
-      var existsTask = TASKS.some(function(t){
-        var tMo = ymds(t.deadline||'').substring(0,7);
-        if(tMo !== moStr) return false;
-        return (t.recurId && String(t.recurId) === String(r.id)) ||
-               (t.desc === r.desc);
-      });
-      var existsTx = TXS.some(function(t){
-        var tMo = ymds(t.date).substring(0,7);
-        if(tMo !== moStr) return false;
-        return (t.recurId && String(t.recurId) === String(r.id)) ||
-               (t.desc === r.desc && (t.type === r.type));
-      });
+      var descKey = r.desc.trim().toLowerCase() + '|' + moStr;
+      var ridKey  = 'rid:'+String(r.id)+'|'+moStr;
 
-      if(!existsTask && !existsTx){
-        var task = {
-          desc:     r.desc,
-          type:     r.type || 'exp',
-          deadline: targetDate,
-          value:    r.value,
-          cat:      r.cat || '',
-          status:   'pend',
-          recurId:  r.id
-        };
-        var tmp = Date.now() + Math.random();
-        TASKS.unshift(Object.assign({id:tmp}, task));
-        created++;
-        apiCall('addTask', task, function(){});
-      }
+      // Já existe tarefa com mesmo nome OU mesmo recurId neste mês?
+      if(taskIndex[descKey] || taskIndex[ridKey]) return;
+      // Já existe TXS paga com mesmo nome neste mês?
+      if(txIndex[descKey]) return;
+
+      var task = {
+        desc:     r.desc,
+        type:     r.type || 'exp',
+        deadline: targetDate,
+        value:    r.value,
+        cat:      r.cat || '',
+        status:   'pend',
+        recurId:  r.id
+      };
+      var tmp = Date.now() + Math.random();
+      TASKS.unshift(Object.assign({id:tmp}, task));
+      // Marcar no índice para não duplicar dentro do mesmo processRecur
+      taskIndex[descKey] = true;
+      taskIndex[ridKey]  = true;
+      created++;
+      apiCall('addTask', task, function(){});
     });
   }
 
   if(created > 0){
     localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
     renderAll();
-    toast('🔁 '+created+' compromisso'+(created>1?'s recorrentes':'  recorrente')+' criado'+(created>1?'s':'')+'!');
+    toast('🔁 '+created+' compromisso'+(created>1?'s recorrentes adicionados':'  recorrente adicionado')+'!');
   }
 }
 
@@ -2653,17 +2672,29 @@ function renderHoje(){
   document.getElementById('hoje-date-lbl').textContent =
     now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-  // Contadores — só pendentes no número do cabeçalho
+  // Contadores
   var todPend = todTasks.filter(function(t){ return t.status !== 'done'; });
   document.getElementById('hc-pgto').textContent = pgtos.length;
   document.getElementById('hc-task').textContent = todPend.length;
   document.getElementById('hc-rec').textContent  = recs.length;
 
   // Badges
-  document.getElementById('hb-pgto').textContent = pgtos.length;
-  document.getElementById('hb-rec').textContent  = recs.length;
-  document.getElementById('hb-task').textContent = todTasks.length;
+  document.getElementById('hb-pgto').textContent     = pgtos.length;
+  document.getElementById('hb-rec').textContent      = recs.length;
+  document.getElementById('hb-task').textContent     = todPend.length;
   document.getElementById('hb-atrasado').textContent = atrasadoTasks.length;
+
+  // Totais — soma dos valores pendentes
+  var totalHoje = todPend.reduce(function(s,t){
+    return s + (t.type !== 'task' ? parseFloat(t.value||0) : 0);
+  }, 0);
+  var totalAtrasado = atrasadoTasks.reduce(function(s,t){
+    return s + (t.type !== 'task' ? parseFloat(t.value||0) : 0);
+  }, 0);
+  var elTotHoje = document.getElementById('ht-task-total');
+  var elTotAtr  = document.getElementById('ht-atrasado-total');
+  if(elTotHoje) elTotHoje.textContent = totalHoje > 0 ? fmtBRL(totalHoje) : '';
+  if(elTotAtr)  elTotAtr.textContent  = totalAtrasado > 0 ? fmtBRL(totalAtrasado) : '';
 
   // Mostrar/ocultar seções vazias
   document.getElementById('hs-pgto').style.display    = pgtos.length    ? 'block':'none';
