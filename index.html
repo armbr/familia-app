@@ -1447,7 +1447,7 @@ function syncAll(){
 
   function tick(){
     done++;
-    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); toast('✅ Sincronizado!'); }
+    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
   apiCall('getRecur',null,function(err,d){
@@ -1505,19 +1505,27 @@ function syncAll(){
   apiCall('getTasks',null,function(err,d){
     if(!err && d.ok){
       TASKS = d.data.map(function(t){
+        // Normalizar deadline — pode vir como string ISO, DD/MM/YYYY, ou YYYY-MM-DD
+        var dl = t.deadline || t.prazo || t.due || '';
+        // Se vier como número (timestamp Excel), converter
+        if(typeof dl === 'number') dl = new Date(dl).toISOString();
+        var dlNorm = ymds(String(dl));
         return Object.assign({}, t, {
-          deadline:  ymds(t.deadline || t.prazo || t.due || ''),
+          deadline:  dlNorm,
           desc:      String(t.desc || t.description || t.descricao || ''),
-          status:    String(t.status || 'pend'),
+          status:    String(t.status || '').trim() || 'pend',
           type:      String(t.type   || t.tipo || 'exp'),
           id:        String(t.id     || t.ID   || Date.now()),
-          recurId:   t.recurId ? String(t.recurId) : ''
+          recurId:   t.recurId ? String(t.recurId) : '',
+          value:     parseFloat(t.value || 0)
         });
       });
       save();
     }
     tasksReady = true;
     tryProcessRecur();
+    // Atualizar aba Hoje imediatamente após TASKS chegarem do servidor
+    if(curSection === 'hoje') renderHoje();
     tick();
   });
 }
