@@ -385,6 +385,17 @@ select option{background:#1A2A3A}
   cursor:pointer;border:none;font-family:inherit;font-size:10px;font-weight:700;
   padding:2px 8px;border-radius:100px;transition:background .15s}
 .tag.trecur:active{background:rgba(160,100,255,.30)}
+.alug-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.alug-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.alug-nome{font-size:15px;font-weight:800;flex:1}
+.alug-ref{font-size:11px;color:var(--t3);margin-top:1px}
+.alug-parcelas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.parc{width:36px;height:36px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9px;font-weight:800;cursor:pointer;border:none;font-family:inherit}
+.parc.pago{background:rgba(46,204,154,.2);color:var(--green)}
+.parc.pend{background:var(--bg3);color:var(--t3)}
+.parc.venc{background:rgba(255,107,107,.2);color:var(--red)}
+.alug-actions{display:flex;gap:8px}
+.alug-btn{flex:1;padding:9px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
 .tmeta{font-size:11px;color:var(--t3);display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center;margin-top:4px}
 .tmeta .ov{color:var(--red)}
 .ssel{
@@ -1063,7 +1074,87 @@ select option{background:#1A2A3A}
   </div><!-- /sec-hoje -->
 
   <!-- ══ DOCS ══ -->
-  <div id="sec-docs" style="display:none">
+  <div id="sec-rec" style="display:none;padding:0 16px 100px">
+
+  <!-- PAGADORES -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="coll-hdr" onclick="toggleColl('pag-body','pag-chev')">
+      <span>👤 Pagadores</span><span id="pag-chev">▾</span>
+    </div>
+    <div class="coll-body" id="pag-body" style="display:none">
+      <div style="margin-bottom:8px"><div class="fl">Nome</div><input id="pag-nome" type="text" placeholder="Nome completo" maxlength="80"></div>
+      <div class="row2">
+        <div><div class="fl">Telefone (WhatsApp)</div><input id="pag-tel" type="tel" placeholder="(47) 99999-0000" maxlength="20"></div>
+        <div><div class="fl">CPF / CNPJ <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="pag-doc" type="text" placeholder="000.000.000-00" maxlength="20"></div>
+      </div>
+      <button class="btn" onclick="addPagador()">Salvar Pagador ✓</button>
+    </div>
+  </div>
+
+  <!-- LISTA PAGADORES -->
+  <div id="pag-list" style="margin-bottom:14px"></div>
+
+  <!-- ALUGUÉIS -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="coll-hdr" onclick="toggleColl('alug-body','alug-chev')">
+      <span>🏠 Aluguéis Recorrentes</span><span id="alug-chev">▾</span>
+    </div>
+    <div class="coll-body" id="alug-body" style="display:none">
+      <div class="row2">
+        <div><div class="fl">Inquilino</div>
+          <select id="alug-pag">
+            <option value="">— selecione —</option>
+          </select>
+        </div>
+        <div><div class="fl">Dia de vencimento</div>
+          <input id="alug-dia" type="number" min="1" max="31" placeholder="Ex: 5" style="width:100%">
+        </div>
+      </div>
+      <div class="row2">
+        <div><div class="fl">Valor mensal (R$)</div>
+          <div class="r-wrap"><input id="alug-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+        </div>
+        <div><div class="fl">Referência</div>
+          <input id="alug-ref" type="text" placeholder="Ex: Apto 12, Casa B" maxlength="40">
+        </div>
+      </div>
+      <button class="btn" onclick="addAluguel()">Cadastrar Aluguel ✓</button>
+    </div>
+  </div>
+
+  <!-- LISTA ALUGUÉIS + REGISTRAR PAGAMENTO -->
+  <div id="alug-list" style="margin-bottom:14px"></div>
+
+  <!-- NOVO RECIBO -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="coll-hdr" onclick="toggleColl('rec-body','rec-chev')">
+      <span>🧾 Emitir Recibo</span><span id="rec-chev">▾</span>
+    </div>
+    <div class="coll-body" id="rec-body" style="display:none">
+      <div style="margin-bottom:8px">
+        <div class="fl">Pagador</div>
+        <select id="rec-pag">
+          <option value="">— selecione ou preencha abaixo —</option>
+        </select>
+      </div>
+      <div style="margin-bottom:8px"><div class="fl">Nome (se não cadastrado)</div><input id="rec-pag-nome" type="text" placeholder="Nome do pagador" maxlength="80"></div>
+      <div style="margin-bottom:8px"><div class="fl">Descrição / Referência</div><input id="rec-desc" type="text" placeholder="Ex: Aluguel março/2026" maxlength="120"></div>
+      <div class="row2">
+        <div><div class="fl">Valor (R$)</div><div class="r-wrap"><input id="rec-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+        <div><div class="fl">Data</div><input id="rec-data" type="date"></div>
+      </div>
+      <div style="margin-bottom:8px"><div class="fl">Observação <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="rec-obs" type="text" placeholder="Ex: Referente ao mês de março" maxlength="200"></div>
+      <button class="btn" onclick="emitirRecibo()">Gerar Recibo 🧾</button>
+    </div>
+  </div>
+
+  <!-- HISTÓRICO DE RECIBOS -->
+  <div class="slbl" style="margin-bottom:8px">Recibos emitidos</div>
+  <div id="rec-hist-list"></div>
+
+</div>
+
+<div id="sec-docs" style="display:none">
 
     <!-- form adicionar link -->
     <div class="docs-add">
@@ -1188,6 +1279,7 @@ select option{background:#1A2A3A}
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
   <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
   <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Compromissos</button>
+  <button class="nb"    id="nb-rec"  onclick="setSection('rec')"><span class="ni">🧾</span>Recibos</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
 </div>
 
@@ -1211,7 +1303,10 @@ var TXS   = (function(){
   });
 })();
 var TASKS = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
-var RECUR = JSON.parse(localStorage.getItem('ff_recur') || '[]');
+var RECUR      = JSON.parse(localStorage.getItem('ff_recur')      || '[]');
+var PAGADORES  = JSON.parse(localStorage.getItem('ff_pagadores')  || '[]');
+var RECIBOS    = JSON.parse(localStorage.getItem('ff_recibos')    || '[]');
+var ALUGUEIS   = JSON.parse(localStorage.getItem('ff_alugueis')   || '[]');
 var COLLAPSED_PASTAS = JSON.parse(localStorage.getItem('ff_collapsed') || '[]');
 var curRecur = false; // toggle do form
 
@@ -1539,13 +1634,16 @@ function setSection(s){
   document.getElementById('sec-task').style.display       = s==='task' ? 'block':'none';
   document.getElementById('sec-hoje').style.display       = s==='hoje' ? 'block':'none';
   document.getElementById('sec-docs').style.display       = s==='docs' ? 'block':'none';
+  document.getElementById('sec-rec').style.display        = s==='rec'  ? 'block':'none';
   document.getElementById('fin-header-extra').style.display = s==='fin' ? 'block':'none';
   document.getElementById('nb-fin').classList.toggle('on',  s==='fin');
   document.getElementById('nb-task').classList.toggle('on', s==='task');
   document.getElementById('nb-hoje').classList.toggle('on', s==='hoje');
   document.getElementById('nb-docs').classList.toggle('on', s==='docs');
+  document.getElementById('nb-rec').classList.toggle('on',  s==='rec');
   if(s==='task') renderTasks();
   if(s==='hoje') renderHoje();
+  if(s==='rec')  renderRecibos();
   if(s==='docs'){
     renderDocs();
     // Sync silencioso ao abrir aba docs para garantir dados atualizados
@@ -1564,6 +1662,539 @@ function ftab(t){
   if(t==='hist')   renderHist();
   if(t==='cat')    renderCat();
   if(t==='agenda') renderFinView();
+}
+
+
+// ════════════════════════════════════════════════════════
+//  PAGADORES
+// ════════════════════════════════════════════════════════
+function savePagadores(){ localStorage.setItem('ff_pagadores', JSON.stringify(PAGADORES)); }
+function saveRecibos(){   localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS));   }
+
+function addPagador(){
+  var nome = document.getElementById('pag-nome').value.trim();
+  var tel  = document.getElementById('pag-tel').value.trim();
+  var doc  = document.getElementById('pag-doc').value.trim();
+  if(!nome){ toast('⚠️ Informe o nome','err'); return; }
+  var p = { id: Date.now(), nome: nome, tel: tel, doc: doc };
+  PAGADORES.unshift(p);
+  savePagadores();
+  document.getElementById('pag-nome').value = '';
+  document.getElementById('pag-tel').value  = '';
+  document.getElementById('pag-doc').value  = '';
+  renderRecibos();
+  toast('✅ Pagador salvo!');
+}
+
+function delPagador(id){
+  PAGADORES = PAGADORES.filter(function(p){ return String(p.id)!==String(id); });
+  savePagadores();
+  renderRecibos();
+  toast('🗑️ Pagador removido');
+}
+
+
+// ════════════════════════════════════════════════════════
+//  ALUGUÉIS
+// ════════════════════════════════════════════════════════
+function saveAlugueis(){ localStorage.setItem('ff_alugueis', JSON.stringify(ALUGUEIS)); }
+
+var MESES_BR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function addAluguel(){
+  var pid = document.getElementById('alug-pag').value;
+  var dia = parseInt(document.getElementById('alug-dia').value)||1;
+  var val = parseFloat(document.getElementById('alug-val').value)||0;
+  var ref = document.getElementById('alug-ref').value.trim();
+  var pag = PAGADORES.find(function(p){ return String(p.id)===pid; });
+  if(!pag){ toast('⚠️ Selecione um inquilino','err'); return; }
+  if(!val||val<=0){ toast('⚠️ Informe o valor','err'); return; }
+  // Verificar duplicata
+  if(ALUGUEIS.some(function(a){ return String(a.pagadorId)===pid; })){
+    toast('⚠️ Inquilino já cadastrado','err'); return;
+  }
+  var now = new Date();
+  var alug = {
+    id: Date.now(),
+    pagadorId: String(pid),
+    nome:      pag.nome,
+    tel:       pag.tel||'',
+    dia:       dia,
+    valorBase: val,
+    ref:       ref,
+    parcelas:  [],
+    criadoEm:  now.toISOString()
+  };
+  ALUGUEIS.unshift(alug);
+  saveAlugueis();
+  document.getElementById('alug-dia').value = '';
+  document.getElementById('alug-val').value = '';
+  document.getElementById('alug-ref').value = '';
+  renderRecibos();
+  sincronizarFichaGoogleSheets(alug);
+  toast('✅ Aluguel cadastrado!');
+}
+
+function delAluguel(id){
+  if(!confirm('Remover este aluguel? O histórico de parcelas será perdido.')) return;
+  ALUGUEIS = ALUGUEIS.filter(function(a){ return String(a.id)!==String(id); });
+  saveAlugueis();
+  renderRecibos();
+  toast('🗑️ Aluguel removido');
+}
+
+function registrarPagamento(alugId, mesAno, valorCustom){
+  var a = ALUGUEIS.find(function(x){ return String(x.id)===String(alugId); });
+  if(!a) return;
+  // Verificar se já pago
+  var jaExiste = a.parcelas.find(function(p){ return p.mesAno===mesAno; });
+  if(jaExiste){ toast('⚠️ Mês já registrado como pago'); return; }
+
+  var val = valorCustom || a.valorBase;
+  var agora = new Date();
+  var codigo = 'ALG-'+Date.now().toString(36).toUpperCase();
+  var emitidoEm = agora.toLocaleString('pt-BR');
+  var dataPgto  = ymd(agora);
+  var partes    = mesAno.split('-');
+  var mesLabel  = MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+
+  var parcela = {
+    mesAno:    mesAno,
+    valor:     val,
+    dataPgto:  dataPgto,
+    codigo:    codigo,
+    emitidoEm: emitidoEm
+  };
+  a.parcelas.push(parcela);
+  saveAlugueis();
+
+  // Salvar recibo automaticamente
+  var recibo = {
+    id:        Date.now(),
+    codigo:    codigo,
+    pagador:   a.nome,
+    tel:       a.tel,
+    desc:      'Aluguel '+(a.ref?a.ref+' — ':'')+mesLabel,
+    valor:     val,
+    data:      dataPgto,
+    obs:       'Referente ao mês de '+mesLabel,
+    emitidoEm: emitidoEm,
+    aluguelId: String(alugId),
+    mesAno:    mesAno
+  };
+  RECIBOS.unshift(recibo);
+  saveRecibos();
+
+  // Enviar para planilha
+  apiCall('registrarPagamentoAluguel', {
+    nome: a.nome, ref: a.ref, mesAno: mesAno, valor: val,
+    dataPgto: dataPgto, codigo: codigo, tel: a.tel
+  }, function(){});
+
+  renderRecibos();
+  // Abrir recibo automaticamente
+  abrirRecibo(recibo);
+  toast('✅ Pagamento registrado — recibo gerado!');
+}
+
+function abrirRegistrarPagamento(alugId){
+  var a = ALUGUEIS.find(function(x){ return String(x.id)===String(alugId); });
+  if(!a) return;
+  var now    = new Date();
+  var mesAno = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var mesLabel = MESES_BR[now.getMonth()]+'/'+now.getFullYear();
+
+  // Verificar se já pago
+  var jaExiste = a.parcelas.find(function(p){ return p.mesAno===mesAno; });
+  if(jaExiste){ toast('✅ '+mesLabel+' já registrado'); return; }
+
+  // Pedir valor (pode ser diferente do base)
+  var val = prompt(
+    'Registrar pagamento de '+a.nome+'\nMês: '+mesLabel+'\n\nValor (deixe em branco para R$ '+a.valorBase.toFixed(2).replace('.',',')+'):',
+    a.valorBase.toFixed(2).replace('.',',')
+  );
+  if(val === null) return; // cancelou
+  var valNum = parseFloat(String(val).replace(',','.'));
+  if(isNaN(valNum)||valNum<=0) valNum = a.valorBase;
+  registrarPagamento(alugId, mesAno, valNum);
+}
+
+function sincronizarFichaGoogleSheets(a){
+  apiCall('criarFichaAluguel', {
+    nome: a.nome, tel: a.tel, ref: a.ref,
+    dia: a.dia, valorBase: a.valorBase
+  }, function(){});
+}
+
+function renderAluguelCard(a){
+  var now    = new Date();
+  var mesAtual = now.getFullYear()+'-'+pad(now.getMonth()+1);
+
+  // Gerar últimos 6 meses + próximo
+  var meses = [];
+  for(var i=-5; i<=1; i++){
+    var d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+    meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1));
+  }
+
+  var parcMap = {};
+  (a.parcelas||[]).forEach(function(p){ parcMap[p.mesAno]=p; });
+
+  var parcsHTML = meses.map(function(mo){
+    var p = MESES_BR[parseInt(mo.split('-')[1])-1];
+    var parc = parcMap[mo];
+    var hoje = ymd(now);
+    var venc = mo+'-'+pad(a.dia);
+    var cls, title;
+    if(parc){
+      cls='pago'; title='Pago em '+parc.dataPgto;
+    } else if(mo < mesAtual || (mo===mesAtual && hoje>venc)){
+      cls='venc'; title='Vencido!';
+    } else {
+      cls='pend'; title=mo===mesAtual?'Vence dia '+a.dia:'Futuro';
+    }
+    return '<button class="parc '+cls+'" data-parc-alug="'+a.id+'" data-parc-mo="'+mo+'" data-parc-done="'+(parc?'1':'0')+'" title="'+title+'">'+
+      '<span>'+p+'</span>'+
+      '<span>'+(parc?'✓':mo<=mesAtual?'!':'')+'</span>'+
+    '</button>';
+  }).join('');
+
+  var jaPageiHoje = parcMap[mesAtual];
+  var totalPago  = (a.parcelas||[]).reduce(function(s,p){ return s+p.valor; },0);
+
+  return '<div class="alug-card" data-alug-id="'+a.id+'">'+
+    '<div class="alug-card-header">'+
+      '<div style="font-size:24px">🏠</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div class="alug-nome">'+esc(a.nome)+'</div>'+
+        '<div class="alug-ref">'+(a.ref?esc(a.ref)+' · ':'')+
+          'Vence dia '+a.dia+' · R$ '+a.valorBase.toFixed(2).replace('.',',')+'/mês'+
+        '</div>'+
+      '</div>'+
+      '<button class="tdel2" data-delalug="'+a.id+'">🗑️</button>'+
+    '</div>'+
+    '<div class="alug-parcelas">'+parcsHTML+'</div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">'+
+      'Total recebido: <strong style="color:var(--green)">R$ '+totalPago.toFixed(2).replace('.',',')+'</strong>'+
+      ' · '+(a.parcelas||[]).length+' parcela'+(a.parcelas.length!==1?'s':'')+' paga'+(a.parcelas.length!==1?'s':'')+
+    '</div>'+
+    '<div class="alug-actions">'+
+      (!jaPageiHoje
+        ? '<button class="alug-btn" style="background:var(--green);color:#0A1A12" data-pgtalug="'+a.id+'">💰 Registrar pagamento</button>'
+        : '<button class="alug-btn" style="background:var(--bg3);color:var(--t3);cursor:default">✅ Pago este mês</button>'
+      )+
+      '<button class="alug-btn" style="background:var(--bg3);color:var(--t2)" data-fichalug="'+a.id+'">📋 Ver ficha</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function abrirFichaAluguel(alugId){
+  var a = ALUGUEIS.find(function(x){ return String(x.id)===String(alugId); });
+  if(!a) return;
+  var parcMap = {};
+  (a.parcelas||[]).forEach(function(p){ parcMap[p.mesAno]=p; });
+
+  // Gerar todos os meses desde criação até hoje
+  var inicio = new Date(a.criadoEm||new Date());
+  var agora  = new Date();
+  var meses  = [];
+  var d = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+  while(d <= agora){
+    meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1));
+    d.setMonth(d.getMonth()+1);
+  }
+
+  var totalEsperado = meses.length * a.valorBase;
+  var totalPago     = (a.parcelas||[]).reduce(function(s,p){ return s+p.valor; },0);
+  var totalPendente = Math.max(0, totalEsperado - totalPago);
+
+  var linhas = meses.map(function(mo){
+    var p    = parcMap[mo];
+    var mes  = MESES_BR[parseInt(mo.split('-')[1])-1]+'/'+mo.split('-')[0];
+    var venc = mo+'-'+pad(a.dia);
+    var agr  = ymd(agora);
+    var status, cor, ico;
+    if(p){
+      status='Pago em '+p.dataPgto; cor='#2ecc9a'; ico='✅';
+    } else if(mo+'-'+pad(a.dia) < agr){
+      status='Vencido'; cor='#FF6B6B'; ico='⚠️';
+    } else {
+      status='Pendente'; cor='#888'; ico='⏳';
+    }
+    return '<tr>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222">'+ico+' '+mes+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-weight:700">'+
+        'R$ '+(p?p.valor:a.valorBase).toFixed(2).replace('.',',')+
+      '</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;color:'+cor+';font-size:12px">'+status+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-family:monospace;font-size:10px;color:#555">'+
+        (p?p.codigo:'')+
+      '</td>'+
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Ficha — '+a.nome+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}'+
+    'body{font-family:"Segoe UI",Arial,sans-serif;background:#0a0a14;color:#eee;padding:24px 16px}'+
+    '.ficha{max-width:600px;margin:0 auto;background:#111;border-radius:12px;overflow:hidden;border:1px solid #222}'+
+    '.fh{background:#1a1a2e;padding:24px;border-bottom:1px solid #222}'+
+    '.fh h2{font-size:18px;font-weight:900;margin-bottom:4px}'+
+    '.fh p{font-size:12px;color:#888}'+
+    '.ftotais{display:flex;gap:0;border-bottom:1px solid #222}'+
+    '.ftot{flex:1;padding:16px;text-align:center;border-right:1px solid #222}'+
+    '.ftot:last-child{border:none}'+
+    '.ftot-v{font-size:18px;font-weight:900;margin-bottom:2px}'+
+    '.ftot-l{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px}'+
+    'table{width:100%;border-collapse:collapse}'+
+    'td{font-size:13px}'+
+    '@media print{body{background:#fff;color:#000}.ficha{border:1px solid #ddd;background:#fff}.fh{background:#f5f5f5}.ftotais,.ftot{border-color:#ddd}}'+
+    '</style></head><body>'+
+    '<div class="ficha">'+
+      '<div class="fh">'+
+        '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⚡ Fluxo App · Ficha de Aluguel</div>'+
+        '<h2>'+esc(a.nome)+'</h2>'+
+        '<p>'+(a.ref?esc(a.ref)+' · ':'')+
+          (a.tel?'📱 '+esc(a.tel)+' · ':'')+
+          'Vence dia '+a.dia+' · R$ '+a.valorBase.toFixed(2).replace('.',',')+'/mês'+
+        '</p>'+
+      '</div>'+
+      '<div class="ftotais">'+
+        '<div class="ftot"><div class="ftot-v" style="color:#2ecc9a">R$ '+totalPago.toFixed(2).replace('.',',')+'</div><div class="ftot-l">Recebido</div></div>'+
+        '<div class="ftot"><div class="ftot-v" style="color:#FF6B6B">R$ '+totalPendente.toFixed(2).replace('.',',')+'</div><div class="ftot-l">Pendente</div></div>'+
+        '<div class="ftot"><div class="ftot-v">'+meses.length+'</div><div class="ftot-l">Meses</div></div>'+
+      '</div>'+
+      '<table>'+linhas+'</table>'+
+    '</div>'+
+    '<div style="text-align:center;margin-top:16px">'+
+      '<button onclick="window.print()" style="padding:10px 24px;border:none;border-radius:8px;background:#2ecc9a;color:#0a1a0a;font-weight:700;cursor:pointer;font-size:14px">🖨️ Imprimir / Salvar PDF</button>'+
+    '</div>'+
+    '</body></html>';
+
+  var win = window.open('','_blank','width=640,height=860');
+  if(win){ win.document.write(html); win.document.close(); }
+  else toast('⚠️ Permita pop-ups para ver a ficha','err');
+}
+
+function renderAlugueisSection(){
+  // Atualizar select de pagadores no form de aluguel
+  var sel = document.getElementById('alug-pag');
+  if(sel){
+    sel.innerHTML = '<option value="">— selecione —</option>'+
+      PAGADORES.map(function(p){
+        return '<option value="'+p.id+'">'+esc(p.nome)+'</option>';
+      }).join('');
+  }
+  var el = document.getElementById('alug-list');
+  if(!el) return;
+  if(!ALUGUEIS.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhum aluguel cadastrado</div>';
+    return;
+  }
+  el.innerHTML = ALUGUEIS.map(renderAluguelCard).join('');
+}
+
+function renderPagadores(){
+  var el = document.getElementById('pag-list');
+  if(!el) return;
+  if(!PAGADORES.length){ el.innerHTML=''; return; }
+  el.innerHTML = PAGADORES.map(function(p){
+    return '<div class="taski" style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+      '<div style="font-size:22px">👤</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:14px;font-weight:700">'+esc(p.nome)+'</div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+
+          (p.tel?'📱 '+esc(p.tel):'')+(p.tel&&p.doc?' · ':'')+(p.doc?esc(p.doc):'')+
+        '</div>'+
+      '</div>'+
+      '<button class="tdel2" data-delpag="'+p.id+'">🗑️</button>'+
+    '</div>';
+  }).join('');
+
+  // Atualizar select de pagadores no form de recibo
+  var sel = document.getElementById('rec-pag');
+  if(sel){
+    sel.innerHTML = '<option value="">— selecione ou preencha abaixo —</option>'+
+      PAGADORES.map(function(p){
+        return '<option value="'+p.id+'">'+esc(p.nome)+(p.tel?' ('+esc(p.tel)+')':'')+'</option>';
+      }).join('');
+    sel.onchange = function(){
+      var pid = sel.value;
+      var p   = PAGADORES.find(function(x){ return String(x.id)===pid; });
+      if(p) document.getElementById('rec-pag-nome').value = p.nome;
+      else  document.getElementById('rec-pag-nome').value = '';
+    };
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  RECIBOS
+// ════════════════════════════════════════════════════════
+function emitirRecibo(){
+  var pid   = document.getElementById('rec-pag').value;
+  var pag   = PAGADORES.find(function(p){ return String(p.id)===pid; });
+  var nome  = pag ? pag.nome : document.getElementById('rec-pag-nome').value.trim();
+  var tel   = pag ? pag.tel  : '';
+  var desc  = document.getElementById('rec-desc').value.trim();
+  var val   = parseFloat(document.getElementById('rec-val').value)||0;
+  var data  = document.getElementById('rec-data').value || ymd(new Date());
+  var obs   = document.getElementById('rec-obs').value.trim();
+
+  if(!nome){ toast('⚠️ Informe o pagador','err'); return; }
+  if(!desc){ toast('⚠️ Informe a descrição','err'); return; }
+  if(!val||val<=0){ toast('⚠️ Informe o valor','err'); return; }
+
+  // Código único do recibo
+  var codigo = 'REC-'+Date.now().toString(36).toUpperCase();
+  var emitidoEm = new Date().toLocaleString('pt-BR');
+
+  var recibo = { id: Date.now(), codigo: codigo, pagador: nome, tel: tel,
+    desc: desc, valor: val, data: data, obs: obs, emitidoEm: emitidoEm };
+  RECIBOS.unshift(recibo);
+  saveRecibos();
+
+  // Limpar form
+  document.getElementById('rec-pag').value       = '';
+  document.getElementById('rec-pag-nome').value  = '';
+  document.getElementById('rec-desc').value      = '';
+  document.getElementById('rec-val').value       = '';
+  document.getElementById('rec-obs').value       = '';
+  document.getElementById('rec-data').value      = '';
+
+  renderRecibos();
+  abrirRecibo(recibo);
+  toast('🧾 Recibo emitido!');
+}
+
+function abrirRecibo(r){
+  var dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Recibo '+r.codigo+'</title>'+
+    '<style>'+
+      '*{margin:0;padding:0;box-sizing:border-box}'+
+      'body{font-family:"Segoe UI",Arial,sans-serif;background:#f5f5f5;display:flex;justify-content:center;padding:30px 16px}'+
+      '.recibo{background:#fff;max-width:520px;width:100%;border-radius:4px;box-shadow:0 2px 20px rgba(0,0,0,.12);overflow:hidden}'+
+      '.rec-header{background:#0a0a1a;color:#fff;padding:28px 32px;text-align:center}'+
+      '.rec-logo{font-size:28px;font-weight:900;letter-spacing:2px;margin-bottom:4px}'+
+      '.rec-sub{font-size:11px;color:#888;letter-spacing:3px;text-transform:uppercase}'+
+      '.rec-titulo{background:#1a1a2e;color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}'+
+      '.rec-titulo h2{font-size:16px;font-weight:700;letter-spacing:1px}'+
+      '.rec-codigo{font-size:11px;color:#888;font-family:monospace}'+
+      '.rec-body{padding:28px 32px}'+
+      '.rec-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f0f0}'+
+      '.rec-row:last-child{border:none}'+
+      '.rec-label{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;font-weight:600}'+
+      '.rec-value{font-size:14px;color:#111;font-weight:600;text-align:right;max-width:60%}'+
+      '.rec-valor-total{background:#f8f8f8;border-radius:8px;padding:20px 32px;margin:0 32px 28px;text-align:center}'+
+      '.rec-valor-label{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}'+
+      '.rec-valor-num{font-size:32px;font-weight:900;color:#0a0a1a}'+
+      '.rec-carimbo{margin:0 32px 32px;border:2px dashed #ddd;border-radius:8px;padding:16px;text-align:center}'+
+      '.rec-carimbo-label{font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}'+
+      '.rec-carimbo-codigo{font-family:monospace;font-size:13px;font-weight:700;color:#444;letter-spacing:2px}'+
+      '.rec-carimbo-data{font-size:11px;color:#999;margin-top:4px}'+
+      '.rec-btns{display:flex;gap:10px;padding:0 32px 28px}'+
+      '.btn-print{flex:1;padding:12px;border:none;border-radius:8px;background:#0a0a1a;color:#fff;font-size:14px;font-weight:700;cursor:pointer}'+
+      '.btn-wpp{flex:1;padding:12px;border:none;border-radius:8px;background:#25D366;color:#fff;font-size:14px;font-weight:700;cursor:pointer}'+
+      '@media print{.rec-btns{display:none}body{background:#fff;padding:0}.recibo{box-shadow:none}}'+
+    '</style></head><body>'+
+    '<div class="recibo">'+
+      '<div class="rec-header">'+
+        '<div class="rec-logo">⚡ FLUXO</div>'+
+        '<div class="rec-sub">Recibo de Pagamento</div>'+
+      '</div>'+
+      '<div class="rec-titulo">'+
+        '<h2>RECIBO</h2>'+
+        '<span class="rec-codigo">'+r.codigo+'</span>'+
+      '</div>'+
+      '<div class="rec-body">'+
+        '<div class="rec-row"><div><div class="rec-label">Recebemos de</div><div class="rec-value">'+esc(r.pagador)+'</div></div></div>'+
+        '<div class="rec-row"><div><div class="rec-label">Referente a</div><div class="rec-value">'+esc(r.desc)+'</div></div></div>'+
+        '<div class="rec-row"><div><div class="rec-label">Data</div><div class="rec-value">'+dataFmt+'</div></div></div>'+
+        (r.obs?'<div class="rec-row"><div><div class="rec-label">Observação</div><div class="rec-value">'+esc(r.obs)+'</div></div></div>':'')+
+      '</div>'+
+      '<div class="rec-valor-total">'+
+        '<div class="rec-valor-label">Valor pago</div>'+
+        '<div class="rec-valor-num">'+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'</div>'+
+      '</div>'+
+      '<div class="rec-carimbo">'+
+        '<div class="rec-carimbo-label">Carimbo digital · Fluxo App</div>'+
+        '<div class="rec-carimbo-codigo">'+r.codigo+'</div>'+
+        '<div class="rec-carimbo-data">Emitido em: '+r.emitidoEm+'</div>'+
+      '</div>'+
+      '<div class="rec-btns">'+
+        '<button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>'+
+        (r.tel
+          ? '<button class="btn-wpp" onclick="enviarWpp()">💬 WhatsApp</button>'
+          : '<button class="btn-wpp" style="background:#ccc;cursor:default">💬 Sem telefone</button>'
+        )+
+      '</div>'+
+    '</div>'+
+    '<script>'+
+    'function enviarWpp(){'+
+      'var linhas = [];'+
+      'linhas.push("🧾 *RECIBO DE PAGAMENTO*");'+
+      'linhas.push("");'+
+      'linhas.push("Código: '+r.codigo+'");'+
+      'linhas.push("Pagador: '+r.pagador.replace(/['"]/g,' ')+'");'+
+      'linhas.push("Referente: '+r.desc.replace(/['"]/g,' ')+'");'+
+      'linhas.push("Valor: '+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'");'+
+      'linhas.push("Data: '+dataFmt+'");'+
+      (r.obs ? 'linhas.push("Obs: '+r.obs.replace(/['"]/g,' ')+'");' : '')+
+      'linhas.push("Emitido via Fluxo App em '+r.emitidoEm+'");'+
+      'var msg = encodeURIComponent(linhas.join("\\n"));'+
+      'var tel = "'+( r.tel ? r.tel.replace(/\D/g,'') : '' )+'";'+
+      'window.open("https://wa.me/"+(tel||"")+"?text="+msg,"_blank");'+
+    '}'+
+    '<\/script>'+
+    '</body></html>';
+
+  var win = window.open('','_blank','width=600,height=800');
+  if(win){ win.document.write(html); win.document.close(); }
+  else    toast('⚠️ Permita pop-ups para ver o recibo','err');
+}
+
+function delRecibo(id){
+  RECIBOS = RECIBOS.filter(function(r){ return String(r.id)!==String(id); });
+  saveRecibos();
+  renderRecibos();
+  toast('🗑️ Recibo removido');
+}
+
+function renderRecibos(){
+  renderAlugueisSection();
+  renderPagadores();
+  // Preencher data padrão = hoje
+  var dataEl = document.getElementById('rec-data');
+  if(dataEl && !dataEl.value) dataEl.value = ymd(new Date());
+
+  var el = document.getElementById('rec-hist-list');
+  if(!el) return;
+  if(!RECIBOS.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhum recibo emitido ainda</div>';
+    return;
+  }
+  el.innerHTML = RECIBOS.map(function(r){
+    var dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
+    return '<div class="taski" style="margin-bottom:8px">'+
+      '<div class="taski-hdr">'+
+        '<div style="font-size:20px">🧾</div>'+
+        '<div class="tname">'+esc(r.pagador)+'</div>'+
+        '<button class="tdel2" data-delrec="'+r.id+'">🗑️</button>'+
+      '</div>'+
+      '<div class="tmeta">'+
+        '<span style="font-weight:800;color:var(--green)">'+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'</span>'+
+        '<span>'+esc(r.desc)+'</span>'+
+        '<span>'+dataFmt+'</span>'+
+        '<span style="color:var(--t3);font-family:monospace">'+r.codigo+'</span>'+
+      '</div>'+
+      '<div style="margin-top:8px;display:flex;gap:8px">'+
+        '<button data-abrirec="'+r.id+'" style="flex:1;padding:8px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Abrir recibo</button>'+
+        (r.tel ? '<button data-wppec="'+r.id+'" style="flex:1;padding:8px;border:none;border-radius:8px;background:#25D366;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">💬 WhatsApp</button>' : '')+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 
 // ════════════════════════════════════════
@@ -2398,6 +3029,52 @@ function initTaskDelegation(){
     if(del){ delTask(del.getAttribute('data-del')); return; }
     var txdel = e.target.closest('[data-txdel]');
     if(txdel){ delTx(txdel.getAttribute('data-txdel')); return; }
+    // Recibos
+    var delpag = e.target.closest('[data-delpag]');
+    if(delpag){ delPagador(delpag.getAttribute('data-delpag')); return; }
+    var delrec = e.target.closest('[data-delrec]');
+    if(delrec){ delRecibo(delrec.getAttribute('data-delrec')); return; }
+    var abrir = e.target.closest('[data-abrirec]');
+    if(abrir){
+      var rid = abrir.getAttribute('data-abrirec');
+      var r = RECIBOS.find(function(x){ return String(x.id)===rid; });
+      if(r) abrirRecibo(r);
+      return;
+    }
+    var delalug = e.target.closest('[data-delalug]');
+    if(delalug){ delAluguel(delalug.getAttribute('data-delalug')); return; }
+    var pgtalug = e.target.closest('[data-pgtalug]');
+    if(pgtalug){ abrirRegistrarPagamento(pgtalug.getAttribute('data-pgtalug')); return; }
+    var fichalug = e.target.closest('[data-fichalug]');
+    if(fichalug){ abrirFichaAluguel(fichalug.getAttribute('data-fichalug')); return; }
+    var parcBtn = e.target.closest('[data-parc-alug]');
+    if(parcBtn && parcBtn.getAttribute('data-parc-done')==='1'){
+      var mo = parcBtn.getAttribute('data-parc-mo');
+      var aid = parcBtn.getAttribute('data-parc-alug');
+      var a = ALUGUEIS.find(function(x){ return String(x.id)===aid; });
+      if(a){ var p=a.parcelas.find(function(x){ return x.mesAno===mo; }); if(p) abrirRecibo(Object.assign({pagador:a.nome,tel:a.tel,obs:''},p,{id:p.codigo,desc:'Aluguel '+(a.ref?a.ref+' — ':'')+MESES_BR[parseInt(mo.split('-')[1])-1]+'/'+mo.split('-')[0]})); }
+      return;
+    }
+    var wpp = e.target.closest('[data-wppec]');
+    if(wpp){
+      var rid = wpp.getAttribute('data-wppec');
+      var r = RECIBOS.find(function(x){ return String(x.id)===rid; });
+      if(r && r.tel){
+        var tel = r.tel.replace(/\D/g,'');
+        var dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
+        var msg = encodeURIComponent(
+          '🧾 *RECIBO*\n'+
+          'Código: '+r.codigo+'\n'+
+          'Pagador: '+r.pagador+'\n'+
+          'Referente: '+r.desc+'\n'+
+          'Valor: '+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'\n'+
+          'Data: '+dataFmt+'\n'+
+          'Emitido via Fluxo App'
+        );
+        window.open('https://wa.me/'+tel+'?text='+msg,'_blank');
+      }
+      return;
+    }
   });
 }
 
