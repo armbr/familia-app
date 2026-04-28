@@ -2207,8 +2207,9 @@ function renderAll(){
   if(curFinTab==='agenda') renderFinView();
   if(curSection==='task')  renderTasks();
   if(curSection==='hoje')  renderHoje();
-  renderDocs();  // sempre atualiza, independente da aba visível
-  renderFixos(); // sempre atualiza lista inline de fixos
+  if(curSection==='rec')   renderRecibos();
+  renderDocs();
+  renderFixos();
 }
 
 // ════════════════════════════════════════
@@ -2710,7 +2711,7 @@ function renderFM(){
   var dh=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var gh=dh.map(function(d){return '<div class="mgh">'+d+'</div>';}).join('');
   var fd=new Date(yr,mo,1); var ld=new Date(yr,mo+1,0);
-  var off=fd.getDay()-1; if(off<0)off=6;
+  var off=fd.getDay(); // domingo=0 correto
   var rows=Math.ceil((off+ld.getDate())/7);
   for(var i=0;i<rows*7;i++){
     var dn=i-off+1;
@@ -2738,55 +2739,59 @@ function finMoDay(d){ fdDate=new Date(d+'T00:00:00'); setFinView('day'); }
 
 // FUTURE
 function renderFuture(){
-  var now=new Date(); var html='';
+  var now=new Date(); now.setHours(0,0,0,0);
+  var today=ymd(now);
+  var html='';
+
+  // Próximos 3 meses
   for(var mOff=0;mOff<3;mOff++){
-    var d=new Date(now.getFullYear(),now.getMonth()+mOff,1);
-    var yr=d.getFullYear(); var mo=d.getMonth();
+    var mDate=new Date(now.getFullYear(),now.getMonth()+mOff,1);
+    var yr=mDate.getFullYear(); var mo=mDate.getMonth();
     var ms=yr+'-'+pad(mo+1);
-    var mTxs=TXS.filter(function(t){return ymds(t.date).startsWith(ms);});
-    var b=balOf(mTxs);
-    var isCur=mOff===0;
-    var projI=0,projE=0;
-    if(!isCur){
-      var past=[];
-      for(var p=1;p<=2;p++){
-        var pd=new Date(now.getFullYear(),now.getMonth()-p,1);
-        var ps=pd.getFullYear()+'-'+pad(pd.getMonth()+1);
-        var ptx=TXS.filter(function(t){return ymds(t.date).startsWith(ps);});
-        if(ptx.length) past.push(balOf(ptx));
-      }
-      if(past.length){
-        projI=past.reduce(function(s,x){return s+x.i;},0)/past.length;
-        projE=past.reduce(function(s,x){return s+x.e;},0)/past.length;
-      }
-    }
-    var saldo=isCur?b.b:(projI-projE);
     var ld=new Date(yr,mo+1,0).getDate();
-    var whtml='';
-    for(var day=1;day<=ld;day+=7){
-      var wEnd=Math.min(day+6,ld);
-      var from=yr+'-'+pad(mo+1)+'-'+pad(day);
-      var to=yr+'-'+pad(mo+1)+'-'+pad(wEnd);
-      var wTxs=txsIn(from,to); var wb=balOf(wTxs);
-      whtml+='<div class="fwr" onclick="finWkDay(\''+from+'\')">'+
-        '<div class="fwl">'+pad(day)+'/'+pad(mo+1)+' – '+pad(wEnd)+'/'+pad(mo+1)+'</div>'+
-        '<div class="fwa">'+
-        (wTxs.length
-          ?'<span class="i">+'+fmtBRL(wb.i)+'</span><span class="e">-'+fmtBRL(wb.e)+'</span>'
-          :'<span style="color:var(--t3);font-size:11px">sem dados</span>')+
-        '</div></div>';
-    }
+    var mLabel=mDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+
+    // TXS do mês + projeções aluguel
+    var moTxs = validTxs().filter(function(t){ return ymds(t.date).startsWith(ms); });
+    var moAlug = projecoesAluguel(ms);
+    var totalRec = moTxs.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0)
+                 + moAlug.filter(function(t){return !t._pago;}).reduce(function(s,t){return s+t.value;},0);
+    var totalExp = moTxs.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+    // Tarefas com valor
+    var moTasks = TASKS.filter(function(t){
+      return t.deadline && ymds(t.deadline).startsWith(ms) && t.status!=='done' && parseFloat(t.value||0)>0;
+    });
+    totalExp += moTasks.reduce(function(s,t){return s+(t.type==='exp'?parseFloat(t.value||0):0);},0);
+
+    var saldo = totalRec - totalExp;
     html+='<div class="fmb">'+
-      '<div class="fmb-title"><span>'+(isCur?'☀️ ':'')+d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})+'</span>'+
-      '<span class="fproj '+(saldo>=0?'pos':'neg')+'">'+(isCur?'':' ~ ')+fmtBRL(Math.abs(saldo))+' '+(saldo>=0?'sobra':'déficit')+'</span></div>'+
-      whtml+'</div>';
+      '<div class="fmb-title">'+
+        '<span>'+(mOff===0?'☀️ ':mOff===1?'📅 ':'🔮 ')+mLabel+'</span>'+
+        '<span style="font-size:12px;font-weight:800;color:'+(saldo>=0?'var(--green)':'var(--red)')+'">'+
+          (saldo>=0?'+':'')+fmtBRL(saldo)+
+        '</span>'+
+      '</div>';
+
+    // Bloco receitas
+    if(moAlug.length){
+      html+='<div style="margin:8px 0 4px;font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">🏠 Aluguéis esperados</div>';
+      html+=moAlug.map(function(t){return taskCardComAlug(t);}).join('');
+    }
+    // Bloco tarefas com valor
+    if(moTasks.length){
+      html+='<div style="margin:8px 0 4px;font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.8px">📅 Compromissos com valor</div>';
+      html+=moTasks.map(function(t){return taskCard(t);}).join('');
+    }
+    if(!moAlug.length && !moTasks.length){
+      html+='<div style="color:var(--t3);font-size:12px;padding:12px 0">Nenhum lançamento previsto</div>';
+    }
+    html+='</div>';
   }
-  document.getElementById('future-body').innerHTML=html||emptyHTML('🔮','Sem dados','Adicione transações para ver a projeção');
+
+  document.getElementById('future-body').innerHTML = html ||
+    emptyHTML('🔮','Sem projeções','Cadastre aluguéis ou compromissos com valor para ver o fluxo futuro');
 }
 
-// ════════════════════════════════════════
-//  TASKS
-// ════════════════════════════════════════
 function toggleTF(){
   tfOpen=!tfOpen;
   document.getElementById('tf-body').style.display=tfOpen?'block':'none';
@@ -3023,6 +3028,19 @@ function initTaskDelegation(){
   document.addEventListener('click', function(e){
     var rmBtn = e.target.closest('.recur-manage-btn');
     if(rmBtn){ e.stopPropagation(); openRecurModal(rmBtn.getAttribute('data-rid')); return; }
+    var alugPgto = e.target.closest('[data-alugpgto]');
+    if(alugPgto){
+      var aid2 = alugPgto.getAttribute('data-alugpgto');
+      var mo2  = alugPgto.getAttribute('data-alugmo');
+      var a2   = ALUGUEIS.find(function(x){ return String(x.id)===aid2; });
+      if(a2){
+        var vl2 = prompt('Confirmar pagamento de '+a2.nome+'\nValor (R$):', a2.valorBase.toFixed(2).replace('.',','));
+        if(vl2===null) return;
+        var vn2 = parseFloat(String(vl2).replace(',','.'))||a2.valorBase;
+        registrarPagamento(aid2, mo2, vn2);
+      }
+      return;
+    }
     var chk = e.target.closest('[data-chk]');
     if(chk){ toggleTask(chk.getAttribute('data-chk')); return; }
     var del = e.target.closest('[data-del]');
@@ -3053,6 +3071,21 @@ function initTaskDelegation(){
       var aid = parcBtn.getAttribute('data-parc-alug');
       var a = ALUGUEIS.find(function(x){ return String(x.id)===aid; });
       if(a){ var p=a.parcelas.find(function(x){ return x.mesAno===mo; }); if(p) abrirRecibo(Object.assign({pagador:a.nome,tel:a.tel,obs:''},p,{id:p.codigo,desc:'Aluguel '+(a.ref?a.ref+' — ':'')+MESES_BR[parseInt(mo.split('-')[1])-1]+'/'+mo.split('-')[0]})); }
+      return;
+    }
+    // Clique no checkbox de aluguel virtual (marcar como pago)
+    var alugChk = e.target.closest('[data-alugpgto]');
+    if(alugChk){
+      var aid = alugChk.getAttribute('data-alugpgto');
+      var amo = alugChk.getAttribute('data-alugmo');
+      var aa  = ALUGUEIS.find(function(x){ return String(x.id)===aid; });
+      if(aa){
+        var val = prompt('Registrar pagamento de '+aa.nome+'\nMês: '+amo+'\n\nValor:', aa.valorBase.toFixed(2).replace('.',','));
+        if(val===null) return;
+        var valN = parseFloat(String(val).replace(',','.'));
+        if(isNaN(valN)||valN<=0) valN = aa.valorBase;
+        registrarPagamento(aid, amo, valN);
+      }
       return;
     }
     var wpp = e.target.closest('[data-wppec]');
@@ -3138,19 +3171,19 @@ function renderTL(){
 
 // TASK DAY
 function renderTD(){
-  var tod=ymd(new Date()); var d=ymd(tdDate); var isT=d===tod;
-  document.getElementById('td-date').textContent=isT
-    ?'Hoje, '+tdDate.toLocaleDateString('pt-BR',{day:'numeric',month:'long'})
-    :tdDate.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
-  document.getElementById('td-sub').textContent=isT?'☀️ hoje':tdDate.toLocaleDateString('pt-BR',{year:'numeric'});
-  var tasks=TASKS.filter(function(t){return ymds(t.deadline)===d;});
-  document.getElementById('td-list').innerHTML=tasks.length
-    ?tasks.map(function(t){return taskCard(t);}).join('')
+  var d=tdDate; var dy=ymd(d);
+  var mo=dy.substring(0,7);
+  document.getElementById('td-lbl').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  var tasks=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
+  var alugDia=projecoesAluguel(mo).filter(function(t){return t.deadline===dy;});
+  var all=tasks.map(function(t){return {t:t,isA:false};}).concat(
+    alugDia.filter(function(a){return !tasks.some(function(t){return t.id===a.id;});}).map(function(a){return {t:a,isA:true};})
+  );
+  document.getElementById('td-list').innerHTML=all.length
+    ?all.map(function(x){return x.isA?taskCardComAlug(x.t):taskCard(x.t);}).join('')
     :emptyHTML('✨','Nenhum compromisso neste dia','Crie uma tarefa com prazo em '+fmtDate(d));
 }
-function shiftTD(n){ tdDate.setDate(tdDate.getDate()+n); renderTD(); }
 
-// TASK WEEK
 function renderTW(){
   var days=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var tod=ymd(new Date());
@@ -3170,12 +3203,13 @@ function renderTW(){
   document.getElementById('tw-strip').innerHTML=sh;
   var h='';
   dates.forEach(function(dy){
-    var dt=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
+    var alugDy=projecoesAluguelRange(dy,dy);
+    var dt=TASKS.filter(function(t){return ymds(t.deadline)===dy;}).concat(alugDy);
     if(!dt.length)return; total+=dt.length;
     var p=dy.split('-');
     var lbl=new Date(p[0],parseInt(p[1])-1,parseInt(p[2])).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
     var isT=dy===tod;
-    h+='<div class="glbl'+(isT?' g-today':'')+'">'+( isT?'☀️ ':'')+lbl+' <span class="gbadge">'+dt.length+'</span></div>'+dt.map(function(t){return taskCard(t);}).join('');
+    h+='<div class="glbl'+(isT?' g-today':'')+'">'+( isT?'☀️ ':'')+lbl+' <span class="gbadge">'+dt.length+'</span></div>'+dt.map(function(t){return taskCardComAlug(t);}).join('');
   });
   if(!total) h=emptyHTML('📅','Semana livre!','Nenhum compromisso nesta semana');
   document.getElementById('tw-list').innerHTML=h;
@@ -3184,6 +3218,78 @@ function shiftTW(n){ twStart.setDate(twStart.getDate()+n*7); renderTW(); }
 function taskWkDay(d){ tdDate=new Date(d+'T00:00:00'); setTaskView('day'); }
 
 // TASK MONTH
+
+// ════════════════════════════════════════════════════════
+//  PROJEÇÕES DE ALUGUEL — visíveis no calendário e planner
+// ════════════════════════════════════════════════════════
+
+// Retorna array de objetos "tarefa virtual" de aluguel para um mês YYYY-MM
+function projecoesAluguel(mesAno){
+  return ALUGUEIS.map(function(a){
+    var parcMap = {};
+    (a.parcelas||[]).forEach(function(p){ parcMap[p.mesAno]=p; });
+    var pago = !!parcMap[mesAno];
+    var dia  = a.dia || 1;
+    var date = mesAno+'-'+pad(dia);
+    return {
+      id:       'alug-'+a.id+'-'+mesAno,
+      desc:     '🏠 '+a.nome+(a.ref?' ('+a.ref+')':''),
+      type:     'inc',
+      value:    a.valorBase,
+      deadline: date,
+      status:   pago ? 'done' : 'pend',
+      _isAlug:  true,
+      _alugId:  a.id,
+      _mesAno:  mesAno,
+      _pago:    pago
+    };
+  });
+}
+
+// Retorna projeções para um intervalo de datas
+function projecoesAluguelRange(from, to){
+  var result = [];
+  // Coletar meses únicos no intervalo
+  var meses = {};
+  var d = new Date(from+'T00:00:00');
+  var dEnd = new Date(to+'T00:00:00');
+  while(d <= dEnd){
+    meses[d.getFullYear()+'-'+pad(d.getMonth()+1)] = true;
+    d.setDate(d.getDate()+1);
+  }
+  Object.keys(meses).forEach(function(mo){
+    projecoesAluguel(mo).forEach(function(t){
+      if(t.deadline >= from && t.deadline <= to) result.push(t);
+    });
+  });
+  return result;
+}
+
+// taskCard estendido — detecta aluguel virtual para mostrar badge especial
+var _origTaskCard = null;
+function taskCardComAlug(t){
+  if(!t._isAlug) return taskCard(t);
+  var done = t._pago;
+  var sid  = String(t.id);
+  return '<div class="taski" data-id="'+sid+'" style="border-color:'+(done?'var(--green2)':'rgba(255,200,50,.3)')+'">'+
+    '<div class="taski-hdr">'+
+      '<div class="chk'+(done?' done':'')+'" style="cursor:'+(done?'default':'pointer')+'"'+
+        (!done?' data-alugpgto="'+t._alugId+'" data-alugmo="'+t._mesAno+'"':'')+'>'+(done?'✓':'')+'</div>'+
+      '<div class="tname'+(done?' done':'')+'">'+esc(t.desc)+'</div>'+
+    '</div>'+
+    '<div class="tmeta">'+
+      '<span class="tag tinc">🟢 Receita</span>'+
+      '<span class="tag trecur" style="background:rgba(160,100,255,.15);color:#A064FF">🏠 Aluguel</span>'+
+      (done?'<span style="color:var(--green);font-size:11px">✅ Pago</span>':
+            '<span style="color:var(--yellow);font-size:11px">⏳ Aguardando</span>')+
+    '</div>'+
+    '<div class="tmeta" style="margin-top:4px">'+
+      '<span style="font-weight:800;color:var(--green)">'+fmtBRL(t.value)+'</span>'+
+      '<span>Vence '+fmtDate(t.deadline)+'</span>'+
+    '</div>'+
+  '</div>';
+}
+
 function renderTM(){
   var yr=tmDate.getFullYear(); var mo=tmDate.getMonth();
   var tod=ymd(new Date());
@@ -3192,7 +3298,7 @@ function renderTM(){
   var dh=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var gh=dh.map(function(d){return '<div class="mgh">'+d+'</div>';}).join('');
   var fd=new Date(yr,mo,1); var ld=new Date(yr,mo+1,0);
-  var off=fd.getDay()-1; if(off<0)off=6;
+  var off=fd.getDay(); // domingo=0 correto
   var rows=Math.ceil((off+ld.getDate())/7);
   for(var i=0;i<rows*7;i++){
     var dn=i-off+1;
@@ -3200,9 +3306,11 @@ function renderTM(){
     var d=new Date(yr,mo,dn); var dy=ymd(d);
     var isT=dy===tod;
     var dTasks=TASKS.filter(function(t){return ymds(t.deadline)===dy&&t.status!=='done';});
-    var dots=dTasks.slice(0,3).map(function(t){
-      var c=t.status==='done'?'var(--green)':t.status==='prog'?'var(--blue)':'var(--yellow)';
-      return '<div class="dot" style="background:'+c+'"></div>';
+    var dAlug=projecoesAluguelRange(dy,dy).filter(function(t){return !t._pago;});
+    var allDots=dTasks.concat(dAlug);
+    var dots=allDots.slice(0,3).map(function(t){
+      var col=t._isAlug?'var(--green)':t.status==='done'?'var(--green)':'var(--yellow)';
+      return '<div class="dot" style="background:'+col+'"></div>';
     }).join('');
     gh+='<div class="mgc'+(isT?' today':'')+'" onclick="taskMoDay(\''+dy+'\')">'+
       '<div class="mgn">'+dn+'</div>'+
@@ -3211,18 +3319,36 @@ function renderTM(){
   document.getElementById('tm-grid').innerHTML=gh;
   var ms=yr+'-'+pad(mo+1);
   var moTasks=TASKS.filter(function(t){return t.deadline&&ymds(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
+  // Adicionar projeções de aluguel
+  var moAlug = projecoesAluguel(ms);
+  var allTasks = moTasks.concat(moAlug).sort(function(a,b){
+    return String(a.deadline).localeCompare(String(b.deadline));
+  });
   var h='';
-  if(moTasks.length){
+  if(allTasks.length){
     var fd2=new Date(yr,mo,1);
     var byW={};
-    moTasks.forEach(function(t){
-      var dd=new Date(t.deadline+'T00:00:00');
+    allTasks.forEach(function(t){
+      var dd=new Date((t.deadline||ms+'-01')+'T00:00:00');
       var w=Math.ceil((dd.getDate()+fd2.getDay()-1)/7);
       if(!byW[w])byW[w]=[]; byW[w].push(t);
     });
     Object.entries(byW).forEach(function(e){
-      h+='<div class="glbl g-soon">Semana '+e[0]+' <span class="gbadge">'+e[1].length+'</span></div>'+e[1].map(function(t){return taskCard(t);}).join('');
+      h+='<div class="glbl g-soon">Semana '+e[0]+' <span class="gbadge">'+e[1].length+'</span></div>'+
+        e[1].map(function(t){return taskCardComAlug(t);}).join('');
     });
+    // Resumo financeiro do mês
+    var totalAlug = moAlug.reduce(function(s,t){return s+t.value;},0);
+    var pagoAlug  = moAlug.filter(function(t){return t._pago;}).reduce(function(s,t){return s+t.value;},0);
+    if(totalAlug>0){
+      h='<div class="taski" style="background:rgba(46,204,154,.08);border-color:var(--green2);margin-bottom:10px">'+
+        '<div style="font-size:11px;font-weight:800;color:var(--t3);margin-bottom:4px">💰 ALUGUÉIS DO MÊS</div>'+
+        '<div style="display:flex;gap:16px">'+
+          '<span style="font-size:13px;font-weight:800;color:var(--green)">Recebido: '+fmtBRL(pagoAlug)+'</span>'+
+          '<span style="font-size:13px;color:var(--t3)">Total: '+fmtBRL(totalAlug)+'</span>'+
+        '</div>'+
+      '</div>'+h;
+    }
   } else {
     h=emptyHTML('📆','Nenhum compromisso neste mês','');
   }
@@ -3243,24 +3369,30 @@ function renderTP(){
     var ld=new Date(yr,mo+1,0).getDate();
     var isCur=mOff===0;
 
-    // tarefas do mês
+    // tarefas do mês + projeções de aluguel
     var moTasks=TASKS.filter(function(t){
       return t.deadline && ymds(t.deadline).startsWith(ms) && t.status!=='done';
     });
     var doneCount=TASKS.filter(function(t){
       return t.deadline && ymds(t.deadline).startsWith(ms) && t.status==='done';
     }).length;
+    // Aluguéis: só mostrar meses futuros e atual (não passados já tratados)
+    var moAlugTP = (mOff >= 0) ? projecoesAluguel(ms) : [];
+    var totalAlugMo = moAlugTP.reduce(function(s,t){return s+t.value;},0);
+    var moTasks = moTasks.concat(moAlugTP.filter(function(t){return !t._pago;}));
     var totalCount=moTasks.length+doneCount;
 
     var mLabel=mDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-    var summary=moTasks.length+' pendente'+(moTasks.length!==1?'s':'')+
+    var taskPend = moTasks.filter(function(t){return !t._isAlug;}).length;
+    var summary=taskPend+' pendente'+(taskPend!==1?'s':'')+
       (doneCount?' · '+doneCount+' concluída'+(doneCount!==1?'s':''):'');
+    var alugSuffix = totalAlugMo>0 ? ' · 🏠 '+fmtBRL(totalAlugMo) : '';
 
     // cabeçalho do mês
     html+='<div class="fmb">'+
       '<div class="fmb-title">'+
       '<span>'+(isCur?'☀️ ':'')+mLabel+'</span>'+
-      '<span style="font-size:11px;color:var(--t2)">'+summary+'</span>'+
+      '<span style="font-size:11px;color:var(--t2)">'+summary+alugSuffix+'</span>'+
       '</div>';
 
     // semanas do mês
@@ -3274,10 +3406,11 @@ function renderTP(){
       // só mostrar semanas a partir de hoje no mês atual
       if(isCur && to < ymd(now)) { wNum++; continue; }
 
+      var wAlug=projecoesAluguelRange(from,to).filter(function(t){return !t._pago;});
       var wTasks=TASKS.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status!=='done';
-      });
+      }).concat(wAlug);
       var wDone=TASKS.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status==='done';
@@ -3298,7 +3431,7 @@ function renderTP(){
 
       // listar tarefas desta semana expandidas (só mês atual / próxima semana)
       if(wTasks.length && mOff<=1){
-        whtml+=wTasks.map(function(t){return taskCard(t);}).join('');
+        whtml+=wTasks.map(function(t){return taskCardComAlug(t);}).join('');
       }
       wNum++;
     }
@@ -3344,9 +3477,21 @@ function renderHoje(){
   var atrasadoTasks = TASKS.filter(function(t){
     return t.deadline && ymds(t.deadline) < tod && t.status !== 'done';
   });
-  // Gastos atrasados = transações com data no passado que foram marcadas com status 'pending'
-  // Como transações não têm status de "pago", usamos só tarefas como atrasadas
-  // (O usuário pode registrar pagamentos como transações normais no dia que pagar)
+  // Aluguéis vencidos e não pagos
+  var _n2=new Date();
+  ALUGUEIS.forEach(function(a){
+    for(var _mi=-2;_mi<=0;_mi++){
+      var _md=new Date(_n2.getFullYear(),_n2.getMonth()+_mi,1);
+      var _ms=_md.getFullYear()+'-'+pad(_md.getMonth()+1);
+      var _venc=_ms+'-'+pad(a.dia);
+      if(_venc>=tod) continue;
+      var _pg=(a.parcelas||[]).some(function(p){return p.mesAno===_ms;});
+      if(!_pg){
+        var _pr=projecoesAluguel(_ms).find(function(t){return String(t._alugId)===String(a.id);});
+        if(_pr&&!atrasadoTasks.some(function(t){return t.id===_pr.id;})) atrasadoTasks.push(_pr);
+      }
+    }
+  });
 
   // Atualizar cabeçalho
   var now2 = new Date();
@@ -3404,7 +3549,7 @@ function renderHoje(){
 
   // Render atrasados
   document.getElementById('hoje-atrasado-list').innerHTML = atrasadoTasks.length
-    ? atrasadoTasks.map(function(t){ return taskCard(t); }).join('')
+    ? atrasadoTasks.map(function(t){ return t._isAlug?taskCardComAlug(t):taskCard(t,'ov'); }).join('')
     : '';
 
   // Se tudo vazio, mostrar mensagem de parabéns
