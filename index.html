@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo App</title>
+<title>Fluxo</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0F1923">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fluxo">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+CiAgPCEtLSBGdW5kbyAtLT4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzBGMTkyMyIvPgogIDwhLS0gQ8OtcmN1bG8gZXh0ZXJubyBjb20gc2V0YXMgLS0+CiAgPGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyMDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJFQ0M5QSIgc3Ryb2tlLXdpZHRoPSIyOCIgc3Ryb2tlLWRhc2hhcnJheT0iNTMwIDExMCIgc3Ryb2tlLWRhc2hvZmZzZXQ9IjAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwhLS0gU2V0YSBzdXBlcmlvciBkaXJlaXRhIC0tPgogIDxwb2x5bGluZSBwb2ludHM9IjQyMCwxNjUgNDQ1LDE0NSA0MzAsMTE1IiBmaWxsPSJub25lIiBzdHJva2U9IiMyRUNDOUEiIHN0cm9rZS13aWR0aD0iMjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDwhLS0gU2V0YSBpbmZlcmlvciBlc3F1ZXJkYSAtLT4KICA8cG9seWxpbmUgcG9pbnRzPSI5MiwzNDcgNjcsMzY3IDgyLDM5NyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkVDQzlBIiBzdHJva2Utd2lkdGg9IjI4IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8IS0tIEPDrXJjdWxvIGludGVybm8gcHJlZW5jaGlkbyAtLT4KICA8Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjEyMCIgZmlsbD0iIzJFQ0M5QSIvPgogIDwhLS0gU8OtbWJvbG8gJCAtLT4KICA8dGV4dCB4PSIyNTYiIHk9IjMwMCIgZm9udC1mYW1pbHk9IkFyaWFsLEhlbHZldGljYSxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2MCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzBGMTkyMyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+JDwvdGV4dD4KPC9zdmc+">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiI+CiAgPCEtLSBGdW5kbyAtLT4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEwMCIgZmlsbD0iIzBGMTkyMyIvPgogIDwhLS0gQ8OtcmN1bG8gZXh0ZXJubyBjb20gc2V0YXMgLS0+CiAgPGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyMDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJFQ0M5QSIgc3Ryb2tlLXdpZHRoPSIyOCIgc3Ryb2tlLWRhc2hhcnJheT0iNTMwIDExMCIgc3Ryb2tlLWRhc2hvZmZzZXQ9IjAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwhLS0gU2V0YSBzdXBlcmlvciBkaXJlaXRhIC0tPgogIDxwb2x5bGluZSBwb2ludHM9IjQyMCwxNjUgNDQ1LDE0NSA0MzAsMTE1IiBmaWxsPSJub25lIiBzdHJva2U9IiMyRUNDOUEiIHN0cm9rZS13aWR0aD0iMjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDwhLS0gU2V0YSBpbmZlcmlvciBlc3F1ZXJkYSAtLT4KICA8cG9seWxpbmUgcG9pbnRzPSI5MiwzNDcgNjcsMzY3IDgyLDM5NyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMkVDQzlBIiBzdHJva2Utd2lkdGg9IjI4IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8IS0tIEPDrXJjdWxvIGludGVybm8gcHJlZW5jaGlkbyAtLT4KICA8Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjEyMCIgZmlsbD0iIzJFQ0M5QSIvPgogIDwhLS0gU8OtbWJvbG8gJCAtLT4KICA8dGV4dCB4PSIyNTYiIHk9IjMwMCIgZm9udC1mYW1pbHk9IkFyaWFsLEhlbHZldGljYSxzYW5zLXNlcmlmIiBmb250LXNpemU9IjE2MCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzBGMTkyMyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+JDwvdGV4dD4KPC9zdmc+">
 <style>
 /* ── RESET & BASE ── */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -214,6 +222,8 @@ select option{background:#1A2A3A}
 .coll-hdr{
   display:flex;justify-content:space-between;align-items:center;
   cursor:pointer;margin-bottom:0;
+  padding:4px 0;user-select:none;
+  -webkit-tap-highlight-color:rgba(46,204,154,.15);
 }
 .coll-arrow{font-size:16px;color:var(--t3);transition:transform .2s}
 .coll-body{margin-top:12px}
@@ -1076,81 +1086,78 @@ select option{background:#1A2A3A}
   <!-- ══ DOCS ══ -->
   <div id="sec-rec" style="display:none;padding:0 16px 100px">
 
-  <!-- PAGADORES -->
-  <div class="card" style="margin-bottom:12px">
-    <div class="coll-hdr" onclick="toggleColl('pag-body','pag-chev')">
-      <span>👤 Pagadores</span><span id="pag-chev">▾</span>
-    </div>
-    <div class="coll-body" id="pag-body" style="display:none">
-      <div style="margin-bottom:8px"><div class="fl">Nome</div><input id="pag-nome" type="text" placeholder="Nome completo" maxlength="80"></div>
-      <div class="row2">
-        <div><div class="fl">Telefone (WhatsApp)</div><input id="pag-tel" type="tel" placeholder="(47) 99999-0000" maxlength="20"></div>
-        <div><div class="fl">CPF / CNPJ <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="pag-doc" type="text" placeholder="000.000.000-00" maxlength="20"></div>
-      </div>
-      <button class="btn" onclick="addPagador()">Salvar Pagador ✓</button>
-    </div>
+  <!-- ABAS internas -->
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="vbtn on" id="rb-pagadores" onclick="setRecTab('pagadores')" style="flex:1;padding:10px;border-radius:10px">👤 Pagadores</button>
+    <button class="vbtn"    id="rb-alugueis"  onclick="setRecTab('alugueis')"  style="flex:1;padding:10px;border-radius:10px">🏠 Aluguéis</button>
+    <button class="vbtn"    id="rb-recibos"   onclick="setRecTab('recibos')"   style="flex:1;padding:10px;border-radius:10px">🧾 Recibos</button>
   </div>
 
-  <!-- LISTA PAGADORES -->
-  <div id="pag-list" style="margin-bottom:14px"></div>
-
-  <!-- ALUGUÉIS -->
-  <div class="card" style="margin-bottom:12px">
-    <div class="coll-hdr" onclick="toggleColl('alug-body','alug-chev')">
-      <span>🏠 Aluguéis Recorrentes</span><span id="alug-chev">▾</span>
+  <!-- ABA: PAGADORES -->
+  <div id="rp-pagadores">
+    <div class="card" style="margin-bottom:12px">
+      <div class="fl" style="margin-bottom:4px">Nome</div>
+      <input id="pag-nome" type="text" placeholder="Nome completo" maxlength="80" style="margin-bottom:10px">
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Telefone (WhatsApp)</div><input id="pag-tel" type="tel" placeholder="(47) 99999-0000" maxlength="20"></div>
+        <div><div class="fl">CPF / CNPJ (opcional)</div><input id="pag-doc" type="text" placeholder="000.000.000-00" maxlength="20"></div>
+      </div>
+      <button class="btn" onclick="addPagador()">+ Salvar Pagador</button>
     </div>
-    <div class="coll-body" id="alug-body" style="display:none">
-      <div class="row2">
+    <div class="slbl" style="margin-bottom:8px">Pagadores cadastrados</div>
+    <div id="pag-list"></div>
+  </div>
+
+  <!-- ABA: ALUGUÉIS -->
+  <div id="rp-alugueis" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div class="row2" style="margin-bottom:10px">
         <div><div class="fl">Inquilino</div>
-          <select id="alug-pag">
-            <option value="">— selecione —</option>
-          </select>
+          <select id="alug-pag"><option value="">— selecione —</option></select>
         </div>
-        <div><div class="fl">Dia de vencimento</div>
-          <input id="alug-dia" type="number" min="1" max="31" placeholder="Ex: 5" style="width:100%">
+        <div><div class="fl">Dia vencimento</div>
+          <input id="alug-dia" type="number" min="1" max="31" placeholder="Ex: 5">
         </div>
       </div>
-      <div class="row2">
+      <div class="row2" style="margin-bottom:10px">
         <div><div class="fl">Valor mensal (R$)</div>
           <div class="r-wrap"><input id="alug-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
         </div>
         <div><div class="fl">Referência</div>
-          <input id="alug-ref" type="text" placeholder="Ex: Apto 12, Casa B" maxlength="40">
+          <input id="alug-ref" type="text" placeholder="Ex: Apto 12" maxlength="40">
         </div>
       </div>
-      <button class="btn" onclick="addAluguel()">Cadastrar Aluguel ✓</button>
+      <button class="btn" onclick="addAluguel()">+ Cadastrar Aluguel</button>
     </div>
+    <div class="slbl" style="margin-bottom:8px">Aluguéis cadastrados</div>
+    <div id="alug-list"></div>
   </div>
 
-  <!-- LISTA ALUGUÉIS + REGISTRAR PAGAMENTO -->
-  <div id="alug-list" style="margin-bottom:14px"></div>
-
-  <!-- NOVO RECIBO -->
-  <div class="card" style="margin-bottom:12px">
-    <div class="coll-hdr" onclick="toggleColl('rec-body','rec-chev')">
-      <span>🧾 Emitir Recibo</span><span id="rec-chev">▾</span>
-    </div>
-    <div class="coll-body" id="rec-body" style="display:none">
-      <div style="margin-bottom:8px">
+  <!-- ABA: RECIBOS -->
+  <div id="rp-recibos" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div style="margin-bottom:10px">
         <div class="fl">Pagador</div>
-        <select id="rec-pag">
-          <option value="">— selecione ou preencha abaixo —</option>
-        </select>
+        <select id="rec-pag"><option value="">— selecione ou preencha abaixo —</option></select>
       </div>
-      <div style="margin-bottom:8px"><div class="fl">Nome (se não cadastrado)</div><input id="rec-pag-nome" type="text" placeholder="Nome do pagador" maxlength="80"></div>
-      <div style="margin-bottom:8px"><div class="fl">Descrição / Referência</div><input id="rec-desc" type="text" placeholder="Ex: Aluguel março/2026" maxlength="120"></div>
-      <div class="row2">
+      <div style="margin-bottom:10px"><div class="fl">Nome (se não cadastrado)</div>
+        <input id="rec-pag-nome" type="text" placeholder="Nome do pagador" maxlength="80">
+      </div>
+      <div style="margin-bottom:10px"><div class="fl">Descrição / Referência</div>
+        <input id="rec-desc" type="text" placeholder="Ex: Aluguel março/2026" maxlength="120">
+      </div>
+      <div class="row2" style="margin-bottom:10px">
         <div><div class="fl">Valor (R$)</div><div class="r-wrap"><input id="rec-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
         <div><div class="fl">Data</div><input id="rec-data" type="date"></div>
       </div>
-      <div style="margin-bottom:8px"><div class="fl">Observação <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="rec-obs" type="text" placeholder="Ex: Referente ao mês de março" maxlength="200"></div>
+      <div style="margin-bottom:10px"><div class="fl">Observação (opcional)</div>
+        <input id="rec-obs" type="text" placeholder="Ex: Referente ao mês de março" maxlength="200">
+      </div>
       <button class="btn" onclick="emitirRecibo()">Gerar Recibo 🧾</button>
     </div>
+    <div class="slbl" style="margin-bottom:8px">Recibos emitidos</div>
+    <div id="rec-hist-list"></div>
   </div>
-
-  <!-- HISTÓRICO DE RECIBOS -->
-  <div class="slbl" style="margin-bottom:8px">Recibos emitidos</div>
-  <div id="rec-hist-list"></div>
 
 </div>
 
@@ -1302,7 +1309,22 @@ var TXS   = (function(){
     return true;
   });
 })();
-var TASKS = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
+var TASKS = (function(){
+  var raw = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
+  // Deduplicar: para cada (desc+mês), manter só 1 entrada
+  var seen = {};
+  return raw.filter(function(t){
+    var dl = t.deadline ? String(t.deadline).substring(0,7) : 'none';
+    var key = (t.desc||'').trim().toLowerCase() + '|' + dl;
+    if(seen[key]){
+      // Se o novo tem recurId e o existente não, trocar
+      if(t.recurId && !seen[key].recurId){ seen[key] = t; return false; }
+      return false; // descartar duplicata
+    }
+    seen[key] = t;
+    return true;
+  });
+})();
 var RECUR      = JSON.parse(localStorage.getItem('ff_recur')      || '[]');
 var PAGADORES  = JSON.parse(localStorage.getItem('ff_pagadores')  || '[]');
 var RECIBOS    = JSON.parse(localStorage.getItem('ff_recibos')    || '[]');
@@ -1986,6 +2008,9 @@ function renderAlugueisSection(){
         return '<option value="'+p.id+'">'+esc(p.nome)+'</option>';
       }).join('');
   }
+  // Preencher select de pagadores no form de aluguel também
+  var selAlug = document.getElementById('alug-pag');
+  if(selAlug && !selAlug.innerHTML.includes(PAGADORES.length)){} // já feito acima
   var el = document.getElementById('alug-list');
   if(!el) return;
   if(!ALUGUEIS.length){
@@ -2162,9 +2187,19 @@ function delRecibo(id){
   toast('🗑️ Recibo removido');
 }
 
+var curRecTab = 'pagadores';
+function setRecTab(t){
+  curRecTab = t;
+  ['pagadores','alugueis','recibos'].forEach(function(tab){
+    document.getElementById('rp-'+tab).style.display = tab===t ? 'block' : 'none';
+    document.getElementById('rb-'+tab).classList.toggle('on', tab===t);
+  });
+  renderRecibos();
+}
+
 function renderRecibos(){
-  renderAlugueisSection();
-  renderPagadores();
+  try { renderAlugueisSection(); } catch(e){ console.error('renderAlugueisSection:', e); }
+  try { renderPagadores(); } catch(e){ console.error('renderPagadores:', e); }
   // Preencher data padrão = hoje
   var dataEl = document.getElementById('rec-data');
   if(dataEl && !dataEl.value) dataEl.value = ymd(new Date());
@@ -2796,6 +2831,16 @@ function toggleTF(){
   tfOpen=!tfOpen;
   document.getElementById('tf-body').style.display=tfOpen?'block':'none';
   document.getElementById('tf-arrow').style.transform=tfOpen?'':'rotate(-90deg)';
+}
+
+// Genérica — abre/fecha qualquer coll-body pelo ID
+function toggleColl(bodyId, chevId){
+  var body = document.getElementById(bodyId);
+  var chev = chevId ? document.getElementById(chevId) : null;
+  if(!body) return;
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if(chev) chev.style.transform = isOpen ? 'rotate(-90deg)' : '';
 }
 
 function onTaskTypeChange(){
