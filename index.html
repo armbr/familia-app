@@ -1311,19 +1311,26 @@ var TXS   = (function(){
 })();
 var TASKS = (function(){
   var raw = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
-  // Deduplicar: para cada (desc+mês), manter só 1 entrada
-  var seen = {};
-  return raw.filter(function(t){
-    var dl = t.deadline ? String(t.deadline).substring(0,7) : 'none';
-    var key = (t.desc||'').trim().toLowerCase() + '|' + dl;
-    if(seen[key]){
-      // Se o novo tem recurId e o existente não, trocar
-      if(t.recurId && !seen[key].recurId){ seen[key] = t; return false; }
-      return false; // descartar duplicata
+  // Deduplicar por desc|mês — manter a que tem recurId
+  var seen = {}; // key → índice no resultado
+  var result = [];
+  raw.forEach(function(t){
+    var dl  = ymds ? ymds(t.deadline||'') : String(t.deadline||'');
+    var mo  = dl.substring(0,7) || 'none';
+    var key = (t.desc||'').trim().toLowerCase()+'|'+mo;
+    if(key in seen){
+      var existIdx = seen[key];
+      // Trocar se o novo tem recurId e o existente não
+      if(t.recurId && !result[existIdx].recurId){
+        result[existIdx] = t;
+      }
+      // caso contrário descartar o novo
+    } else {
+      seen[key] = result.length;
+      result.push(t);
     }
-    seen[key] = t;
-    return true;
   });
+  return result;
 })();
 var RECUR      = JSON.parse(localStorage.getItem('ff_recur')      || '[]');
 var PAGADORES  = JSON.parse(localStorage.getItem('ff_pagadores')  || '[]');
@@ -2448,80 +2455,76 @@ function delRecur(id){
   toast('🗑️ Recorrência cancelada');
 }
 
-// Chamado no syncAll — cria lançamento deste mês se ainda não existe
+// Chamado no syncAll — cria tarefas recorrentes se ainda não existem
 function processRecur(){
   if(!RECUR.length) return;
-  var now    = new Date();
-  var today  = ymd(now);
-  var created = 0;
+  var now   = new Date();
+  var today = ymd(now);
 
-  // Pré-indexar TASKS por "desc|mês" para lookup O(1)
-  var taskIndex = {};
+  // Construir índice de TASKS existentes: "desc_normalizado|YYYY-MM" → true
+  var idx = {};
   TASKS.forEach(function(t){
-    var dl = ymds(t.deadline || '');
+    var dl = ymds(t.deadline||'');
     if(!dl) return;
-    var mo = dl.substring(0,7);
-    var key = t.desc.trim().toLowerCase() + '|' + mo;
-    taskIndex[key] = true;
-    // também indexar por recurId|mês
-    if(t.recurId){
-      var rkey = 'rid:'+String(t.recurId)+'|'+mo;
-      taskIndex[rkey] = true;
-    }
+    var k1 = t.desc.trim().toLowerCase()+'|'+dl.substring(0,7);
+    var k2 = 'rid:'+String(t.recurId||'')+'|'+dl.substring(0,7);
+    idx[k1] = true;
+    if(t.recurId) idx[k2] = true;
   });
 
-  // Pré-indexar TXS concluídas por "desc|mês"
-  var txIndex = {};
+  // Índice de TXS pagas
+  var txIdx = {};
   TXS.forEach(function(t){
-    var mo = ymds(t.date).substring(0,7);
-    var key = t.desc.trim().toLowerCase() + '|' + mo;
-    txIndex[key] = true;
+    var k = t.desc.trim().toLowerCase()+'|'+ymds(t.date).substring(0,7);
+    txIdx[k] = true;
   });
 
-  // Gerar para os próximos 2 meses a partir do mês atual
-  for(var mo = 0; mo < 2; mo++){
-    var d = new Date(now.getFullYear(), now.getMonth() + mo, 1);
-    var moStr = d.getFullYear()+'-'+pad(d.getMonth()+1);
+  var added = [];
+
+  // Gerar mês atual + próximo mês
+  for(var mOff=0; mOff<2; mOff++){
+    var mDate  = new Date(now.getFullYear(), now.getMonth()+mOff, 1);
+    var moStr  = mDate.getFullYear()+'-'+pad(mDate.getMonth()+1);
 
     RECUR.forEach(function(r){
-      var origDay    = new Date((r.date||today)+'T12:00:00').getDate();
-      var targetDate = moStr+'-'+pad(origDay);
+      var day  = new Date((r.date||today)+'T12:00:00').getDate();
+      var dl   = moStr+'-'+pad(day);
+      if(dl < today) return; // não gerar passado
 
-      // Não gerar datas passadas
-      if(targetDate < today) return;
+      var dk = r.desc.trim().toLowerCase()+'|'+moStr;
+      var rk = 'rid:'+String(r.id)+'|'+moStr;
 
-      var descKey = r.desc.trim().toLowerCase() + '|' + moStr;
-      var ridKey  = 'rid:'+String(r.id)+'|'+moStr;
-
-      // Já existe tarefa com mesmo nome OU mesmo recurId neste mês?
-      if(taskIndex[descKey] || taskIndex[ridKey]) return;
-      // Já existe TXS paga com mesmo nome neste mês?
-      if(txIndex[descKey]) return;
+      if(idx[dk] || idx[rk] || txIdx[dk]) return; // já existe
 
       var task = {
-        desc:     r.desc,
-        type:     r.type || 'exp',
-        deadline: targetDate,
-        value:    r.value,
-        cat:      r.cat || '',
-        status:   'pend',
-        recurId:  r.id
+        desc:    r.desc,
+        type:    r.type||'exp',
+        deadline:dl,
+        value:   r.value,
+        cat:     r.cat||'',
+        status:  'pend',
+        recurId: r.id
       };
-      var tmp = Date.now() + Math.random();
+      var tmp = Date.now()+Math.random();
       TASKS.unshift(Object.assign({id:tmp}, task));
-      // Marcar no índice para não duplicar dentro do mesmo processRecur
-      taskIndex[descKey] = true;
-      taskIndex[ridKey]  = true;
-      created++;
-      apiCall('addTask', task, function(){});
+      idx[dk] = true; // marcar para não duplicar neste loop
+      idx[rk] = true;
+      added.push(task);
     });
   }
 
-  if(created > 0){
-    localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
-    renderAll();
-    toast('🔁 '+created+' compromisso'+(created>1?'s recorrentes adicionados':'  recorrente adicionado')+'!');
-  }
+  if(!added.length) return;
+
+  // Salvar localmente primeiro
+  localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+
+  // Enviar ao servidor com delay entre chamadas para evitar race condition
+  added.forEach(function(task, i){
+    setTimeout(function(){ apiCall('addTask', task, function(){}); }, i*200);
+  });
+
+  renderAll();
+  toast('🔁 '+added.length+' recorrente'+(added.length>1?'s adicionados':' adicionado')+'!');
 }
 
 function addRecur(tx){
