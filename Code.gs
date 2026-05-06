@@ -191,8 +191,52 @@ function addTask(body) {
     sheet.setFrozenRows(1);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#0F2438').setFontColor('#FFF');
   }
-  var id = Date.now();
-  sheet.appendRow([id, body.desc, body.type, body.deadline || '', body.value ? parseFloat(body.value) : '', body.status || 'pend', new Date().toISOString(), body.cat || '', body.recurId ? String(body.recurId) : '']);
+
+  // Garantir colunas cat e recurId existem
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (headers.indexOf('cat') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('cat');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+  if (headers.indexOf('recurId') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('recurId');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
+  // Verificar duplicata antes de inserir
+  var descIdx2    = headers.indexOf('desc');
+  var deadlineIdx2= headers.indexOf('deadline');
+  var recurIdx2   = headers.indexOf('recurId');
+  var allRows     = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow()-1, headers.length).getValues() : [];
+  var newMo       = String(body.deadline || '').substring(0,7);
+  var newDesc     = String(body.desc || '').trim().toLowerCase();
+  var newRid      = String(body.recurId || '');
+
+  for (var ri = 0; ri < allRows.length; ri++) {
+    var rDesc = String(allRows[ri][descIdx2] || '').trim().toLowerCase();
+    var rDl   = String(allRows[ri][deadlineIdx2] || '').substring(0,7);
+    var rRid  = String(allRows[ri][recurIdx2]  || '');
+    // Duplicata: mesmo desc + mesmo mês
+    if (rDesc === newDesc && rDl === newMo) {
+      return { ok: true, id: allRows[ri][0], duplicate: true };
+    }
+  }
+
+  // Montar linha com posições corretas
+  var id  = Date.now();
+  var row = new Array(headers.length).fill('');
+  var set = function(col, val){ var i=headers.indexOf(col); if(i>=0) row[i]=val; };
+  set('id',        id);
+  set('desc',      body.desc || '');
+  set('type',      body.type || 'exp');
+  set('deadline',  body.deadline || '');
+  set('value',     body.value ? parseFloat(body.value) : '');
+  set('status',    body.status || 'pend');
+  set('createdAt', new Date().toISOString());
+  set('cat',       body.cat || '');
+  set('recurId',   newRid);
+
+  sheet.appendRow(row);
   return { ok: true, id: id };
 }
 
@@ -659,4 +703,53 @@ function registrarPagamentoAluguel(body) {
   sheet.getRange(lastRow, 1, 1, 5).setBackground('#d4edda');
 
   return { ok: true };
+}
+
+// ════════════════════════════════════════════════════════════
+//  LIMPEZA DE TAREFAS DUPLICADAS
+//  Execute uma vez para limpar duplicatas na planilha
+// ════════════════════════════════════════════════════════════
+function limparTarefasDuplicadas() {
+  var r = sheetRows('Tarefas');
+  if (!r.sheet || !r.rows.length) { Logger.log('Sem dados'); return; }
+
+  var headers    = r.headers;
+  var descIdx    = headers.indexOf('desc');
+  var deadlineIdx= headers.indexOf('deadline');
+  var recurIdx   = headers.indexOf('recurId');
+  var statusIdx  = headers.indexOf('status');
+
+  var seen    = {}; // chave: desc|mes → rowIndex
+  var toDelete= [];
+
+  r.rows.forEach(function(row, i) {
+    var desc     = String(row[descIdx]  || '').trim().toLowerCase();
+    var deadline = String(row[deadlineIdx] || '');
+    // Normalizar deadline para YYYY-MM
+    var mo = deadline.length >= 7 ? deadline.substring(0,7) : deadline;
+    var key = desc + '|' + mo;
+    var recurId = String(row[recurIdx] || '').trim();
+
+    if (!seen[key]) {
+      seen[key] = { rowIndex: i, recurId: recurId };
+    } else {
+      // Duplicata — manter a que tem recurId
+      if (recurId && !seen[key].recurId) {
+        // A nova tem recurId, a antiga não — deletar a antiga
+        toDelete.push(seen[key].rowIndex);
+        seen[key] = { rowIndex: i, recurId: recurId };
+      } else {
+        // Deletar a nova (duplicata sem recurId, ou ambas têm)
+        toDelete.push(i);
+      }
+    }
+  });
+
+  // Deletar de baixo para cima (para não deslocar índices)
+  toDelete.sort(function(a,b){ return b-a; });
+  toDelete.forEach(function(i) {
+    r.sheet.deleteRow(i + 2); // +2 porque header é row 1
+  });
+
+  Logger.log('Tarefas duplicadas removidas: ' + toDelete.length);
 }
