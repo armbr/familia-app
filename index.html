@@ -395,6 +395,15 @@ select option{background:#1A2A3A}
   cursor:pointer;border:none;font-family:inherit;font-size:10px;font-weight:700;
   padding:2px 8px;border-radius:100px;transition:background .15s}
 .tag.trecur:active{background:rgba(160,100,255,.30)}
+.cc-fatura-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.cc-fatura-item .fi-info{flex:1;min-width:0}
+.cc-fatura-item .fi-desc{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-fatura-item .fi-meta{font-size:11px;color:var(--t3);margin-top:2px}
+.cc-fatura-item .fi-val{font-size:14px;font-weight:800;color:var(--red);flex-shrink:0}
+.cc-card-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px}
+.fatura-total{background:var(--card2);border-radius:10px;padding:16px;margin-bottom:12px;text-align:center}
+.fatura-total .ft-val{font-size:28px;font-weight:900;color:var(--red)}
+.fatura-total .ft-lbl{font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}
 .alug-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px}
 .alug-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .alug-nome{font-size:15px;font-weight:800;flex:1}
@@ -1087,14 +1096,15 @@ select option{background:#1A2A3A}
   <div id="sec-rec" style="display:none;padding:0 16px 100px">
 
   <!-- ABAS internas -->
-  <div style="display:flex;gap:8px;margin-bottom:14px">
-    <button class="vbtn on" id="rb-pagadores" onclick="setRecTab('pagadores')" style="flex:1;padding:10px;border-radius:10px">👤 Pagadores</button>
-    <button class="vbtn"    id="rb-alugueis"  onclick="setRecTab('alugueis')"  style="flex:1;padding:10px;border-radius:10px">🏠 Aluguéis</button>
-    <button class="vbtn"    id="rb-recibos"   onclick="setRecTab('recibos')"   style="flex:1;padding:10px;border-radius:10px">🧾 Recibos</button>
+  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+    <button class="vbtn" id="rb-pagadores"  onclick="setRecTab('pagadores')"  style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">👤 Pag.</button>
+    <button class="vbtn"    id="rb-alugueis"   onclick="setRecTab('alugueis')"   style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">🏠 Alug.</button>
+    <button class="vbtn on" id="rb-contratos"  onclick="setRecTab('contratos')"  style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">📄 Contratos</button>
+    <button class="vbtn"    id="rb-recibos"    onclick="setRecTab('recibos')"    style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">🧾 Recibos</button>
   </div>
 
   <!-- ABA: PAGADORES -->
-  <div id="rp-pagadores">
+  <div id="rp-pagadores" style="display:none">
     <div class="card" style="margin-bottom:12px">
       <div class="fl" style="margin-bottom:4px">Nome</div>
       <input id="pag-nome" type="text" placeholder="Nome completo" maxlength="80" style="margin-bottom:10px">
@@ -1133,6 +1143,123 @@ select option{background:#1A2A3A}
     <div id="alug-list"></div>
   </div>
 
+
+  <!-- ABA: CONTRATOS -->
+  <div id="rp-contratos">
+
+    <!-- Formulário novo contrato -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="slbl" style="margin-bottom:10px">📄 Novo Contrato</div>
+
+      <!-- Tipo -->
+      <div style="margin-bottom:10px">
+        <div class="fl">Tipo de imóvel</div>
+        <select id="ct-tipo">
+          <option value="residencial">🏠 Residencial</option>
+          <option value="comercial">🏢 Comercial</option>
+        </select>
+      </div>
+
+      <!-- Imóvel -->
+      <div style="margin-bottom:10px"><div class="fl">Descrição do imóvel</div>
+        <input id="ct-imovel" type="text" placeholder="Ex: Apto 201, Sala 03, Casa..." maxlength="100">
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Endereço</div><input id="ct-end" type="text" placeholder="Rua, número" maxlength="100"></div>
+        <div><div class="fl">Matrícula / Registro</div><input id="ct-mat" type="text" placeholder="Nº registro" maxlength="40"></div>
+      </div>
+
+      <!-- Locador -->
+      <div class="slbl" style="margin:10px 0 8px">👤 Locador</div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Nome</div><input id="ct-loc-nome" type="text" placeholder="Nome completo" maxlength="80"></div>
+        <div><div class="fl">Estado civil / Profissão</div><input id="ct-loc-eciv" type="text" placeholder="Ex: casado, empresário" maxlength="60"></div>
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">CPF</div><input id="ct-loc-cpf" type="text" placeholder="000.000.000-00" maxlength="14"></div>
+        <div><div class="fl">RG</div><input id="ct-loc-rg" type="text" placeholder="0.000.000" maxlength="20"></div>
+      </div>
+      <!-- Segundo locador (opcional) -->
+      <div style="margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer">
+          <input type="checkbox" id="ct-loc2-chk" onchange="toggleCampo('ct-loc2-campos',this.checked)">
+          Segundo locador (cônjuge / sócio)
+        </label>
+      </div>
+      <div id="ct-loc2-campos" style="display:none;margin-bottom:10px">
+        <div class="row2" style="margin-bottom:8px">
+          <div><div class="fl">Nome</div><input id="ct-loc2-nome" type="text" placeholder="Nome completo" maxlength="80"></div>
+          <div><div class="fl">CPF</div><input id="ct-loc2-cpf" type="text" placeholder="000.000.000-00" maxlength="14"></div>
+        </div>
+      </div>
+
+      <!-- Locatário -->
+      <div class="slbl" style="margin:10px 0 8px">🔑 Locatário</div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Nome</div><input id="ct-inq-nome" type="text" placeholder="Nome completo" maxlength="80"></div>
+        <div><div class="fl">Estado civil / Profissão</div><input id="ct-inq-eciv" type="text" placeholder="Ex: solteiro, arquiteto" maxlength="60"></div>
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">CPF</div><input id="ct-inq-cpf" type="text" placeholder="000.000.000-00" maxlength="14"></div>
+        <div><div class="fl">RG</div><input id="ct-inq-rg" type="text" placeholder="0.000.000" maxlength="20"></div>
+      </div>
+      <div style="margin-bottom:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer">
+          <input type="checkbox" id="ct-inq2-chk" onchange="toggleCampo('ct-inq2-campos',this.checked)">
+          Segundo locatário (cônjuge)
+        </label>
+      </div>
+      <div id="ct-inq2-campos" style="display:none;margin-bottom:10px">
+        <div class="row2" style="margin-bottom:8px">
+          <div><div class="fl">Nome</div><input id="ct-inq2-nome" type="text" placeholder="Nome completo" maxlength="80"></div>
+          <div><div class="fl">CPF</div><input id="ct-inq2-cpf" type="text" placeholder="000.000.000-00" maxlength="14"></div>
+        </div>
+      </div>
+
+      <!-- Endereço locatário -->
+      <div style="margin-bottom:10px"><div class="fl">Endereço do locatário</div>
+        <input id="ct-inq-end" type="text" placeholder="Rua, número, cidade" maxlength="120">
+      </div>
+
+      <!-- Valores e datas -->
+      <div class="slbl" style="margin:10px 0 8px">💰 Valores e Prazos</div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Valor mensal (R$)</div>
+          <div class="r-wrap"><input id="ct-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+        </div>
+        <div><div class="fl">Dia de pagamento</div>
+          <input id="ct-diapgto" type="number" min="1" max="31" placeholder="Ex: 10">
+        </div>
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Início do contrato</div><input id="ct-inicio" type="date"></div>
+        <div><div class="fl">Duração</div>
+          <select id="ct-duracao">
+            <option value="12">12 meses</option>
+            <option value="24">24 meses</option>
+            <option value="6">6 meses</option>
+            <option value="0">Indeterminado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Vistoria -->
+      <div class="slbl" style="margin:10px 0 8px">🔍 Vistoria</div>
+      <div style="margin-bottom:10px"><div class="fl">Estado geral do imóvel</div>
+        <textarea id="ct-vistoria" rows="3" placeholder="Ex: Pintura nova, piso em bom estado, janelas funcionando..." style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--t1);font-family:inherit;font-size:14px;resize:vertical"></textarea>
+      </div>
+      <div style="margin-bottom:10px"><div class="fl">Itens entregues</div>
+        <input id="ct-itens" type="text" placeholder="Ex: 2 chaves porta, 1 controle portão, ar-condicionado..." maxlength="200">
+      </div>
+
+      <button class="btn" onclick="salvarContrato()" style="margin-bottom:8px">💾 Salvar Contrato</button>
+    </div>
+
+    <!-- Lista de contratos -->
+    <div class="slbl" style="margin-bottom:8px">Contratos ativos</div>
+    <div id="ct-list"></div>
+  </div>
+
   <!-- ABA: RECIBOS -->
   <div id="rp-recibos" style="display:none">
     <div class="card" style="margin-bottom:12px">
@@ -1157,6 +1284,98 @@ select option{background:#1A2A3A}
     </div>
     <div class="slbl" style="margin-bottom:8px">Recibos emitidos</div>
     <div id="rec-hist-list"></div>
+  </div>
+
+</div>
+
+<div id="sec-cc" style="display:none;padding:0 16px 100px">
+
+  <!-- ABAS internas -->
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="vbtn on" id="ccb-gastos"   onclick="setCCTab('gastos')"   style="flex:1;padding:10px;border-radius:10px">💸 Gastos</button>
+    <button class="vbtn"    id="ccb-fatura"   onclick="setCCTab('fatura')"   style="flex:1;padding:10px;border-radius:10px">📄 Fatura</button>
+    <button class="vbtn"    id="ccb-cartoes"  onclick="setCCTab('cartoes')"  style="flex:1;padding:10px;border-radius:10px">⚙️ Cartões</button>
+  </div>
+
+  <!-- ABA: GASTOS -->
+  <div id="ccp-gastos">
+    <div class="card" style="margin-bottom:12px">
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Cartão</div>
+          <select id="cg-cartao"><option value="">— selecione —</option></select>
+        </div>
+        <div><div class="fl">Data</div><input id="cg-data" type="date"></div>
+      </div>
+      <div style="margin-bottom:10px"><div class="fl">Descrição</div>
+        <input id="cg-desc" type="text" placeholder="Ex: Supermercado, Farmácia..." maxlength="80">
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Valor (R$)</div>
+          <div class="r-wrap"><input id="cg-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+        </div>
+        <div><div class="fl">Categoria</div>
+          <select id="cg-cat">
+            <option>🍽️ Alimentação</option><option>🚗 Carro/Transporte</option>
+            <option>🏠 Casa/Moradia</option><option>💊 Saúde</option>
+            <option>📚 Educação</option><option>👗 Roupas</option>
+            <option>🎮 Lazer</option><option>💼 Empresa/Negócio</option>
+            <option>🏛️ Taxas/Impostos</option><option>💳 Cartão de Crédito</option>
+            <option>📈 Investimentos</option><option>🏦 Financiamentos</option>
+            <option>📦 Outros</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:10px"><div class="fl">Parcelas</div>
+        <select id="cg-parc">
+          <option value="1">À vista (1x)</option>
+          <option value="2">2x</option><option value="3">3x</option>
+          <option value="4">4x</option><option value="6">6x</option>
+          <option value="10">10x</option><option value="12">12x</option>
+          <option value="18">18x</option><option value="24">24x</option>
+        </select>
+      </div>
+      <button class="btn" onclick="addGastoCartao()">+ Registrar Gasto</button>
+    </div>
+    <div class="slbl" style="margin-bottom:8px">Gastos recentes</div>
+    <div id="cg-list"></div>
+  </div>
+
+  <!-- ABA: FATURA -->
+  <div id="ccp-fatura" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div class="row2">
+        <div><div class="fl">Cartão</div>
+          <select id="cf-cartao" onchange="renderFatura()"><option value="">— selecione —</option></select>
+        </div>
+        <div><div class="fl">Mês</div>
+          <input id="cf-mes" type="month" onchange="renderFatura()">
+        </div>
+      </div>
+    </div>
+    <div id="cf-body"></div>
+  </div>
+
+  <!-- ABA: CARTÕES -->
+  <div id="ccp-cartoes" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div style="margin-bottom:10px"><div class="fl">Nome do cartão</div>
+        <input id="cc-nome" type="text" placeholder="Ex: Nubank, Inter, Sicoob Visa" maxlength="40">
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Dia fechamento</div>
+          <input id="cc-fech" type="number" min="1" max="31" placeholder="Ex: 25">
+        </div>
+        <div><div class="fl">Dia vencimento</div>
+          <input id="cc-venc" type="number" min="1" max="31" placeholder="Ex: 5">
+        </div>
+      </div>
+      <div style="margin-bottom:10px"><div class="fl">Limite (R$)</div>
+        <div class="r-wrap"><input id="cc-limite" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+      </div>
+      <button class="btn" onclick="addCartao()">+ Salvar Cartão</button>
+    </div>
+    <div class="slbl" style="margin-bottom:8px">Cartões cadastrados</div>
+    <div id="cc-list"></div>
   </div>
 
 </div>
@@ -1284,8 +1503,9 @@ select option{background:#1A2A3A}
 <!-- ══ BOTTOM NAV ══ -->
 <div id="nav" style="display:none">
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
-  <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💳</span>Finanças</button>
-  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Compromissos</button>
+  <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💰</span>Finanças</button>
+  <button class="nb"    id="nb-cc"   onclick="setSection('cc')"><span class="ni">💳</span>Cartão</button>
+  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Agenda</button>
   <button class="nb"    id="nb-rec"  onclick="setSection('rec')"><span class="ni">🧾</span>Recibos</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
 </div>
@@ -1311,31 +1531,56 @@ var TXS   = (function(){
 })();
 var TASKS = (function(){
   var raw = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
-  // Deduplicar por desc|mês — manter a que tem recurId
-  var seen = {}; // key → índice no resultado
+
+  // Normaliza desc: lowercase, sem espaços duplos, sem acentos simples
+  function normDesc(s){
+    return String(s||'').trim().toLowerCase()
+      .replace(/\s+/g,' ')
+      .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
+      .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
+      .replace(/[ùúûü]/g,'u').replace(/[ç]/g,'c');
+  }
+
+  var seen   = {}; // "rid|mo" ou "desc_norm|mo" → idx no result
   var result = [];
+
   raw.forEach(function(t){
-    var dl  = ymds ? ymds(t.deadline||'') : String(t.deadline||'');
-    var mo  = dl.substring(0,7) || 'none';
-    var key = (t.desc||'').trim().toLowerCase()+'|'+mo;
-    if(key in seen){
-      var existIdx = seen[key];
-      // Trocar se o novo tem recurId e o existente não
-      if(t.recurId && !result[existIdx].recurId){
-        result[existIdx] = t;
-      }
-      // caso contrário descartar o novo
-    } else {
-      seen[key] = result.length;
-      result.push(t);
+    var dl   = String(t.deadline||'').substring(0,7) || 'none';
+    var rid  = String(t.recurId||'');
+    var desc = normDesc(t.desc);
+
+    // Chaves de lookup
+    var keyRid  = rid ? ('rid:'+rid+'|'+dl) : null;
+    var keyDesc = desc+'|'+dl;
+
+    // Verificar se já existe pelo recurId
+    if(keyRid && seen[keyRid] !== undefined){
+      var ei = seen[keyRid];
+      if(rid && !result[ei].recurId) result[ei] = t;
+      return;
     }
+    // Verificar se já existe pelo desc normalizado
+    if(seen[keyDesc] !== undefined){
+      var ei2 = seen[keyDesc];
+      if(rid && !result[ei2].recurId) result[ei2] = t;
+      return;
+    }
+
+    var idx = result.length;
+    result.push(t);
+    if(keyRid)  seen[keyRid]  = idx;
+    seen[keyDesc] = idx;
   });
+
   return result;
 })();
 var RECUR      = JSON.parse(localStorage.getItem('ff_recur')      || '[]');
 var PAGADORES  = JSON.parse(localStorage.getItem('ff_pagadores')  || '[]');
 var RECIBOS    = JSON.parse(localStorage.getItem('ff_recibos')    || '[]');
 var ALUGUEIS   = JSON.parse(localStorage.getItem('ff_alugueis')   || '[]');
+var CARTOES    = JSON.parse(localStorage.getItem('ff_cartoes')    || '[]');
+var CGASTOS    = JSON.parse(localStorage.getItem('ff_cgastos')    || '[]'); // gastos do cartão
+var CONTRATOS  = JSON.parse(localStorage.getItem('ff_contratos')  || '[]');
 var COLLAPSED_PASTAS = JSON.parse(localStorage.getItem('ff_collapsed') || '[]');
 var curRecur = false; // toggle do form
 
@@ -1477,6 +1722,9 @@ function boot(){
   document.getElementById('hdr').style.display='block';
   document.getElementById('content').style.display='block';
   document.getElementById('nav').style.display='flex';
+
+  // Limpar recorrências e tarefas duplicadas automaticamente
+  limparRecurDuplicados();
 
   // Resetar datas de navegação sempre que a página carrega
   tdDate  = today0();
@@ -1664,15 +1912,18 @@ function setSection(s){
   document.getElementById('sec-hoje').style.display       = s==='hoje' ? 'block':'none';
   document.getElementById('sec-docs').style.display       = s==='docs' ? 'block':'none';
   document.getElementById('sec-rec').style.display        = s==='rec'  ? 'block':'none';
+  document.getElementById('sec-cc').style.display         = s==='cc'   ? 'block':'none';
   document.getElementById('fin-header-extra').style.display = s==='fin' ? 'block':'none';
   document.getElementById('nb-fin').classList.toggle('on',  s==='fin');
   document.getElementById('nb-task').classList.toggle('on', s==='task');
   document.getElementById('nb-hoje').classList.toggle('on', s==='hoje');
   document.getElementById('nb-docs').classList.toggle('on', s==='docs');
   document.getElementById('nb-rec').classList.toggle('on',  s==='rec');
+  document.getElementById('nb-cc').classList.toggle('on',   s==='cc');
   if(s==='task') renderTasks();
   if(s==='hoje') renderHoje();
   if(s==='rec')  renderRecibos();
+  if(s==='cc')   renderCC();
   if(s==='docs'){
     renderDocs();
     // Sync silencioso ao abrir aba docs para garantir dados atualizados
@@ -2194,19 +2445,706 @@ function delRecibo(id){
   toast('🗑️ Recibo removido');
 }
 
-var curRecTab = 'pagadores';
+
+// ════════════════════════════════════════════════════════
+//  CARTÃO DE CRÉDITO
+// ════════════════════════════════════════════════════════
+var curCCTab = 'gastos';
+
+function saveCartoes(){ localStorage.setItem('ff_cartoes', JSON.stringify(CARTOES)); }
+function saveCGastos(){ localStorage.setItem('ff_cgastos', JSON.stringify(CGASTOS)); }
+
+function setCCTab(t){
+  curCCTab = t;
+  ['gastos','fatura','cartoes'].forEach(function(tab){
+    var el = document.getElementById('ccp-'+tab);
+    if(el) el.style.display = tab===t ? 'block' : 'none';
+    var btn = document.getElementById('ccb-'+tab);
+    if(btn) btn.classList.toggle('on', tab===t);
+  });
+  if(t==='fatura') renderFatura();
+}
+
+// ── Cadastro de cartões ──────────────────────────────────
+function addCartao(){
+  var nome  = (document.getElementById('cc-nome').value||'').trim();
+  var fech  = parseInt(document.getElementById('cc-fech').value)||25;
+  var venc  = parseInt(document.getElementById('cc-venc').value)||5;
+  var limite= parseFloat(document.getElementById('cc-limite').value)||0;
+  if(!nome){ toast('⚠️ Informe o nome do cartão','err'); return; }
+  CARTOES.push({ id: Date.now(), nome:nome, fech:fech, venc:venc, limite:limite });
+  saveCartoes();
+  document.getElementById('cc-nome').value  = '';
+  document.getElementById('cc-fech').value  = '';
+  document.getElementById('cc-venc').value  = '';
+  document.getElementById('cc-limite').value= '';
+  renderCC();
+  toast('✅ Cartão salvo!');
+}
+
+function delCartao(id){
+  if(!confirm('Remover este cartão? Os gastos vinculados permanecem.')) return;
+  CARTOES = CARTOES.filter(function(c){ return String(c.id)!==String(id); });
+  saveCartoes();
+  renderCC();
+  toast('🗑️ Cartão removido');
+}
+
+// ── Lançar gasto ─────────────────────────────────────────
+function addGastoCartao(){
+  var cid   = document.getElementById('cg-cartao').value;
+  var data  = document.getElementById('cg-data').value || ymd(new Date());
+  var desc  = (document.getElementById('cg-desc').value||'').trim();
+  var val   = parseFloat(document.getElementById('cg-val').value)||0;
+  var cat   = document.getElementById('cg-cat').value;
+  var parc  = parseInt(document.getElementById('cg-parc').value)||1;
+  var cartao= CARTOES.find(function(c){ return String(c.id)===cid; });
+
+  if(!cartao){ toast('⚠️ Selecione o cartão','err'); return; }
+  if(!desc)  { toast('⚠️ Informe a descrição','err'); return; }
+  if(!val||val<=0){ toast('⚠️ Informe o valor','err'); return; }
+
+  var valParcela = val / parc;
+  var baseDate   = new Date(data+'T12:00:00');
+
+  // Criar um gasto por parcela
+  for(var p=0; p<parc; p++){
+    var d = new Date(baseDate.getFullYear(), baseDate.getMonth()+p, baseDate.getDate());
+    // Determinar a qual fatura pertence (baseado no dia de fechamento)
+    var fatMes = faturaDoGasto(d, cartao.fech);
+
+    CGASTOS.push({
+      id:       Date.now() + p,
+      cartaoId: String(cartao.id),
+      cartao:   cartao.nome,
+      desc:     desc + (parc>1 ? ' ('+( p+1)+'/'+parc+')' : ''),
+      val:      valParcela,
+      cat:      cat,
+      data:     ymd(d),
+      fatMes:   fatMes,  // YYYY-MM da fatura
+      pago:     false
+    });
+  }
+
+  saveCGastos();
+  document.getElementById('cg-desc').value = '';
+  document.getElementById('cg-val').value  = '';
+  document.getElementById('cg-parc').value = '1';
+  renderCC();
+  toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
+}
+
+// Determina a qual fatura um gasto pertence
+// Se a data do gasto é APÓS o fechamento, vai para o próximo mês
+function faturaDoGasto(dataGasto, diaFech){
+  var d = new Date(dataGasto);
+  if(d.getDate() > diaFech){
+    // Após fechamento → próxima fatura
+    return new Date(d.getFullYear(), d.getMonth()+1, 1)
+      .toISOString().substring(0,7);
+  }
+  return d.getFullYear()+'-'+pad(d.getMonth()+1);
+}
+
+function delGasto(id){
+  CGASTOS = CGASTOS.filter(function(g){ return String(g.id)!==String(id); });
+  saveCGastos();
+  renderCC();
+  toast('🗑️ Gasto removido');
+}
+
+// ── Fechar fatura ────────────────────────────────────────
+function fecharFatura(cartaoId, mesAno){
+  var cartao  = CARTOES.find(function(c){ return String(c.id)===cartaoId; });
+  if(!cartao) return;
+  var gastos  = CGASTOS.filter(function(g){
+    return String(g.cartaoId)===cartaoId && g.fatMes===mesAno && !g.pago;
+  });
+  if(!gastos.length){ toast('Nenhum gasto pendente nesta fatura'); return; }
+
+  var total   = gastos.reduce(function(s,g){ return s+g.val; }, 0);
+  var partes  = mesAno.split('-');
+  var mesLabel= ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(partes[1])-1]+'/'+partes[0];
+
+  if(!confirm('Fechar fatura de '+cartao.nome+' — '+mesLabel+'\nTotal: '+fmtBRL(total)+'\n\nIsso registrará UMA despesa no balanço financeiro. Confirmar?')) return;
+
+  // Marcar gastos como pagos
+  CGASTOS.forEach(function(g){
+    if(String(g.cartaoId)===cartaoId && g.fatMes===mesAno) g.pago = true;
+  });
+  saveCGastos();
+
+  // Registrar UMA transação no balanço
+  var tx = {
+    type:  'exp',
+    desc:  'Fatura '+cartao.nome+' '+mesLabel,
+    value: total,
+    cat:   '💳 Cartão de Crédito',
+    date:  ymd(new Date()),
+    fatCartaoId: cartaoId,
+    fatMes: mesAno
+  };
+  var tmp = Date.now();
+  TXS.unshift(Object.assign({id:tmp}, tx));
+  save();
+  apiCall('addTransaction', tx, function(err){
+    if(err){ TXS=TXS.filter(function(t){return t.id!==tmp;}); save(); toast('❌ Erro ao salvar','err'); }
+  });
+
+  // Lançar no resumo de categorias (gastos individuais)
+  // Os gastos do cartão já têm categoria — serão incluídos no relatório
+  renderCC();
+  renderBal();
+  toast('✅ Fatura fechada! R$ '+fmtBRL(total)+' registrado.');
+}
+
+// ── Render ───────────────────────────────────────────────
+function renderCC(){
+  // Atualizar selects de cartão
+  var opts = '<option value="">— selecione —</option>'+
+    CARTOES.map(function(c){
+      return '<option value="'+c.id+'">'+esc(c.nome)+'</option>';
+    }).join('');
+  ['cg-cartao','cf-cartao'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){ var v=el.value; el.innerHTML=opts; if(v) el.value=v; }
+  });
+
+  // Data padrão = hoje
+  var dgEl = document.getElementById('cg-data');
+  if(dgEl && !dgEl.value) dgEl.value = ymd(new Date());
+
+  // Mês padrão = atual
+  var mfEl = document.getElementById('cf-mes');
+  if(mfEl && !mfEl.value){
+    var n=new Date(); mfEl.value=n.getFullYear()+'-'+pad(n.getMonth()+1);
+  }
+
+  renderListaCartoes();
+  renderListaGastos();
+  if(curCCTab==='fatura') renderFatura();
+}
+
+function renderListaCartoes(){
+  var el = document.getElementById('cc-list');
+  if(!el) return;
+  if(!CARTOES.length){
+    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhum cartão cadastrado</div>';
+    return;
+  }
+  el.innerHTML = CARTOES.map(function(cc){
+    var gastosPend = CGASTOS.filter(function(g){ return String(g.cartaoId)===String(cc.id)&&!g.pago; });
+    var total = gastosPend.reduce(function(s,g){return s+g.val;},0);
+    var pct   = cc.limite>0 ? Math.min(100, Math.round(total/cc.limite*100)) : 0;
+    return '<div class="cc-card-item">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+        '<div style="font-size:24px">💳</div>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:15px;font-weight:800">'+esc(cc.nome)+'</div>'+
+          '<div style="font-size:11px;color:var(--t3)">Fecha dia '+cc.fech+' · Vence dia '+cc.venc+
+            (cc.limite?' · Limite '+fmtBRL(cc.limite):'')+
+          '</div>'+
+        '</div>'+
+        '<button class="tdel2" data-delcc="'+cc.id+'">🗑️</button>'+
+      '</div>'+
+      (cc.limite>0?
+        '<div style="height:6px;background:var(--bg3);border-radius:3px;margin-bottom:6px">'+
+          '<div style="height:6px;width:'+pct+'%;background:'+(pct>80?'var(--red)':'var(--green)')+';border-radius:3px"></div>'+
+        '</div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+fmtBRL(total)+' de '+fmtBRL(cc.limite)+' ('+pct+'%)</div>'
+      :
+        '<div style="font-size:12px;color:var(--t3)">'+fmtBRL(total)+' em gastos pendentes</div>'
+      )+
+    '</div>';
+  }).join('');
+}
+
+function renderListaGastos(){
+  var el = document.getElementById('cg-list');
+  if(!el) return;
+  // Mostrar gastos dos últimos 30 dias não pagos + pagos da fatura atual
+  var now   = new Date();
+  var mes   = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var recentes = CGASTOS.filter(function(g){
+    return !g.pago || g.fatMes===mes;
+  }).slice(0,30);
+
+  if(!recentes.length){
+    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhum gasto registrado</div>';
+    return;
+  }
+  // Ordenar por data desc
+  recentes.sort(function(a,b){ return ymds(b.data)>ymds(a.data)?1:-1; });
+
+  el.innerHTML = recentes.map(function(g){
+    return '<div class="cc-fatura-item'+(g.pago?' pago':'')+'">'+
+      '<div style="font-size:20px">'+(g.pago?'✅':'🛍️')+'</div>'+
+      '<div class="fi-info">'+
+        '<div class="fi-desc">'+esc(g.desc)+'</div>'+
+        '<div class="fi-meta">'+esc(g.cartao)+' · '+esc(g.cat)+' · '+fmtDate(g.data)+'</div>'+
+      '</div>'+
+      '<div class="fi-val">'+fmtBRL(g.val)+'</div>'+
+      (!g.pago?'<button class="tdel2" data-delcg="'+g.id+'">🗑️</button>':'')+
+    '</div>';
+  }).join('');
+}
+
+function renderFatura(){
+  var cartaoId = (document.getElementById('cf-cartao')||{}).value||'';
+  var mesAno   = (document.getElementById('cf-mes')||{}).value||'';
+  var el = document.getElementById('cf-body');
+  if(!el) return;
+
+  if(!cartaoId||!mesAno){
+    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:24px">Selecione o cartão e o mês</div>';
+    return;
+  }
+  var cartao  = CARTOES.find(function(c){ return String(c.id)===cartaoId; });
+  if(!cartao){ el.innerHTML=''; return; }
+
+  var gastos  = CGASTOS.filter(function(g){
+    return String(g.cartaoId)===cartaoId && g.fatMes===mesAno;
+  });
+  var pendentes = gastos.filter(function(g){ return !g.pago; });
+  var pagos     = gastos.filter(function(g){ return g.pago; });
+  var total     = gastos.reduce(function(s,g){ return s+g.val; }, 0);
+  var totalPend = pendentes.reduce(function(s,g){ return s+g.val; }, 0);
+
+  // Agrupar por categoria
+  var porCat = {};
+  gastos.forEach(function(g){
+    porCat[g.cat] = (porCat[g.cat]||0) + g.val;
+  });
+
+  var partes   = mesAno.split('-');
+  var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var mesLabel = meses_br[parseInt(partes[1])-1]+'/'+partes[0];
+
+  // Data de vencimento
+  var vencData = new Date(parseInt(partes[0]), parseInt(partes[1])-1+(cartao.venc<cartao.fech?1:0), cartao.venc);
+  var vencStr  = vencData.toLocaleDateString('pt-BR');
+
+  var html = '';
+
+  // Total
+  html += '<div class="fatura-total">'+
+    '<div class="ft-lbl">Fatura '+cartao.nome+' — '+mesLabel+'</div>'+
+    '<div class="ft-val">'+fmtBRL(total)+'</div>'+
+    '<div style="font-size:12px;color:var(--t3);margin-top:4px">Vencimento: '+vencStr+
+      (pagos.length?' · ✅ '+fmtBRL(pagos.reduce(function(s,g){return s+g.val;},0))+' pago':'')+
+    '</div>'+
+  '</div>';
+
+  // Gastos por categoria
+  if(Object.keys(porCat).length){
+    html += '<div class="slbl" style="margin-bottom:8px">Por categoria</div>';
+    html += '<div style="margin-bottom:12px">';
+    Object.keys(porCat).sort(function(a,b){ return porCat[b]-porCat[a]; }).forEach(function(cat){
+      var pct = total>0 ? Math.round(porCat[cat]/total*100) : 0;
+      html += '<div style="margin-bottom:8px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'+
+          '<span>'+esc(cat)+'</span><span style="font-weight:700">'+fmtBRL(porCat[cat])+' ('+pct+'%)</span>'+
+        '</div>'+
+        '<div style="height:5px;background:var(--bg3);border-radius:3px">'+
+          '<div style="height:5px;width:'+pct+'%;background:var(--blue);border-radius:3px"></div>'+
+        '</div>'+
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Lista de gastos
+  if(gastos.length){
+    html += '<div class="slbl" style="margin-bottom:8px">Lançamentos</div>';
+    gastos.sort(function(a,b){ return ymds(a.data)>ymds(b.data)?1:-1; });
+    html += gastos.map(function(g){
+      return '<div class="cc-fatura-item">'+
+        '<div style="font-size:18px">'+(g.pago?'✅':'🛍️')+'</div>'+
+        '<div class="fi-info">'+
+          '<div class="fi-desc">'+esc(g.desc)+'</div>'+
+          '<div class="fi-meta">'+esc(g.cat)+' · '+fmtDate(g.data)+'</div>'+
+        '</div>'+
+        '<div class="fi-val" style="color:'+(g.pago?'var(--t3)':'var(--red)')+'">'+fmtBRL(g.val)+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  // Botão fechar fatura (só se tem pendentes)
+  if(pendentes.length){
+    html += '<button data-fechfat="1" id="btn-fechar-fat" style="width:100%;margin-top:14px;padding:14px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">'+
+      '💳 Fechar fatura — '+fmtBRL(totalPend)+
+    '</button>';
+    // Guardar params no botão
+    var _fatBtn = document.getElementById('btn-fechar-fat');
+    if(_fatBtn){ _fatBtn.setAttribute('data-cid', cartaoId); _fatBtn.setAttribute('data-mes', mesAno); }
+    html += '<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:8px;padding:0 16px">Isso registrará uma única despesa no balanço financeiro sem duplicar os gastos individuais</div>';
+  } else if(pagos.length){
+    html += '<div style="text-align:center;padding:16px;color:var(--green);font-weight:700">✅ Fatura paga</div>';
+  } else {
+    html += '<div style="text-align:center;padding:16px;color:var(--t3)">Nenhum lançamento nesta fatura</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+
+// ════════════════════════════════════════════════════════
+//  CONTRATOS DE LOCAÇÃO
+// ════════════════════════════════════════════════════════
+function saveContratos(){ localStorage.setItem('ff_contratos', JSON.stringify(CONTRATOS)); }
+
+function toggleCampo(id, show){
+  var el = document.getElementById(id);
+  if(el) el.style.display = show ? 'block' : 'none';
+}
+
+function gV(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; }
+
+function salvarContrato(){
+  var inqNome = gV('ct-inq-nome');
+  var locNome = gV('ct-loc-nome');
+  var imovel  = gV('ct-imovel');
+  var valor   = parseFloat(gV('ct-valor'))||0;
+  var inicio  = gV('ct-inicio');
+  if(!inqNome){ toast('⚠️ Informe o nome do locatário','err'); return; }
+  if(!locNome){ toast('⚠️ Informe o nome do locador','err'); return; }
+  if(!imovel) { toast('⚠️ Informe o imóvel','err'); return; }
+  if(!valor)  { toast('⚠️ Informe o valor do aluguel','err'); return; }
+  if(!inicio) { toast('⚠️ Informe a data de início','err'); return; }
+
+  var dur = parseInt(gV('ct-duracao'))||12;
+  var fimDate = dur > 0
+    ? new Date(new Date(inicio+'T12:00:00').setMonth(new Date(inicio+'T12:00:00').getMonth()+dur))
+    : null;
+
+  var ct = {
+    id:        Date.now(),
+    tipo:      gV('ct-tipo'),
+    imovel:    imovel,
+    end:       gV('ct-end'),
+    mat:       gV('ct-mat'),
+    // Locador
+    locNome:   locNome,
+    locEciv:   gV('ct-loc-eciv'),
+    locCpf:    gV('ct-loc-cpf'),
+    locRg:     gV('ct-loc-rg'),
+    locNome2:  gV('ct-loc2-nome'),
+    locCpf2:   gV('ct-loc2-cpf'),
+    // Locatário
+    inqNome:   inqNome,
+    inqEciv:   gV('ct-inq-eciv'),
+    inqCpf:    gV('ct-inq-cpf'),
+    inqRg:     gV('ct-inq-rg'),
+    inqNome2:  gV('ct-inq2-nome'),
+    inqCpf2:   gV('ct-inq2-cpf'),
+    inqEnd:    gV('ct-inq-end'),
+    // Valores
+    valor:     valor,
+    diaPgto:   parseInt(gV('ct-diapgto'))||10,
+    inicio:    inicio,
+    duracao:   dur,
+    fim:       fimDate ? ymd(fimDate) : '',
+    // Vistoria
+    vistoria:  gV('ct-vistoria'),
+    itens:     gV('ct-itens'),
+    // Pagamentos registrados
+    pagamentos: [],
+    ativo:     true,
+    criadoEm: new Date().toISOString()
+  };
+
+  CONTRATOS.unshift(ct);
+  saveContratos();
+
+  // Criar planilha no Google Sheets
+  apiCall('criarPlanilhaContrato', ct, function(err){
+    if(err) toast('⚠️ Contrato salvo localmente, mas erro na planilha','err');
+    else toast('✅ Contrato salvo e planilha criada!');
+  });
+
+  // Criar pagador automaticamente se não existir
+  if(!PAGADORES.some(function(p){ return p.nome.toLowerCase()===inqNome.toLowerCase(); })){
+    var np = {id: Date.now()+1, nome: inqNome, tel: '', doc: ct.inqCpf};
+    PAGADORES.unshift(np);
+    savePagadores();
+  }
+
+  // Criar aluguel recorrente automaticamente
+  if(!ALUGUEIS.some(function(a){ return a.nome.toLowerCase()===inqNome.toLowerCase(); })){
+    var pag = PAGADORES.find(function(p){ return p.nome.toLowerCase()===inqNome.toLowerCase(); });
+    if(pag){
+      var alug = {
+        id: Date.now()+2, pagadorId: String(pag.id),
+        nome: inqNome, tel: pag.tel||'', dia: ct.diaPgto,
+        valorBase: valor, ref: imovel, parcelas: [], criadoEm: ct.criadoEm
+      };
+      ALUGUEIS.unshift(alug);
+      saveAlugueis();
+      sincronizarFichaGoogleSheets(alug);
+    }
+  }
+
+  renderContratos();
+  // Limpar form
+  ['ct-imovel','ct-end','ct-mat','ct-loc-nome','ct-loc-eciv','ct-loc-cpf','ct-loc-rg',
+   'ct-loc2-nome','ct-loc2-cpf','ct-inq-nome','ct-inq-eciv','ct-inq-cpf','ct-inq-rg',
+   'ct-inq2-nome','ct-inq2-cpf','ct-inq-end','ct-valor','ct-diapgto','ct-inicio',
+   'ct-vistoria','ct-itens'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('ct-loc2-chk').checked=false;
+  document.getElementById('ct-inq2-chk').checked=false;
+  toggleCampo('ct-loc2-campos',false);
+  toggleCampo('ct-inq2-campos',false);
+}
+
+function delContrato(id){
+  if(!confirm('Remover este contrato? O histórico de pagamentos será perdido.')) return;
+  CONTRATOS = CONTRATOS.filter(function(c){ return String(c.id)!==String(id); });
+  saveContratos();
+  renderContratos();
+  toast('🗑️ Contrato removido');
+}
+
+function renderContratos(){
+  var el = document.getElementById('ct-list');
+  if(!el) return;
+  if(!CONTRATOS.length){
+    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:20px;font-size:13px">Nenhum contrato cadastrado</div>';
+    return;
+  }
+  el.innerHTML = CONTRATOS.map(function(ct){
+    var fmtD = function(s){ return s ? s.split('-').reverse().join('/') : '—'; };
+    var pago  = ct.pagamentos.filter(function(p){ return p.pago; }).length;
+    var total = ct.duracao || '∞';
+    var venc  = ct.fim ? (new Date(ct.fim+'T12:00:00') < new Date() ? '🔴 Vencido' : '🟢 Ativo') : '🟢 Ativo';
+    return '<div class="taski" style="margin-bottom:10px">'+
+      '<div class="taski-hdr">'+
+        '<div style="font-size:22px">'+(ct.tipo==='comercial'?'🏢':'🏠')+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:14px;font-weight:800">'+esc(ct.inqNome)+(ct.inqNome2?' + '+esc(ct.inqNome2):'')+'</div>'+
+          '<div style="font-size:11px;color:var(--t3)">'+esc(ct.imovel)+' · '+fmtBRL(ct.valor)+'/mês</div>'+
+        '</div>'+
+        '<button class="tdel2" data-delct="'+ct.id+'">🗑️</button>'+
+      '</div>'+
+      '<div class="tmeta">'+
+        '<span>'+venc+'</span>'+
+        '<span>📅 '+fmtD(ct.inicio)+(ct.fim?' → '+fmtD(ct.fim):'')+'</span>'+
+        '<span>💰 '+pago+'/'+total+' meses</span>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-top:10px">'+
+        '<button data-ctcontrato="'+ct.id+'" style="flex:1;padding:9px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📄 Contrato</button>'+
+        '<button data-ctvistoria="'+ct.id+'" style="flex:1;padding:9px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔍 Vistoria</button>'+
+        '<button data-ctpgto="'+ct.id+'" style="flex:1;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">💰 Pgto</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ── Gerar contrato HTML para imprimir ────────────────────
+function gerarContrato(ctId){
+  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
+  if(!ct) return;
+  var fmtD = function(s){ return s ? s.split('-').reverse().join('/') : '___/___/______'; };
+  var hoje = new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});
+  var tipoLabel = ct.tipo==='comercial' ? 'NÃO RESIDENCIAL' : 'RESIDENCIAL';
+
+  var locadorBloco = ct.locNome+', '+ct.locEciv+', inscrito no CPF sob o nº '+ct.locCpf+', portador da RG nº '+ct.locRg+
+    (ct.locNome2?'; e '+ct.locNome2+', inscrito no CPF sob o nº '+ct.locCpf2:'');
+
+  var locatarioBloco = ct.inqNome+', '+ct.inqEciv+', inscrito no CPF sob o nº '+ct.inqCpf+', portador da RG nº '+ct.inqRg+
+    (ct.inqNome2?'; e '+ct.inqNome2+', inscrito no CPF sob o nº '+ct.inqCpf2:'');
+
+  var valorExt = '(valor por extenso)';
+  var durMeses = ct.duracao > 0 ? ct.duracao+' ('+ct.duracao+') meses' : 'prazo indeterminado';
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+  '<title>Contrato '+ct.inqNome+'</title>'+
+  '<style>'+
+    'body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;color:#000;margin:0;padding:0}'+
+    '.page{max-width:18cm;margin:0 auto;padding:2cm 2.5cm}'+
+    'h1{font-size:14pt;text-align:center;text-transform:uppercase;margin-bottom:20px}'+
+    'h2{font-size:12pt;text-transform:uppercase;margin:20px 0 8px}'+
+    'p{text-align:justify;margin:0 0 10px}'+
+    '.assin{margin-top:60px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:30px}'+
+    '.assin-bloco{min-width:200px;text-align:center}'+
+    '.linha{border-bottom:1px solid #000;width:100%;margin-bottom:4px}'+
+    '.testem{margin-top:40px;display:flex;justify-content:space-between;gap:30px}'+
+    '@media print{body{margin:0}.no-print{display:none}button{display:none}}'+
+    '.btn-print{position:fixed;top:20px;right:20px;padding:10px 20px;background:#0a1a2e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700}'+
+  '</style></head><body>'+
+  '<button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>'+
+  '<div class="page">'+
+  '<h1>Contrato de Locação de Imóvel '+tipoLabel+'</h1>'+
+
+  '<p style="text-indent:2em">Contrato de LOCAÇÃO, que fazem entre si, de um lado como LOCADOR, '+locadorBloco+
+  ', residentes e domiciliados à '+esc(ct.end)+', Chapecó/SC; e de outro lado como LOCATÁRIO, '+locatarioBloco+
+  ', residentes e domiciliados à '+esc(ct.inqEnd)+', neste instrumento, doravante denominados simplesmente como LOCATÁRIO.</p>'+
+
+  '<h2>Cláusula Primeira – Do Imóvel</h2>'+
+  '<p style="text-indent:2em">Neste ato contratam as partes a locação do imóvel '+tipoLabel.toLowerCase()+
+  ': '+esc(ct.imovel)+', localizado à '+esc(ct.end)+', nesta cidade de Chapecó-SC'+
+  (ct.mat?', matriculado no Registro de Imóveis sob o nº '+esc(ct.mat):'')+'.</p>'+
+
+  '<h2>Cláusula Segunda – Do Prazo</h2>'+
+  '<p style="text-indent:2em">O prazo de locação é de '+durMeses+', tendo o seu início na data '+fmtD(ct.inicio)+
+  (ct.fim?' e término na data '+fmtD(ct.fim):'')+ '. Findo o prazo, compromete-se o LOCATÁRIO a restituir o imóvel nas mesmas condições em que o recebeu. '+
+  'A permanência do LOCATÁRIO após o término somente será possível por meio de novo contrato. '+
+  'Os valores serão reajustados a cada 12 (doze) meses pelo INPC-IBGE.</p>'+
+  '<p><em>Parágrafo Primeiro:</em> A partir de 12 (doze) meses, o locatário poderá desocupar o imóvel, notificando o LOCADOR por escrito com antecedência mínima de 30 (trinta) dias.</p>'+
+  '<p><em>Parágrafo Segundo:</em> Em caso de devolução durante o prazo contratual, o LOCATÁRIO pagará multa de 50% dos aluguéis devidos até o término, com redução proporcional ao período cumprido, nos termos do art. 4 da Lei nº 8.245/1991 e do art. 413 do Código Civil, com multa mínima de 01 (um) mês de aluguel.</p>'+
+
+  '<h2>Cláusula Terceira – Do Valor / Forma de Pagamento e Reajuste</h2>'+
+  '<p style="text-indent:2em">O valor do aluguel mensal é de '+fmtBRL(ct.valor)+' '+valorExt+
+  '. O pagamento deve ser efetuado todo o dia '+ct.diaPgto+' ('+ct.diaPgto+'º) de cada mês, '+
+  'diretamente ao LOCADOR ou mediante depósito bancário a ser indicado. Os aluguéis não quitados até o vencimento '+
+  'sofrerão acréscimo de multa de 10% (dez por cento) e juros de mora.</p>'+
+
+  '<h2>Cláusula Quarta</h2>'+
+  '<p style="text-indent:2em">Antes do vencimento do prazo, não poderá o LOCADOR retomar o imóvel, salvo infração contratual do LOCATÁRIO ou fundamentações legais estabelecidas na Lei nº 8.245/91.</p>'+
+
+  '<h2>Cláusula Quinta – Dos Impostos e Taxas</h2>'+
+  '<p style="text-indent:2em">Os impostos, taxas e despesas ordinárias de condomínio serão pagos pelo LOCATÁRIO junto com o aluguel. São de responsabilidade do LOCATÁRIO os encargos com energia elétrica, água, telefone e outros inerentes à sua atividade.</p>'+
+
+  '<h2>Cláusula Oitava – Do Uso e das Sublocações</h2>'+
+  '<p style="text-indent:2em">O LOCATÁRIO destinará o imóvel para fins exclusivamente '+
+  (ct.tipo==='comercial'?'comerciais/profissionais':'residenciais')+
+  ', não podendo sublocar, ceder ou emprestar o imóvel sem prévio consentimento por escrito do LOCADOR.</p>'+
+
+  '<h2>Cláusula Décima – Da Vistoria</h2>'+
+  '<p style="text-indent:2em">O LOCATÁRIO declara ter examinado o imóvel, encontrando-o em boas condições, '+
+  'conforme relatório de vistoria anexo, obrigando-se a restituí-lo ao final da locação no mesmo estado.</p>'+
+
+  '<h2>Cláusula Décima Quinta – Da Multa</h2>'+
+  '<p style="text-indent:2em">A falta de cumprimento de qualquer cláusula sujeitará o infrator a multa de 03 (três) meses de aluguel, além de honorários advocatícios de 20% sobre o total dos débitos.</p>'+
+
+  '<h2>Cláusula Décima Nona – Foro</h2>'+
+  '<p style="text-indent:2em">Fica eleito o Foro da Comarca de Chapecó/SC para solução de todas as questões decorrentes deste contrato.</p>'+
+
+  '<p style="text-align:center;margin-top:30px">Chapecó, '+hoje+'.</p>'+
+
+  '<div class="assin">'+
+    '<div class="assin-bloco"><div class="linha"></div><div>LOCADOR<br>'+esc(ct.locNome)+'<br>CPF: '+esc(ct.locCpf)+'</div></div>'+
+    (ct.locNome2?'<div class="assin-bloco"><div class="linha"></div><div>LOCADOR<br>'+esc(ct.locNome2)+'<br>CPF: '+esc(ct.locCpf2)+'</div></div>':'')+
+    '<div class="assin-bloco"><div class="linha"></div><div>LOCATÁRIO<br>'+esc(ct.inqNome)+'<br>CPF: '+esc(ct.inqCpf)+'</div></div>'+
+    (ct.inqNome2?'<div class="assin-bloco"><div class="linha"></div><div>LOCATÁRIO<br>'+esc(ct.inqNome2)+'<br>CPF: '+esc(ct.inqCpf2)+'</div></div>':'')+
+  '</div>'+
+  '<div class="testem">'+
+    '<div style="min-width:200px;text-align:center"><div class="linha"></div><div>TESTEMUNHA 1</div></div>'+
+    '<div style="min-width:200px;text-align:center"><div class="linha"></div><div>TESTEMUNHA 2</div></div>'+
+  '</div>'+
+  '</div></body></html>';
+
+  var win=window.open('','_blank','width=800,height=900');
+  if(win){ win.document.write(html); win.document.close(); }
+  else toast('⚠️ Permita pop-ups para visualizar o contrato','err');
+}
+
+// ── Gerar relatório de vistoria ──────────────────────────
+function gerarVistoria(ctId){
+  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
+  if(!ct) return;
+  var fmtD = function(s){ return s ? s.split('-').reverse().join('/') : '___/___/______'; };
+
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Vistoria</title>'+
+  '<style>body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;color:#000}'+
+  '.page{max-width:18cm;margin:0 auto;padding:2cm 2.5cm}'+
+  'h1{font-size:13pt;text-align:center;text-transform:uppercase;margin-bottom:20px}'+
+  'p{text-align:justify;margin:0 0 10px}'+
+  '.linha{border-bottom:1px solid #000;margin-bottom:4px}'+
+  '.assin{margin-top:60px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:30px}'+
+  '.assin-bloco{min-width:200px;text-align:center}'+
+  '@media print{button{display:none}}'+
+  '</style></head><body>'+
+  '<button onclick="window.print()" style="position:fixed;top:20px;right:20px;padding:10px 20px;background:#0a1a2e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700">🖨️ Imprimir / PDF</button>'+
+  '<div class="page">'+
+  '<h1>Relatório de Vistoria</h1>'+
+  '<p><strong>Parte integrante do Contrato de Locação firmado em '+fmtD(ct.inicio)+'.</strong></p>'+
+  '<p><strong>Imóvel:</strong> '+esc(ct.imovel)+', '+esc(ct.end)+', Chapecó/SC.</p>'+
+  '<p><strong>Locatário:</strong> '+esc(ct.inqNome)+(ct.inqNome2?' e '+esc(ct.inqNome2):'')+' — CPF: '+esc(ct.inqCpf)+'</p>'+
+  '<p><strong>Estado geral do imóvel:</strong></p>'+
+  '<p style="padding:12px;border:1px solid #ccc;border-radius:4px;background:#f9f9f9;white-space:pre-wrap">'+esc(ct.vistoria||'Não informado')+'</p>'+
+  '<p><strong>Itens entregues ao locatário:</strong></p>'+
+  '<p style="padding:12px;border:1px solid #ccc;border-radius:4px;background:#f9f9f9">'+esc(ct.itens||'Não informado')+'</p>'+
+  '<p style="margin-top:20px">Reconheço as anotações constantes deste relatório e me comprometo a restituir o imóvel nas mesmas condições em que o recebi, responsabilizando-me por todos os danos causados durante a locação.</p>'+
+  '<p style="margin-top:8px">O LOCATÁRIO tem prazo máximo de 3 (três) dias úteis para reclamar ou requerer retificação, findo o qual fica responsável pelos danos descritos.</p>'+
+  '<p style="text-align:center;margin-top:30px">Chapecó, '+new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'})+'.</p>'+
+  '<div class="assin">'+
+    '<div class="assin-bloco"><div class="linha"></div><div>LOCADOR<br>'+esc(ct.locNome)+'</div></div>'+
+    '<div class="assin-bloco"><div class="linha"></div><div>LOCATÁRIO<br>'+esc(ct.inqNome)+'</div></div>'+
+  '</div>'+
+  '</div></body></html>';
+
+  var win=window.open('','_blank','width=800,height=700');
+  if(win){ win.document.write(html); win.document.close(); }
+  else toast('⚠️ Permita pop-ups','err');
+}
+
+// ── Registrar pagamento do contrato ─────────────────────
+function registrarPgtoContrato(ctId){
+  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
+  if(!ct) return;
+  var now    = new Date();
+  var mesAno = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var mesLabel = meses_br[now.getMonth()]+'/'+now.getFullYear();
+
+  var jaPago = ct.pagamentos.some(function(p){ return p.mesAno===mesAno; });
+  if(jaPago){ toast('✅ '+mesLabel+' já registrado'); return; }
+
+  var val = prompt('Registrar pagamento de '+ct.inqNome+'\nMês: '+mesLabel+'\n\nValor (R$):', ct.valor.toFixed(2).replace('.',','));
+  if(val===null) return;
+  var valN = parseFloat(String(val).replace(',','.'));
+  if(isNaN(valN)||valN<=0) valN = ct.valor;
+
+  var codigo    = 'REC-'+Date.now().toString(36).toUpperCase();
+  var emitidoEm = now.toLocaleString('pt-BR');
+  var dataPgto  = ymd(now);
+
+  var pgto = { mesAno:mesAno, valor:valN, dataPgto:dataPgto, codigo:codigo, emitidoEm:emitidoEm, pago:true };
+  ct.pagamentos.push(pgto);
+  saveContratos();
+
+  // Gerar recibo automaticamente
+  var recibo = {
+    id: Date.now(), codigo: codigo, pagador: ct.inqNome,
+    tel: (PAGADORES.find(function(p){return p.nome===ct.inqNome;})||{}).tel||'',
+    desc: 'Aluguel '+esc(ct.imovel)+' — '+mesLabel,
+    valor: valN, data: dataPgto,
+    obs: 'Ref. mês de '+mesLabel+' · Contrato nº '+String(ct.id).substring(0,8),
+    emitidoEm: emitidoEm, contratoId: String(ct.id), mesAno: mesAno
+  };
+  RECIBOS.unshift(recibo);
+  saveRecibos();
+
+  // Registrar na planilha do Google Sheets
+  apiCall('registrarPagamentoContrato', {
+    inqNome: ct.inqNome, imovel: ct.imovel, mesAno: mesAno,
+    valor: valN, dataPgto: dataPgto, codigo: codigo
+  }, function(){});
+
+  renderContratos();
+  abrirRecibo(recibo);
+  toast('✅ Pagamento registrado — recibo gerado!');
+}
+
+var curRecTab = 'contratos';
 function setRecTab(t){
   curRecTab = t;
-  ['pagadores','alugueis','recibos'].forEach(function(tab){
-    document.getElementById('rp-'+tab).style.display = tab===t ? 'block' : 'none';
-    document.getElementById('rb-'+tab).classList.toggle('on', tab===t);
+  ['pagadores','alugueis','contratos','recibos'].forEach(function(tab){
+    var el = document.getElementById('rp-'+tab);
+    if(el) el.style.display = tab===t ? 'block' : 'none';
+    var btn = document.getElementById('rb-'+tab);
+    if(btn) btn.classList.toggle('on', tab===t);
   });
-  renderRecibos();
+  if(t==='contratos') renderContratos();
+  else renderRecibos();
 }
 
 function renderRecibos(){
   try { renderAlugueisSection(); } catch(e){ console.error('renderAlugueisSection:', e); }
   try { renderPagadores(); } catch(e){ console.error('renderPagadores:', e); }
+  try { if(curRecTab==='contratos') renderContratos(); } catch(e){}
   // Preencher data padrão = hoje
   var dataEl = document.getElementById('rec-data');
   if(dataEl && !dataEl.value) dataEl.value = ymd(new Date());
@@ -2399,6 +3337,29 @@ function saveRecur(){
   localStorage.setItem('ff_recur', JSON.stringify(RECUR));
 }
 
+function limparRecurDuplicados(){
+  function nd(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[àáâã]/g,'a').replace(/[èéê]/g,'e').replace(/[ìí]/g,'i').replace(/[òóô]/g,'o').replace(/[ùú]/g,'u').replace(/[ç]/g,'c'); }
+  var seenR = {}; var removidos = 0;
+  RECUR = RECUR.filter(function(r){
+    var k = nd(r.desc);
+    if(seenR[k]){ removidos++; return false; }
+    seenR[k] = true; return true;
+  });
+  // Limpar TASKS duplicadas (mesmo desc normalizado + mês)
+  var seenT = {}; var removidosT = 0;
+  TASKS = TASKS.filter(function(t){
+    var dl = ymds(t.deadline||'').substring(0,7)||'none';
+    var k  = nd(t.desc)+'|'+dl;
+    if(seenT[k]){ removidosT++; return false; }
+    seenT[k] = true; return true;
+  });
+  if(removidos||removidosT){
+    saveRecur();
+    localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+    if(removidos) toast('🧹 '+removidos+' recorrência'+(removidos>1?'s duplicadas removidas':' duplicada removida')+'!');
+  }
+}
+
 function renderFixos(){
   // Lista removida — ícone 🔁 aparece direto no card da tarefa
   var el = document.getElementById('fixos-inline');
@@ -2461,70 +3422,77 @@ function processRecur(){
   var now   = new Date();
   var today = ymd(now);
 
-  // Construir índice de TASKS existentes: "desc_normalizado|YYYY-MM" → true
-  var idx = {};
+  // Para cada entrada RECUR, verificar se já existe tarefa
+  // com o MESMO recurId no mesmo mês — essa é a verificação primária.
+  // Secundária: mesmo desc normalizado no mesmo mês.
+  function normD(s){
+    return String(s||'').trim().toLowerCase()
+      .replace(/\s+/g,' ')
+      .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e')
+      .replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o')
+      .replace(/[ùúûü]/g,'u').replace(/[ç]/g,'c');
+  }
+
+  // Construir índice — chave primária: rid|mês, secundária: desc|mês
+  var ridIdx  = {}; // 'rid:X|YYYY-MM' → true
+  var descIdx2 = {}; // 'desc_norm|YYYY-MM' → true
   TASKS.forEach(function(t){
     var dl = ymds(t.deadline||'');
     if(!dl) return;
-    var k1 = t.desc.trim().toLowerCase()+'|'+dl.substring(0,7);
-    var k2 = 'rid:'+String(t.recurId||'')+'|'+dl.substring(0,7);
-    idx[k1] = true;
-    if(t.recurId) idx[k2] = true;
+    var mo = dl.substring(0,7);
+    if(t.recurId) ridIdx['rid:'+String(t.recurId)+'|'+mo] = true;
+    descIdx2[normD(t.desc)+'|'+mo] = true;
   });
-
-  // Índice de TXS pagas
-  var txIdx = {};
   TXS.forEach(function(t){
-    var k = t.desc.trim().toLowerCase()+'|'+ymds(t.date).substring(0,7);
-    txIdx[k] = true;
+    var mo = ymds(t.date).substring(0,7);
+    descIdx2[normD(t.desc)+'|'+mo] = true;
   });
 
   var added = [];
-
-  // Gerar mês atual + próximo mês
+  // Gerar mês atual + próximo
   for(var mOff=0; mOff<2; mOff++){
-    var mDate  = new Date(now.getFullYear(), now.getMonth()+mOff, 1);
-    var moStr  = mDate.getFullYear()+'-'+pad(mDate.getMonth()+1);
+    var mDate = new Date(now.getFullYear(), now.getMonth()+mOff, 1);
+    var moStr = mDate.getFullYear()+'-'+pad(mDate.getMonth()+1);
 
     RECUR.forEach(function(r){
-      var day  = new Date((r.date||today)+'T12:00:00').getDate();
-      var dl   = moStr+'-'+pad(day);
-      if(dl < today) return; // não gerar passado
+      var rid = String(r.id);
+      var rk  = 'rid:'+rid+'|'+moStr;
+      var dk  = normD(r.desc)+'|'+moStr;
 
-      var dk = r.desc.trim().toLowerCase()+'|'+moStr;
-      var rk = 'rid:'+String(r.id)+'|'+moStr;
+      // Já existe pela chave primária (recurId)?
+      if(ridIdx[rk]) return;
+      // Já existe pelo desc normalizado?
+      if(descIdx2[dk]) return;
 
-      if(idx[dk] || idx[rk] || txIdx[dk]) return; // já existe
+      var day = new Date((r.date||today)+'T12:00:00').getDate();
+      var dl  = moStr+'-'+pad(day);
+      if(dl < today) return; // não criar no passado
 
       var task = {
-        desc:    r.desc,
-        type:    r.type||'exp',
-        deadline:dl,
-        value:   r.value,
-        cat:     r.cat||'',
-        status:  'pend',
-        recurId: r.id
+        desc:     r.desc,
+        type:     r.type||'exp',
+        deadline: dl,
+        value:    r.value,
+        cat:      r.cat||'',
+        status:   'pend',
+        recurId:  rid
       };
       var tmp = Date.now()+Math.random();
       TASKS.unshift(Object.assign({id:tmp}, task));
-      idx[dk] = true; // marcar para não duplicar neste loop
-      idx[rk] = true;
+      // Marcar nos dois índices para não duplicar neste loop
+      ridIdx[rk]   = true;
+      descIdx2[dk] = true;
       added.push(task);
     });
   }
 
   if(!added.length) return;
-
-  // Salvar localmente primeiro
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
-
-  // Enviar ao servidor com delay entre chamadas para evitar race condition
   added.forEach(function(task, i){
-    setTimeout(function(){ apiCall('addTask', task, function(){}); }, i*200);
+    setTimeout(function(){ apiCall('addTask', task, function(){}); }, i*300);
   });
-
   renderAll();
-  toast('🔁 '+added.length+' recorrente'+(added.length>1?'s adicionados':' adicionado')+'!');
+  toast('🔁 '+added.length+' recorrente'+(added.length>1?'s':'')+'!');
 }
 
 function addRecur(tx){
@@ -3136,6 +4104,20 @@ function initTaskDelegation(){
       }
       return;
     }
+    var fechfat = e.target.closest('[data-fechfat]');
+    if(fechfat){ fecharFatura(fechfat.getAttribute('data-cid'), fechfat.getAttribute('data-mes')); return; }
+    var delct = e.target.closest('[data-delct]');
+    if(delct){ delContrato(delct.getAttribute('data-delct')); return; }
+    var ctcontrato = e.target.closest('[data-ctcontrato]');
+    if(ctcontrato){ gerarContrato(ctcontrato.getAttribute('data-ctcontrato')); return; }
+    var ctvistoria = e.target.closest('[data-ctvistoria]');
+    if(ctvistoria){ gerarVistoria(ctvistoria.getAttribute('data-ctvistoria')); return; }
+    var ctpgto = e.target.closest('[data-ctpgto]');
+    if(ctpgto){ registrarPgtoContrato(ctpgto.getAttribute('data-ctpgto')); return; }
+    var delcc = e.target.closest('[data-delcc]');
+    if(delcc){ delCartao(delcc.getAttribute('data-delcc')); return; }
+    var delcg = e.target.closest('[data-delcg]');
+    if(delcg){ delGasto(delcg.getAttribute('data-delcg')); return; }
     var wpp = e.target.closest('[data-wppec]');
     if(wpp){
       var rid = wpp.getAttribute('data-wppec');
