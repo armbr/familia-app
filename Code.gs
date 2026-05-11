@@ -753,3 +753,89 @@ function limparTarefasDuplicadas() {
 
   Logger.log('Tarefas duplicadas removidas: ' + toDelete.length);
 }
+
+// ════════════════════════════════════════════════════════════
+//  CONTRATOS — GOOGLE SHEETS
+// ════════════════════════════════════════════════════════════
+
+function criarPlanilhaContrato(body) {
+  var ssObj  = ss();
+  var inq    = String(body.inqNome || '').substring(0, 18);
+  var imovel = String(body.imovel  || '').substring(0, 10);
+  var nomeAba = 'Contrato - ' + inq;
+
+  var sheet = ssObj.getSheetByName(nomeAba);
+  if (!sheet) {
+    sheet = ssObj.insertSheet(nomeAba);
+    // Cabeçalho informativo
+    sheet.getRange('A1').setValue('CONTROLE DE PAGAMENTOS — ' + body.inqNome).setFontSize(13).setFontWeight('bold');
+    sheet.getRange('A2').setValue('Imóvel: ' + (body.imovel || '') + ' · ' + (body.end || ''));
+    sheet.getRange('A3').setValue('Locador: ' + (body.locNome || ''));
+    sheet.getRange('A4').setValue('Início: ' + (body.inicio || '') + ' · Valor: R$ ' + parseFloat(body.valor||0).toFixed(2) + ' · Venc. dia ' + (body.diaPgto || '10'));
+    sheet.getRange('A5').setValue('');
+
+    // Header da tabela
+    var hdr = ['Mês', 'Valor (R$)', 'Data Pagamento', 'Status', 'Código Recibo', 'Observação'];
+    sheet.getRange(6, 1, 1, hdr.length).setValues([hdr])
+      .setFontWeight('bold')
+      .setBackground('#0F2438')
+      .setFontColor('#FFFFFF');
+
+    sheet.setColumnWidth(1, 80);
+    sheet.setColumnWidth(2, 100);
+    sheet.setColumnWidth(3, 130);
+    sheet.setColumnWidth(4, 100);
+    sheet.setColumnWidth(5, 150);
+    sheet.setColumnWidth(6, 200);
+    sheet.setFrozenRows(6);
+
+    // Pré-preencher meses do contrato como PENDENTE
+    var dur = parseInt(body.duracao) || 12;
+    var startDate = body.inicio ? new Date(body.inicio + 'T12:00:00') : new Date();
+    var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    for (var m = 0; m < dur; m++) {
+      var d = new Date(startDate.getFullYear(), startDate.getMonth() + m, 1);
+      var mesLabel = meses_br[d.getMonth()] + '/' + d.getFullYear();
+      var row = [mesLabel, parseFloat(body.valor||0), '', 'PENDENTE', '', ''];
+      sheet.getRange(7 + m, 1, 1, 6).setValues([row]);
+      sheet.getRange(7 + m, 4).setBackground('#FFF3CD').setFontColor('#856404');
+    }
+  }
+  return { ok: true };
+}
+
+function registrarPagamentoContrato(body) {
+  var ssObj  = ss();
+  var nomeAba = 'Contrato - ' + String(body.inqNome || '').substring(0, 18);
+  var sheet  = ssObj.getSheetByName(nomeAba);
+  if (!sheet) {
+    criarPlanilhaContrato(body);
+    sheet = ssObj.getSheetByName(nomeAba);
+    if (!sheet) return { ok: false, error: 'Aba não criada' };
+  }
+
+  var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var partes = String(body.mesAno || '').split('-');
+  var mesLabel = meses_br[parseInt(partes[1]||1)-1] + '/' + (partes[0]||'');
+
+  var dados = sheet.getDataRange().getValues();
+  for (var i = 6; i < dados.length; i++) {
+    if (String(dados[i][0]) === mesLabel) {
+      sheet.getRange(i+1, 2, 1, 5).setValues([[
+        parseFloat(body.valor || 0),
+        body.dataPgto || '',
+        'PAGO',
+        body.codigo   || '',
+        ''
+      ]]);
+      sheet.getRange(i+1, 1, 1, 6).setBackground('#D4EDDA').setFontColor('#155724');
+      return { ok: true };
+    }
+  }
+  // Mês não encontrado — inserir nova linha
+  var lastRow = sheet.getLastRow() + 1;
+  sheet.getRange(lastRow, 1, 1, 6).setValues([[
+    mesLabel, parseFloat(body.valor||0), body.dataPgto||'', 'PAGO', body.codigo||'', ''
+  ]]).setBackground('#D4EDDA').setFontColor('#155724');
+  return { ok: true };
+}
