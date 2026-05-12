@@ -8,7 +8,7 @@
 
 // ★ SUBSTITUA PELO ID DA SUA PLANILHA ★
 // (está na URL: docs.google.com/spreadsheets/d/SEU_ID_AQUI/edit)
-var SPREADSHEET_ID = '174UmeWX3kmj9qjl7Z3I8hACNpx1pjcWYsl1_wBFzgxM';
+var SPREADSHEET_ID = 'COLE_O_ID_AQUI';
 
 // ════════════════════════════════════════════════════════════
 //  ENTRY POINT — tudo via GET para evitar problemas de CORS
@@ -47,7 +47,24 @@ function doGetInternal(action, body) {
     case 'getRecur':          return getRecur();
     case 'addRecur':          return addRecur(body);
     case 'deleteRecur':       return deleteRecur(body.id);
-    case 'uploadComprovante': return uploadComprovante(body);
+    case 'uploadComprovante':          return uploadComprovante(body);
+    case 'criarPlanilhaContrato':      return criarPlanilhaContrato(body);
+    case 'registrarPagamentoContrato': return registrarPagamentoContrato(body);
+    case 'criarFichaAluguel':          return criarFichaAluguel(body);
+    case 'registrarPagamentoAluguel':  return registrarPagamentoAluguel(body);
+    // CRUD genérico — dados centralizados
+    case 'salvarContrato':    return salvarItemSheet('Contratos', body);
+    case 'deletarContrato':   return deletarItemSheet('Contratos', body.id);
+    case 'getContratos':      return getItemsSheet('Contratos');
+    case 'salvarPagador':     return salvarItemSheet('Pagadores', body);
+    case 'deletarPagador':    return deletarItemSheet('Pagadores', body.id);
+    case 'getPagadores':      return getItemsSheet('Pagadores');
+    case 'salvarAluguel':     return salvarItemSheet('Aluguéis', body);
+    case 'deletarAluguel':    return deletarItemSheet('Aluguéis', body.id);
+    case 'getAlugueis':       return getItemsSheet('Aluguéis');
+    case 'salvarCGasto':      return salvarItemSheet('GastosCartao', body);
+    case 'getCGastos':        return getItemsSheet('GastosCartao');
+    case 'paginaInquilino':   return paginaInquilino(e);
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
@@ -838,4 +855,150 @@ function registrarPagamentoContrato(body) {
     mesLabel, parseFloat(body.valor||0), body.dataPgto||'', 'PAGO', body.codigo||'', ''
   ]]).setBackground('#D4EDDA').setFontColor('#155724');
   return { ok: true };
+}
+
+// ════════════════════════════════════════════════════════════
+//  CRUD GENÉRICO — qualquer aba da planilha
+// ════════════════════════════════════════════════════════════
+
+function salvarItemSheet(nomeAba, body) {
+  var sheet = ss().getSheetByName(nomeAba);
+  if (!sheet) {
+    sheet = ss().insertSheet(nomeAba);
+    sheet.appendRow(['id','json','updatedAt']);
+    sheet.setFrozenRows(1);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#0F2438').setFontColor('#FFF');
+  }
+  var dados = sheet.getDataRange().getValues();
+  var id    = String(body.id || '');
+  var json  = JSON.stringify(body);
+  var now   = new Date().toISOString();
+
+  // Verificar se já existe (atualizar)
+  for (var i = 1; i < dados.length; i++) {
+    if (String(dados[i][0]) === id) {
+      sheet.getRange(i+1, 2, 1, 2).setValues([[json, now]]);
+      return { ok: true, updated: true };
+    }
+  }
+  // Inserir novo
+  sheet.appendRow([id, json, now]);
+  return { ok: true, created: true };
+}
+
+function deletarItemSheet(nomeAba, id) {
+  var sheet = ss().getSheetByName(nomeAba);
+  if (!sheet) return { ok: true };
+  var dados = sheet.getDataRange().getValues();
+  for (var i = dados.length - 1; i >= 1; i--) {
+    if (String(dados[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { ok: true };
+    }
+  }
+  return { ok: true };
+}
+
+function getItemsSheet(nomeAba) {
+  var sheet = ss().getSheetByName(nomeAba);
+  if (!sheet) return { ok: true, data: [] };
+  var dados = sheet.getDataRange().getValues();
+  var result = [];
+  for (var i = 1; i < dados.length; i++) {
+    if (!dados[i][1]) continue;
+    try { result.push(JSON.parse(String(dados[i][1]))); } catch(e) {}
+  }
+  return { ok: true, data: result };
+}
+
+// ════════════════════════════════════════════════════════════
+//  PÁGINA PÚBLICA DO INQUILINO
+//  Retorna HTML com histórico de pagamentos do contrato
+// ════════════════════════════════════════════════════════════
+
+function paginaInquilino(e) {
+  var ctId = e.parameter.ctId || '';
+  var inq  = e.parameter.inq  || '';
+
+  // Buscar contrato
+  var ctSheet = ss().getSheetByName('Contratos');
+  var ct = null;
+  if (ctSheet) {
+    var dados = ctSheet.getDataRange().getValues();
+    for (var i = 1; i < dados.length; i++) {
+      if (!dados[i][1]) continue;
+      try {
+        var obj = JSON.parse(String(dados[i][1]));
+        if (String(obj.id) === ctId) { ct = obj; break; }
+      } catch(e2) {}
+    }
+  }
+
+  if (!ct) {
+    return HtmlService.createHtmlOutput('<h2>Contrato não encontrado</h2>');
+  }
+
+  // Buscar aba de pagamentos
+  var nomeAba = 'Contrato - ' + String(ct.inqNome || '').substring(0, 18);
+  var pgSheet = ss().getSheetByName(nomeAba);
+  var linhas  = [];
+  if (pgSheet) {
+    var pg = pgSheet.getDataRange().getValues();
+    for (var j = 6; j < pg.length; j++) {
+      linhas.push({
+        mes:    pg[j][0], valor: pg[j][1],
+        data:   pg[j][2], status: pg[j][3], codigo: pg[j][4]
+      });
+    }
+  }
+
+  var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var totalPago = 0, totalPend = 0;
+  linhas.forEach(function(l){
+    if(l.status==='PAGO') totalPago += parseFloat(l.valor||0);
+    else totalPend += parseFloat(l.valor||0);
+  });
+
+  function fmtR(v){ return 'R$ '+parseFloat(v||0).toFixed(2).replace('.',','); }
+
+  var rows = linhas.map(function(l){
+    var cor = l.status==='PAGO' ? '#155724' : '#856404';
+    var bg  = l.status==='PAGO' ? '#d4edda' : '#fff3cd';
+    return '<tr style="background:'+bg+'">'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #ddd">'+l.mes+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #ddd;font-weight:700">'+fmtR(l.valor)+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #ddd">'+( l.data||'—')+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #ddd;color:'+cor+';font-weight:700">'+l.status+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #ddd;font-family:monospace;font-size:11px">'+( l.codigo||'')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head>'+
+    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Meus Pagamentos — '+ct.inqNome+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#f5f5f5;padding:20px}'+
+    '.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}'+
+    'h1{font-size:18px;margin-bottom:4px}p{color:#666;font-size:13px}'+
+    '.totais{display:flex;gap:16px;margin-top:12px}.tot{flex:1;text-align:center;padding:12px;border-radius:8px}'+
+    'table{width:100%;border-collapse:collapse}th{padding:10px 12px;text-align:left;background:#0F2438;color:#fff;font-size:12px}'+
+    'td{font-size:13px}@media(max-width:500px){td,th{padding:8px 6px;font-size:11px}}</style></head><body>'+
+    '<div class="card">'+
+      '<p style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⚡ Fluxo App — Área do Inquilino</p>'+
+      '<h1>'+ct.inqNome+'</h1>'+
+      '<p>'+ct.imovel+' · '+ct.end+'</p>'+
+      '<p style="margin-top:4px">Locador: '+ct.locNome+' · Vencimento: dia '+ct.diaPgto+'</p>'+
+      '<div class="totais">'+
+        '<div class="tot" style="background:#d4edda"><div style="font-size:20px;font-weight:900;color:#155724">'+fmtR(totalPago)+'</div><div style="font-size:11px;color:#666">Pago</div></div>'+
+        '<div class="tot" style="background:#fff3cd"><div style="font-size:20px;font-weight:900;color:#856404">'+fmtR(totalPend)+'</div><div style="font-size:11px;color:#666">Pendente</div></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="card">'+
+      '<table><thead><tr><th>Mês</th><th>Valor</th><th>Pago em</th><th>Status</th><th>Recibo</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table>'+
+    '</div>'+
+    '<p style="text-align:center;color:#aaa;font-size:11px;margin-top:8px">Gerado por Fluxo App · Apenas leitura</p>'+
+    '</body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Meus Pagamentos — '+ct.inqNome);
 }
