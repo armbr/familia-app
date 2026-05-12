@@ -1267,8 +1267,13 @@ select option{background:#1A2A3A}
         <div class="fl">Pagador</div>
         <select id="rec-pag"><option value="">— selecione ou preencha abaixo —</option></select>
       </div>
-      <div style="margin-bottom:10px"><div class="fl">Nome (se não cadastrado)</div>
-        <input id="rec-pag-nome" type="text" placeholder="Nome do pagador" maxlength="80">
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Nome (se não cadastrado)</div>
+          <input id="rec-pag-nome" type="text" placeholder="Nome do pagador" maxlength="80">
+        </div>
+        <div><div class="fl">CPF</div>
+          <input id="rec-pag-cpf" type="text" placeholder="000.000.000-00" maxlength="14">
+        </div>
       </div>
       <div style="margin-bottom:10px"><div class="fl">Descrição / Referência</div>
         <input id="rec-desc" type="text" placeholder="Ex: Aluguel março/2026" maxlength="120">
@@ -1819,7 +1824,7 @@ function syncAll(){
 
   function tick(){
     done++;
-    if(done===4){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
+    if(done===8){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
   apiCall('getRecur',null,function(err,d){
@@ -1870,6 +1875,42 @@ function syncAll(){
           return t.type === 'inc' || t.type === 'exp';
         });
       save();
+    }
+    tick();
+  });
+
+  // Sync Contratos
+  apiCall('getContratos',null,function(err,d){
+    if(!err && d && d.ok && d.data){
+      CONTRATOS = d.data;
+      saveContratos();
+    }
+    tick();
+  });
+
+  // Sync Pagadores
+  apiCall('getPagadores',null,function(err,d){
+    if(!err && d && d.ok && d.data){
+      PAGADORES = d.data;
+      savePagadores();
+    }
+    tick();
+  });
+
+  // Sync Aluguéis
+  apiCall('getAlugueis',null,function(err,d){
+    if(!err && d && d.ok && d.data){
+      ALUGUEIS = d.data;
+      saveAlugueis();
+    }
+    tick();
+  });
+
+  // Sync Gastos Cartão
+  apiCall('getCGastos',null,function(err,d){
+    if(!err && d && d.ok && d.data){
+      CGASTOS = d.data;
+      saveCGastos();
     }
     tick();
   });
@@ -1959,6 +2000,7 @@ function addPagador(){
   var p = { id: Date.now(), nome: nome, tel: tel, doc: doc };
   PAGADORES.unshift(p);
   savePagadores();
+  apiCall('salvarPagador', p, function(){});
   document.getElementById('pag-nome').value = '';
   document.getElementById('pag-tel').value  = '';
   document.getElementById('pag-doc').value  = '';
@@ -1969,6 +2011,7 @@ function addPagador(){
 function delPagador(id){
   PAGADORES = PAGADORES.filter(function(p){ return String(p.id)!==String(id); });
   savePagadores();
+  apiCall('deletarPagador', {id:id}, function(){});
   renderRecibos();
   toast('🗑️ Pagador removido');
 }
@@ -2007,6 +2050,7 @@ function addAluguel(){
   };
   ALUGUEIS.unshift(alug);
   saveAlugueis();
+  apiCall('salvarAluguel', alug, function(){});
   document.getElementById('alug-dia').value = '';
   document.getElementById('alug-val').value = '';
   document.getElementById('alug-ref').value = '';
@@ -2019,6 +2063,7 @@ function delAluguel(id){
   if(!confirm('Remover este aluguel? O histórico de parcelas será perdido.')) return;
   ALUGUEIS = ALUGUEIS.filter(function(a){ return String(a.id)!==String(id); });
   saveAlugueis();
+  apiCall('deletarAluguel', {id:id}, function(){});
   renderRecibos();
   toast('🗑️ Aluguel removido');
 }
@@ -2319,6 +2364,7 @@ function emitirRecibo(){
   var pag   = PAGADORES.find(function(p){ return String(p.id)===pid; });
   var nome  = pag ? pag.nome : document.getElementById('rec-pag-nome').value.trim();
   var tel   = pag ? pag.tel  : '';
+  var cpf   = pag ? (pag.doc||'') : (document.getElementById('rec-pag-cpf')||{}).value||'';
   var desc  = document.getElementById('rec-desc').value.trim();
   var val   = parseFloat(document.getElementById('rec-val').value)||0;
   var data  = document.getElementById('rec-data').value || ymd(new Date());
@@ -2332,7 +2378,7 @@ function emitirRecibo(){
   var codigo = 'REC-'+Date.now().toString(36).toUpperCase();
   var emitidoEm = new Date().toLocaleString('pt-BR');
 
-  var recibo = { id: Date.now(), codigo: codigo, pagador: nome, tel: tel,
+  var recibo = { id: Date.now(), codigo: codigo, pagador: nome, tel: tel, cpf: cpf,
     desc: desc, valor: val, data: data, obs: obs, emitidoEm: emitidoEm };
   RECIBOS.unshift(recibo);
   saveRecibos();
@@ -2527,6 +2573,10 @@ function addGastoCartao(){
   }
 
   saveCGastos();
+  // Salvar cada gasto no servidor
+  CGASTOS.filter(function(g){ return !g._synced; }).forEach(function(g){
+    apiCall('salvarCGasto', g, function(){ g._synced=true; });
+  });
   document.getElementById('cg-desc').value = '';
   document.getElementById('cg-val').value  = '';
   document.getElementById('cg-parc').value = '1';
@@ -2856,10 +2906,15 @@ function salvarContrato(){
   CONTRATOS.unshift(ct);
   saveContratos();
 
-  // Criar planilha no Google Sheets
+  // Salvar contrato no servidor (aba Contratos na planilha)
+  apiCall('salvarContrato', ct, function(err){
+    if(err) toast('⚠️ Salvo localmente, erro no servidor','err');
+  });
+
+  // Criar planilha de controle de pagamentos
   apiCall('criarPlanilhaContrato', ct, function(err){
-    if(err) toast('⚠️ Contrato salvo localmente, mas erro na planilha','err');
-    else toast('✅ Contrato salvo e planilha criada!');
+    if(!err) toast('✅ Contrato salvo! Planilha criada no Google Sheets.');
+    else toast('✅ Contrato salvo!');
   });
 
   // Criar pagador automaticamente se não existir
@@ -2902,8 +2957,17 @@ function delContrato(id){
   if(!confirm('Remover este contrato? O histórico de pagamentos será perdido.')) return;
   CONTRATOS = CONTRATOS.filter(function(c){ return String(c.id)!==String(id); });
   saveContratos();
+  apiCall('deletarContrato', {id:id}, function(){});
   renderContratos();
   toast('🗑️ Contrato removido');
+}
+
+function abrirLinkInquilino(ctId){
+  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
+  if(!ct) return;
+  // Gerar página pública do inquilino via Apps Script
+  var url = API + '?action=paginaInquilino&ctId='+ct.id+'&inq='+encodeURIComponent(ct.inqNome);
+  window.open(url, '_blank');
 }
 
 function renderContratos(){
@@ -4112,6 +4176,8 @@ function initTaskDelegation(){
     if(ctcontrato){ gerarContrato(ctcontrato.getAttribute('data-ctcontrato')); return; }
     var ctvistoria = e.target.closest('[data-ctvistoria]');
     if(ctvistoria){ gerarVistoria(ctvistoria.getAttribute('data-ctvistoria')); return; }
+    var ctlink = e.target.closest('[data-ctlink]');
+    if(ctlink){ abrirLinkInquilino(ctlink.getAttribute('data-ctlink')); return; }
     var ctpgto = e.target.closest('[data-ctpgto]');
     if(ctpgto){ registrarPgtoContrato(ctpgto.getAttribute('data-ctpgto')); return; }
     var delcc = e.target.closest('[data-delcc]');
