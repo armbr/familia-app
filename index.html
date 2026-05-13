@@ -803,7 +803,7 @@ select option{background:#1A2A3A}
         <div class="row2">
           <div>
             <div class="fl">Categoria</div>
-            <select id="tx-cat">
+            <select id="tx-cat" onchange="onTxCatChange()">
               <optgroup label="── Gastos ──">
                 <option>🍽️ Alimentação</option>
                 <option>🚗 Carro/Transporte</option>
@@ -826,6 +826,13 @@ select option{background:#1A2A3A}
             </select>
           </div>
           <div><div class="fl">Data</div><input id="tx-date" type="date"></div>
+        </div>
+        <!-- Seletor de cartão — aparece só quando cat = Cartão de Crédito -->
+        <div id="tx-cartao-row" style="display:none;margin-bottom:10px">
+          <div class="fl">💳 Qual cartão?</div>
+          <select id="tx-cartao-sel">
+            <option value="">— sem cartão específico —</option>
+          </select>
         </div>
         <button class="btn" id="btn-add-tx" onclick="addTx()">Registrar ✓</button>
 
@@ -881,6 +888,7 @@ select option{background:#1A2A3A}
         <button class="vbtn"    id="fv-week"   onclick="setFinView('week')">🗓 Sem</button>
         <button class="vbtn"    id="fv-month"  onclick="setFinView('month')">📆 Mês</button>
         <button class="vbtn"    id="fv-future" onclick="setFinView('future')">🔮 Plan</button>
+      <button class="vbtn"    id="fv-cc"     onclick="abrirFaturaCC()">💳 Fatura</button>
       </div>
 
       <div id="fvw-day">
@@ -1509,7 +1517,6 @@ select option{background:#1A2A3A}
 <div id="nav" style="display:none">
   <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
   <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💰</span>Finanças</button>
-  <button class="nb"    id="nb-cc"   onclick="setSection('cc')"><span class="ni">💳</span>Cartão</button>
   <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Agenda</button>
   <button class="nb"    id="nb-rec"  onclick="setSection('rec')"><span class="ni">🧾</span>Recibos</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
@@ -3264,6 +3271,22 @@ function setTxType(t){
   document.getElementById('bt-exp').className='ttype'+(t==='exp'?' exp':'');
   document.getElementById('bt-inc').className='ttype'+(t==='inc'?' inc':'');
   document.getElementById('tx-cat').value = t==='inc' ? '💼 Salário':'🍽️ Alimentação';
+  onTxCatChange();
+}
+
+function onTxCatChange(){
+  var cat = document.getElementById('tx-cat').value;
+  var row = document.getElementById('tx-cartao-row');
+  var sel = document.getElementById('tx-cartao-sel');
+  if(!row || !sel) return;
+  var isCC = cat === '💳 Cartão de Crédito';
+  row.style.display = isCC ? 'block' : 'none';
+  if(isCC && CARTOES.length){
+    sel.innerHTML = '<option value="">— sem cartão específico —</option>'+
+      CARTOES.map(function(cc){
+        return '<option value="'+cc.id+'">'+esc(cc.nome)+'</option>';
+      }).join('');
+  }
 }
 
 // ════════════════════════════════════════
@@ -3577,12 +3600,28 @@ function addTx(){
   if(!val||val<=0){toast('⚠️ Informe o valor','err');return;}
   if(!date){toast('⚠️ Informe a data','err');return;}
   var btn=document.getElementById('btn-add-tx'); btn.disabled=true;
+  var cartaoSelEl = document.getElementById('tx-cartao-sel');
+  var cartaoId    = cartaoSelEl ? cartaoSelEl.value : '';
+  var cartao      = cartaoId ? CARTOES.find(function(cc){ return String(cc.id)===cartaoId; }) : null;
+
   var tx={type:curTxType,desc:desc,value:val,cat:cat,date:date};
+  if(cartaoId) tx.cartaoId = cartaoId;
+
   var tmp=Date.now(); TXS.unshift(Object.assign({id:tmp},tx)); renderAll();
+
+  // Se pagamento no cartão → registrar também em CGASTOS para controle da fatura
+  if(cartao && curTxType==='exp'){
+    var fatMes = faturaDoGasto(new Date(date+'T12:00:00'), cartao.fech);
+    var gasto = { id: tmp, cartaoId:cartaoId, cartao:cartao.nome,
+      desc:desc, val:val, cat:cat, data:date, fatMes:fatMes, pago:false };
+    CGASTOS.push(gasto);
+    saveCGastos();
+    apiCall('salvarCGasto', gasto, function(){});
+  }
 
   apiCall('addTransaction',tx,function(err){
     if(err){ TXS=TXS.filter(function(t){return t.id!==tmp;}); renderAll(); toast('❌ Erro ao salvar','err'); }
-    else{ syncAll(); toast(curTxType==='exp'?'✅ Despesa registrada!':'✅ Receita registrada!'); }
+    else{ toast(curTxType==='exp'?'✅ Despesa registrada!':'✅ Receita registrada!'); }
     btn.disabled=false;
   });
   document.getElementById('tx-desc').value='';
@@ -3660,16 +3699,49 @@ function selMon(m){
 }
 
 function renderCat(){
-  var txs=filteredTxs().filter(function(t){return t.type==='exp';});
   var el=document.getElementById('cat-list');
-  if(!txs.length){el.innerHTML=emptyHTML('📊','Sem despesas','Adicione despesas para ver o resumo');return;}
   var bc={};
-  txs.forEach(function(t){bc[t.cat]=(bc[t.cat]||0)+parseFloat(t.value||0);});
+
+  // 1. TXS reais do mês (diretas em Finanças)
+  filteredTxs().filter(function(t){return t.type==='exp';})
+    .forEach(function(t){ bc[t.cat||'📦 Outros']=(bc[t.cat||'📦 Outros']||0)+parseFloat(t.value||0); });
+
+  // 2. Gastos do cartão do mês (ainda não pagos — fatura aberta)
+  //    Mostrar por categoria real (alimentação, saúde etc.)
+  //    Excluir os que já viraram TXS (pago=true já gerou tx de fatura)
+  var moStr = selMonth; // YYYY-MM
+  CGASTOS.filter(function(g){
+    return g.fatMes === moStr && !g.pago;
+  }).forEach(function(g){
+    var cat = g.cat || '💳 Cartão de Crédito';
+    bc[cat] = (bc[cat]||0) + parseFloat(g.val||0);
+  });
+
+  // 3. Tarefas da Agenda concluídas com valor no mês
+  TASKS.filter(function(t){
+    return t.status==='done' && t.type==='exp' &&
+           t.deadline && ymds(t.deadline).substring(0,7)===moStr &&
+           parseFloat(t.value||0)>0;
+  }).forEach(function(t){
+    var cat = t.cat || '📦 Outros';
+    bc[cat] = (bc[cat]||0) + parseFloat(t.value||0);
+  });
+
+  if(!Object.keys(bc).length){
+    el.innerHTML=emptyHTML('📊','Sem despesas','Adicione despesas para ver o resumo');
+    return;
+  }
   var total=Object.values(bc).reduce(function(a,b){return a+b;},0);
   var sorted=Object.entries(bc).sort(function(a,b){return b[1]-a[1];});
   el.innerHTML=sorted.map(function(x){
     var pct=Math.round(x[1]/total*100);
-    return '<div class="cati"><div class="cati-hdr"><div class="cati-name">'+x[0]+'</div><div class="cati-amt">-'+fmtBRL(x[1])+'</div></div><div class="bar-bg"><div class="bar-fg" style="width:'+pct+'%"></div></div></div>';
+    return '<div class="cati">'+
+      '<div class="cati-hdr">'+
+        '<div class="cati-name">'+esc(x[0])+'</div>'+
+        '<div class="cati-amt">-'+fmtBRL(x[1])+' ('+pct+'%)</div>'+
+      '</div>'+
+      '<div class="bar-bg"><div class="bar-fg" style="width:'+pct+'%"></div></div>'+
+    '</div>';
   }).join('');
 }
 
@@ -3698,7 +3770,22 @@ function setFinView(v){
     document.getElementById('fvw-'+x).style.display = x===v?'block':'none';
     document.getElementById('fv-'+x).classList.toggle('on', x===v);
   });
+  // fatura não é uma view, limpar seleção ativa
+  var fvcc = document.getElementById('fv-cc');
+  if(fvcc) fvcc.classList.remove('on');
   renderFinView();
+}
+
+function abrirFaturaCC(){
+  // Ir direto para aba Cartão na seção CC
+  setSection('cc');
+  setCCTab('fatura');
+  // Garantir seleção de mês atual
+  var mfEl = document.getElementById('cf-mes');
+  if(mfEl && !mfEl.value){
+    var n=new Date(); mfEl.value=n.getFullYear()+'-'+pad(n.getMonth()+1);
+  }
+  renderFatura();
 }
 
 function renderFinView(){
