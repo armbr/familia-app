@@ -8,7 +8,7 @@
 
 // ★ SUBSTITUA PELO ID DA SUA PLANILHA ★
 // (está na URL: docs.google.com/spreadsheets/d/SEU_ID_AQUI/edit)
-var SPREADSHEET_ID = 'COLE_O_ID_AQUI';
+var SPREADSHEET_ID = '174UmeWX3kmj9qjl7Z3I8hACNpx1pjcWYsl1_wBFzgxM';
 
 // ════════════════════════════════════════════════════════════
 //  ENTRY POINT — tudo via GET para evitar problemas de CORS
@@ -918,7 +918,6 @@ function getItemsSheet(nomeAba) {
 
 function paginaInquilino(e) {
   var ctId = e.parameter.ctId || '';
-  var inq  = e.parameter.inq  || '';
 
   // Buscar contrato
   var ctSheet = ss().getSheetByName('Contratos');
@@ -935,70 +934,210 @@ function paginaInquilino(e) {
   }
 
   if (!ct) {
-    return HtmlService.createHtmlOutput('<h2>Contrato não encontrado</h2>');
+    return HtmlService.createHtmlOutput('<div style="font-family:Arial;padding:40px;text-align:center"><h2>Contrato não encontrado</h2><p>Verifique o link com seu locador.</p></div>');
   }
 
-  // Buscar aba de pagamentos
+  // Buscar pagamentos da aba de controle
   var nomeAba = 'Contrato - ' + String(ct.inqNome || '').substring(0, 18);
   var pgSheet = ss().getSheetByName(nomeAba);
   var linhas  = [];
   if (pgSheet) {
     var pg = pgSheet.getDataRange().getValues();
     for (var j = 6; j < pg.length; j++) {
-      linhas.push({
-        mes:    pg[j][0], valor: pg[j][1],
-        data:   pg[j][2], status: pg[j][3], codigo: pg[j][4]
-      });
+      if (!pg[j][0]) continue;
+      linhas.push({ mes: pg[j][0], valor: pg[j][1], data: pg[j][2], status: pg[j][3], codigo: pg[j][4] });
     }
   }
 
-  var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  function fmtR(v){ return 'R$ ' + parseFloat(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmtD(s){ if(!s) return '—'; var p=String(s).split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s; }
+
   var totalPago = 0, totalPend = 0;
   linhas.forEach(function(l){
-    if(l.status==='PAGO') totalPago += parseFloat(l.valor||0);
+    if(String(l.status).toUpperCase()==='PAGO') totalPago += parseFloat(l.valor||0);
     else totalPend += parseFloat(l.valor||0);
   });
 
-  function fmtR(v){ return 'R$ '+parseFloat(v||0).toFixed(2).replace('.',','); }
+  // ── SEÇÃO 1: Resumo ──────────────────────────────────
+  var htmlResumo =
+    '<div class="section active" id="s-resumo">'+
+    '<div class="info-card">'+
+      '<div class="label">Locatário</div>'+
+      '<div class="val">'+esc(ct.inqNome)+'</div>'+
+      (ct.inqCpf?'<div class="sub">CPF: '+esc(ct.inqCpf)+'</div>':'')+
+      (ct.inqNome2?'<div class="sub">+ '+esc(ct.inqNome2)+(ct.inqCpf2?' — CPF: '+esc(ct.inqCpf2):'')+'</div>':'')+
+    '</div>'+
+    '<div class="info-card">'+
+      '<div class="label">Imóvel</div>'+
+      '<div class="val">'+esc(ct.tipo||'Imóvel')+' — '+esc(ct.imovel)+'</div>'+
+      '<div class="sub">'+esc(ct.end)+'</div>'+
+    '</div>'+
+    '<div class="info-card">'+
+      '<div class="label">Contrato</div>'+
+      '<div class="val">'+fmtR(ct.valor)+' /mês</div>'+
+      '<div class="sub">Vencimento dia '+esc(ct.diaPgto)+' · Início: '+fmtD(ct.inicio)+(ct.fim?' · Término: '+fmtD(ct.fim):'')+'</div>'+
+    '</div>'+
+    '<div class="info-card">'+
+      '<div class="label">Locador</div>'+
+      '<div class="val">'+esc(ct.locNome)+'</div>'+
+      (ct.locCpf?'<div class="sub">CPF: '+esc(ct.locCpf)+'</div>':'')+
+    '</div>'+
+    '<div class="totais">'+
+      '<div class="tot pago"><div class="tv">'+fmtR(totalPago)+'</div><div class="tl">Total Pago</div></div>'+
+      '<div class="tot pend"><div class="tv">'+fmtR(totalPend)+'</div><div class="tl">Pendente</div></div>'+
+    '</div>'+
+    '</div>';
 
+  // ── SEÇÃO 2: Pagamentos ───────────────────────────────
   var rows = linhas.map(function(l){
-    var cor = l.status==='PAGO' ? '#155724' : '#856404';
-    var bg  = l.status==='PAGO' ? '#d4edda' : '#fff3cd';
-    return '<tr style="background:'+bg+'">'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #ddd">'+l.mes+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #ddd;font-weight:700">'+fmtR(l.valor)+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #ddd">'+( l.data||'—')+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #ddd;color:'+cor+';font-weight:700">'+l.status+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #ddd;font-family:monospace;font-size:11px">'+( l.codigo||'')+'</td>'+
+    var pago = String(l.status).toUpperCase()==='PAGO';
+    return '<tr class="'+(pago?'row-pago':'row-pend')+'">'+
+      '<td>'+esc(l.mes)+'</td>'+
+      '<td style="font-weight:700">'+fmtR(l.valor)+'</td>'+
+      '<td>'+esc(fmtD(l.data))+'</td>'+
+      '<td><span class="badge '+(pago?'b-pago':'b-pend')+'">'+esc(l.status||'PENDENTE')+'</span></td>'+
+      '<td class="mono">'+esc(l.codigo||'—')+'</td>'+
     '</tr>';
   }).join('');
 
+  var htmlPgto =
+    '<div class="section" id="s-pgto">'+
+    '<table><thead><tr><th>Mês</th><th>Valor</th><th>Pago em</th><th>Status</th><th>Recibo</th></tr></thead>'+
+    '<tbody>'+(rows||'<tr><td colspan="5" style="text-align:center;padding:20px;color:#999">Nenhum lançamento</td></tr>')+'</tbody></table>'+
+    '</div>';
+
+  // ── SEÇÃO 3: Contrato completo ────────────────────────
+  var durLabel = ct.duracao ? ct.duracao + ' meses' : 'Indeterminado';
+  var htmlContrato =
+    '<div class="section" id="s-contrato">'+
+    '<div style="background:#0F2438;color:#fff;border-radius:10px;padding:20px;text-align:center;margin-bottom:16px">'+
+      '<div style="font-size:22px;font-weight:900;letter-spacing:2px">⚡ FLUXO</div>'+
+      '<div style="font-size:13px;color:#aaa;margin-top:4px;letter-spacing:1px">CONTRATO DE LOCAÇÃO</div>'+
+    '</div>'+
+    ct_secao('1. PARTES', [
+      ['Locador', esc(ct.locNome)+(ct.locCpf?' — CPF: '+esc(ct.locCpf):'')+' — RG: '+esc(ct.locRg||'—')],
+      (ct.locNome2?['2º Locador', esc(ct.locNome2)+(ct.locCpf2?' — CPF: '+esc(ct.locCpf2):'')]:null),
+      ['Locatário', esc(ct.inqNome)+(ct.inqCpf?' — CPF: '+esc(ct.inqCpf):'')+' — RG: '+esc(ct.inqRg||'—')],
+      (ct.inqNome2?['2º Locatário', esc(ct.inqNome2)+(ct.inqCpf2?' — CPF: '+esc(ct.inqCpf2):'')]:null),
+      ['Endereço (locatário)', esc(ct.inqEnd||'—')]
+    ])+
+    ct_secao('2. IMÓVEL', [
+      ['Tipo', esc(ct.tipo||'—')],
+      ['Identificação', esc(ct.imovel)],
+      ['Endereço', esc(ct.end||'—')],
+      ['Matrícula', esc(ct.mat||'—')]
+    ])+
+    ct_secao('3. VIGÊNCIA E VALOR', [
+      ['Início', fmtD(ct.inicio)],
+      ['Término', ct.fim?fmtD(ct.fim):'Indeterminado'],
+      ['Duração', durLabel],
+      ['Valor do aluguel', fmtR(ct.valor)+' mensais'],
+      ['Dia de vencimento', 'Todo dia '+esc(ct.diaPgto)+' de cada mês']
+    ])+
+    ct_secao('4. VISTORIA — ESTADO DO IMÓVEL', [
+      ['Descrição geral', esc(ct.vistoria||'—')],
+      ['Itens e condições', esc(ct.itens||'—')]
+    ])+
+    '<div class="clausulas">'+
+      '<div class="cl-title">5. CLÁUSULAS GERAIS</div>'+
+      '<ol>'+
+        '<li>O LOCATÁRIO obriga-se a pagar o aluguel até o dia '+esc(ct.diaPgto)+' de cada mês.</li>'+
+        '<li>O atraso no pagamento sujeitará o LOCATÁRIO a multa de 10% sobre o valor do aluguel, acrescida de juros de 1% ao mês.</li>'+
+        '<li>O LOCATÁRIO declara ter recebido o imóvel nas condições descritas na vistoria e compromete-se a devolvê-lo nas mesmas condições.</li>'+
+        '<li>São proibidas obras, reformas ou modificações no imóvel sem autorização prévia e por escrito do LOCADOR.</li>'+
+        '<li>O contrato poderá ser rescindido por qualquer das partes mediante aviso prévio de 30 dias.</li>'+
+        '<li>O LOCATÁRIO não poderá sublocar, ceder ou emprestar o imóvel, no todo ou em parte, sem autorização escrita do LOCADOR.</li>'+
+        '<li>As despesas de condomínio, IPTU e demais encargos do imóvel são de responsabilidade definida entre as partes conforme acordado verbalmente ou em adendo a este contrato.</li>'+
+        '<li>Fica eleito o foro da comarca de Chapecó/SC para dirimir quaisquer dúvidas oriundas deste contrato.</li>'+
+      '</ol>'+
+    '</div>'+
+    '<div class="assinaturas">'+
+      '<div class="ass"><div class="ass-linha"></div><div>'+esc(ct.locNome)+'</div><div style="font-size:11px;color:#999">Locador</div></div>'+
+      '<div class="ass"><div class="ass-linha"></div><div>'+esc(ct.inqNome)+'</div><div style="font-size:11px;color:#999">Locatário</div></div>'+
+      (ct.inqNome2?'<div class="ass"><div class="ass-linha"></div><div>'+esc(ct.inqNome2)+'</div><div style="font-size:11px;color:#999">Locatário</div></div>':'')+
+    '</div>'+
+    '<div style="text-align:center;margin-top:16px">'+
+      '<button onclick="window.print()" style="padding:12px 28px;background:#0F2438;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>'+
+    '</div>'+
+    '</div>';
+
+  function ct_secao(titulo, campos) {
+    var linhasHtml = campos.filter(function(f){return f;}).map(function(f){
+      return '<tr><td class="cl-key">'+f[0]+'</td><td class="cl-val">'+f[1]+'</td></tr>';
+    }).join('');
+    return '<div class="ct-secao"><div class="ct-titulo">'+titulo+'</div>'+
+      '<table class="ct-table">'+linhasHtml+'</table></div>';
+  }
+
+  // ── HTML FINAL ────────────────────────────────────────
   var html = '<!DOCTYPE html><html lang="pt-BR"><head>'+
     '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>Meus Pagamentos — '+ct.inqNome+'</title>'+
-    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#f5f5f5;padding:20px}'+
-    '.card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}'+
-    'h1{font-size:18px;margin-bottom:4px}p{color:#666;font-size:13px}'+
-    '.totais{display:flex;gap:16px;margin-top:12px}.tot{flex:1;text-align:center;padding:12px;border-radius:8px}'+
-    'table{width:100%;border-collapse:collapse}th{padding:10px 12px;text-align:left;background:#0F2438;color:#fff;font-size:12px}'+
-    'td{font-size:13px}@media(max-width:500px){td,th{padding:8px 6px;font-size:11px}}</style></head><body>'+
-    '<div class="card">'+
-      '<p style="font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⚡ Fluxo App — Área do Inquilino</p>'+
-      '<h1>'+ct.inqNome+'</h1>'+
-      '<p>'+ct.imovel+' · '+ct.end+'</p>'+
-      '<p style="margin-top:4px">Locador: '+ct.locNome+' · Vencimento: dia '+ct.diaPgto+'</p>'+
-      '<div class="totais">'+
-        '<div class="tot" style="background:#d4edda"><div style="font-size:20px;font-weight:900;color:#155724">'+fmtR(totalPago)+'</div><div style="font-size:11px;color:#666">Pago</div></div>'+
-        '<div class="tot" style="background:#fff3cd"><div style="font-size:20px;font-weight:900;color:#856404">'+fmtR(totalPend)+'</div><div style="font-size:11px;color:#666">Pendente</div></div>'+
-      '</div>'+
+    '<title>Área do Inquilino — '+esc(ct.inqNome)+'</title>'+
+    '<style>'+
+    '*{margin:0;padding:0;box-sizing:border-box}'+
+    'body{font-family:-apple-system,Arial,sans-serif;background:#f0f2f5;color:#111}'+
+    '.header{background:#0F2438;color:#fff;padding:20px 16px;position:sticky;top:0;z-index:10}'+
+    '.header h1{font-size:16px;font-weight:900}'+
+    '.header p{font-size:12px;color:#aaa;margin-top:2px}'+
+    '.tabs{display:flex;background:#1a2a3a;overflow-x:auto}'+
+    '.tab{flex:1;padding:12px 8px;border:none;background:transparent;color:#aaa;font-size:12px;font-weight:700;cursor:pointer;text-align:center;white-space:nowrap;letter-spacing:.3px}'+
+    '.tab.on{color:#2ecc9a;border-bottom:2px solid #2ecc9a}'+
+    '.content{padding:16px;max-width:640px;margin:0 auto}'+
+    '.section{display:none}.section.active{display:block}'+
+    '.info-card{background:#fff;border-radius:10px;padding:14px 16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}'+
+    '.label{font-size:10px;font-weight:800;color:#999;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px}'+
+    '.val{font-size:15px;font-weight:700}'+
+    '.sub{font-size:12px;color:#666;margin-top:2px}'+
+    '.totais{display:flex;gap:10px;margin-top:4px}'+
+    '.tot{flex:1;text-align:center;padding:14px;border-radius:10px}'+
+    '.tot.pago{background:#d4edda}.tot.pend{background:#fff3cd}'+
+    '.tv{font-size:18px;font-weight:900}.tl{font-size:11px;color:#666;margin-top:2px}'+
+    '.tot.pago .tv{color:#155724}.tot.pend .tv{color:#856404}'+
+    'table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06)}'+
+    'th{padding:10px 12px;text-align:left;background:#0F2438;color:#fff;font-size:11px;font-weight:700;letter-spacing:.5px}'+
+    'td{padding:10px 12px;font-size:13px;border-bottom:1px solid #f0f0f0}'+
+    '.row-pago td{background:#f8fff9}.row-pend td{background:#fffdf5}'+
+    '.badge{padding:3px 8px;border-radius:20px;font-size:10px;font-weight:800}'+
+    '.b-pago{background:#d4edda;color:#155724}.b-pend{background:#fff3cd;color:#856404}'+
+    '.mono{font-family:monospace;font-size:10px;color:#888}'+
+    '.ct-secao{background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}'+
+    '.ct-titulo{font-size:11px;font-weight:800;color:#0F2438;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #eee}'+
+    '.ct-table{width:100%;border-collapse:collapse}'+
+    '.cl-key{font-size:11px;color:#999;padding:6px 0;width:40%;vertical-align:top}'+
+    '.cl-val{font-size:13px;font-weight:600;padding:6px 0 6px 8px}'+
+    '.clausulas{background:#fff;border-radius:10px;padding:16px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06)}'+
+    '.cl-title{font-size:11px;font-weight:800;color:#0F2438;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}'+
+    '.clausulas ol{padding-left:18px}.clausulas li{font-size:13px;margin-bottom:8px;line-height:1.5;color:#333}'+
+    '.assinaturas{display:flex;gap:20px;margin:20px 0;flex-wrap:wrap}'+
+    '.ass{flex:1;min-width:140px;text-align:center;font-size:13px;font-weight:600}'+
+    '.ass-linha{border-top:1px solid #333;margin-bottom:8px;margin-top:40px}'+
+    '@media print{.header,.tabs{display:none}.section{display:block!important}#s-resumo,#s-pgto{display:none!important}#s-contrato{display:block!important}.content{padding:0;max-width:100%}}'+
+    '</style></head><body>'+
+    '<div class="header">'+
+      '<h1>⚡ Área do Inquilino</h1>'+
+      '<p>'+esc(ct.inqNome)+' · '+esc(ct.imovel)+'</p>'+
     '</div>'+
-    '<div class="card">'+
-      '<table><thead><tr><th>Mês</th><th>Valor</th><th>Pago em</th><th>Status</th><th>Recibo</th></tr></thead>'+
-      '<tbody>'+rows+'</tbody></table>'+
+    '<div class="tabs">'+
+      '<button class="tab on" onclick="showTab(\'resumo\')">📊 Resumo</button>'+
+      '<button class="tab" onclick="showTab(\'pgto\')">💰 Pagamentos</button>'+
+      '<button class="tab" onclick="showTab(\'contrato\')">📄 Contrato</button>'+
     '</div>'+
-    '<p style="text-align:center;color:#aaa;font-size:11px;margin-top:8px">Gerado por Fluxo App · Apenas leitura</p>'+
+    '<div class="content">'+
+      htmlResumo + htmlPgto + htmlContrato +
+    '</div>'+
+    '<script>'+
+    'function showTab(t){'+
+      'document.querySelectorAll(".section").forEach(function(s){s.classList.remove("active")});'+
+      'document.querySelectorAll(".tab").forEach(function(b){b.classList.remove("on")});'+
+      'document.getElementById("s-"+t).classList.add("active");'+
+      'event.target.classList.add("on");'+
+    '}'+
+    '<\/script>'+
     '</body></html>';
 
   return HtmlService.createHtmlOutput(html)
-    .setTitle('Meus Pagamentos — '+ct.inqNome);
+    .setTitle('Área do Inquilino — '+ct.inqNome)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
+
