@@ -1748,10 +1748,14 @@ function boot(){
 
   // Delegação global de eventos das tarefas (feito uma vez)
   initTaskDelegation();
-  // Abre na tela Hoje por padrão
+
+  // Renderizar imediatamente com cache local (antes do sync)
   setSection('hoje');
   renderAll();
-  syncAll();
+
+  // Sync em background — atualiza dados do servidor
+  // Pequeno delay para não bloquear o render inicial
+  setTimeout(function(){ if(online) syncAll(); }, 300);
 }
 
 window.addEventListener('online',  function(){ online=true;  document.getElementById('offline-badge').style.display='none'; });
@@ -2007,7 +2011,7 @@ function addPagador(){
   var p = { id: Date.now(), nome: nome, tel: tel, doc: doc };
   PAGADORES.unshift(p);
   savePagadores();
-  apiCall('salvarPagador', p, function(){});
+  apiPost('salvarPagador', p, function(){});
   document.getElementById('pag-nome').value = '';
   document.getElementById('pag-tel').value  = '';
   document.getElementById('pag-doc').value  = '';
@@ -2057,7 +2061,7 @@ function addAluguel(){
   };
   ALUGUEIS.unshift(alug);
   saveAlugueis();
-  apiCall('salvarAluguel', alug, function(){});
+  apiPost('salvarAluguel', alug, function(){});
   document.getElementById('alug-dia').value = '';
   document.getElementById('alug-val').value = '';
   document.getElementById('alug-ref').value = '';
@@ -2582,7 +2586,7 @@ function addGastoCartao(){
   saveCGastos();
   // Salvar cada gasto no servidor
   CGASTOS.filter(function(g){ return !g._synced; }).forEach(function(g){
-    apiCall('salvarCGasto', g, function(){ g._synced=true; });
+    apiPost('salvarCGasto', g, function(){ g._synced=true; });
   });
   document.getElementById('cg-desc').value = '';
   document.getElementById('cg-val').value  = '';
@@ -2914,12 +2918,12 @@ function salvarContrato(){
   saveContratos();
 
   // Salvar contrato no servidor (aba Contratos na planilha)
-  apiCall('salvarContrato', ct, function(err){
+  apiPost('salvarContrato', ct, function(err){
     if(err) toast('⚠️ Salvo localmente, erro no servidor','err');
   });
 
   // Criar planilha de controle de pagamentos
-  apiCall('criarPlanilhaContrato', ct, function(err){
+  apiPost('criarPlanilhaContrato', ct, function(err){
     if(!err) toast('✅ Contrato salvo! Planilha criada no Google Sheets.');
     else toast('✅ Contrato salvo!');
   });
@@ -3616,7 +3620,7 @@ function addTx(){
       desc:desc, val:val, cat:cat, data:date, fatMes:fatMes, pago:false };
     CGASTOS.push(gasto);
     saveCGastos();
-    apiCall('salvarCGasto', gasto, function(){});
+    apiPost('salvarCGasto', gasto, function(){});
   }
 
   apiCall('addTransaction',tx,function(err){
