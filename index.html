@@ -1804,34 +1804,47 @@ function apiCall(action, body, cb){
 }
 
 // Para uploads (base64) — usa POST para evitar limite de URL
+// apiPost: envia dados grandes via GET com payload na URL
+// Apps Script não aceita POST JSON de domínios externos (CORS)
+// Solução: GET com payload compactado
 function apiPost(action, body, cb){
-  var url = API + '?action=' + action;
-  fetch(url, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' },
-    body: JSON.stringify(body)
-  })
-  .then(function(r){ return r.text(); })
-  .then(function(txt){
-    if(txt.indexOf('<html')!==-1||txt.indexOf('<!DOCTYPE')!==-1)
-      throw new Error('Servidor retornou HTML — verifique publicação do Apps Script');
-    try{ cb(null, JSON.parse(txt)); }
-    catch(e){ cb(new Error('JSON inválido: '+txt.substring(0,120))); }
-  })
-  .catch(function(e){
-    // Fallback XHR POST
-    var xhr=new XMLHttpRequest();
-    xhr.open('POST',url,true);
-    xhr.setRequestHeader('Content-Type','application/json');
-    xhr.setRequestHeader('Accept','application/json, text/plain, */*');
-    xhr.onload=function(){
-      try{ cb(null,JSON.parse(xhr.responseText)); }
-      catch(ex){ cb(new Error('XHR JSON inválido: '+xhr.responseText.substring(0,120))); }
+  if(!API){ cb(new Error('URL não configurada')); return; }
+  
+  // Remover campos desnecessários para reduzir tamanho
+  var payload = JSON.stringify(body);
+  var url = API + '?action=' + action + '&payload=' + encodeURIComponent(payload);
+  
+  // Se URL muito longa (>6000 chars), dividir em 2 partes
+  if(url.length > 6000){
+    // Salvar dados grandes em chunks de 2 campos por vez
+    // Estratégia: salvar campos essenciais primeiro, depois extendidos
+    var essencial = {
+      id: body.id, inqNome: body.inqNome, locNome: body.locNome,
+      imovel: body.imovel, valor: body.valor, inicio: body.inicio,
+      fim: body.fim, diaPgto: body.diaPgto, tipo: body.tipo,
+      duracao: body.duracao, end: body.end, _chunk: 1
     };
-    xhr.onerror=function(){ cb(new Error('Erro de rede no upload')); };
-    xhr.send(JSON.stringify(body));
-  });
+    var extendido = {
+      id: body.id,
+      inqCpf: body.inqCpf, inqRg: body.inqRg, inqEciv: body.inqEciv,
+      inqEnd: body.inqEnd, inqNome2: body.inqNome2, inqCpf2: body.inqCpf2,
+      locCpf: body.locCpf, locRg: body.locRg, locEciv: body.locEciv,
+      locNome2: body.locNome2, locCpf2: body.locCpf2,
+      mat: body.mat, vistoria: body.vistoria, itens: body.itens,
+      pagamentos: body.pagamentos || [], _chunk: 2
+    };
+    // Salvar essencial primeiro, depois extendido
+    apiCall('salvarContratoChunk', essencial, function(err, d){
+      if(err){ cb(err); return; }
+      apiCall('salvarContratoChunk', extendido, function(err2, d2){
+        cb(err2, d2);
+      });
+    });
+    return;
+  }
+  
+  // URL dentro do limite — usar GET normal
+  apiCall(action, body, cb);
 }
 
 function syncAll(){
