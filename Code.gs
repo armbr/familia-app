@@ -17,9 +17,15 @@ function doGet(e) {
   try {
     var params = e.parameter || {};
     var action = params.action || '';
+
+    // paginaInquilino retorna HTML — tratamento especial
+    if (action === 'paginaInquilino') {
+      return paginaInquilino(e);
+    }
+
     var body = {};
     if (params.payload) {
-      body = JSON.parse(decodeURIComponent(params.payload));
+      try { body = JSON.parse(decodeURIComponent(params.payload)); } catch(ex) {}
     }
     var result = doGetInternal(action, body);
     return ContentService
@@ -64,7 +70,7 @@ function doGetInternal(action, body) {
     case 'getAlugueis':       return getItemsSheet('Aluguéis');
     case 'salvarCGasto':      return salvarItemSheet('GastosCartao', body);
     case 'getCGastos':        return getItemsSheet('GastosCartao');
-    case 'paginaInquilino':   return paginaInquilino(e);
+    case 'paginaInquilino':   return { ok: false, error: 'Use GET direto para paginaInquilino' };
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
@@ -862,6 +868,8 @@ function registrarPagamentoContrato(body) {
 // ════════════════════════════════════════════════════════════
 
 function salvarItemSheet(nomeAba, body) {
+  Logger.log('salvarItemSheet: aba=' + nomeAba + ' id=' + body.id);
+  if (!body || !body.id) return { ok: false, error: 'Body ou ID ausente' };
   var sheet = ss().getSheetByName(nomeAba);
   if (!sheet) {
     sheet = ss().insertSheet(nomeAba);
