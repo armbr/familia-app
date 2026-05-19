@@ -60,6 +60,7 @@ function doGetInternal(action, body) {
     case 'registrarPagamentoAluguel':  return registrarPagamentoAluguel(body);
     // CRUD genérico — dados centralizados
     case 'salvarContrato':    return salvarItemSheet('Contratos', body);
+    case 'salvarContratoChunk': return salvarContratoChunk(body);
     case 'deletarContrato':   return deletarItemSheet('Contratos', body.id);
     case 'getContratos':      return getItemsSheet('Contratos');
     case 'salvarPagador':     return salvarItemSheet('Pagadores', body);
@@ -867,6 +868,48 @@ function registrarPagamentoContrato(body) {
 //  CRUD GENÉRICO — qualquer aba da planilha
 // ════════════════════════════════════════════════════════════
 
+function salvarContratoChunk(body) {
+  // Recebe chunks de um contrato grande e faz merge
+  Logger.log('salvarContratoChunk: id=' + body.id + ' chunk=' + body._chunk);
+  if (!body || !body.id) return { ok: false, error: 'ID ausente' };
+  
+  var sheet = ss().getSheetByName('Contratos');
+  if (!sheet) {
+    sheet = ss().insertSheet('Contratos');
+    sheet.appendRow(['id', 'json', 'updatedAt']);
+    sheet.setFrozenRows(1);
+    sheet.getRange('1:1').setFontWeight('bold').setBackground('#0F2438').setFontColor('#FFF');
+  }
+  
+  var id = String(body.id);
+  var dados = sheet.getDataRange().getValues();
+  var existing = null;
+  var existingRow = -1;
+  
+  for (var i = 1; i < dados.length; i++) {
+    if (String(dados[i][0]) === id) {
+      try { existing = JSON.parse(String(dados[i][1])); } catch(e) { existing = {}; }
+      existingRow = i + 1;
+      break;
+    }
+  }
+  
+  // Merge: combinar dados existentes com novo chunk
+  var merged = Object.assign({}, existing || {}, body);
+  delete merged._chunk; // remover flag de chunk
+  
+  var json = JSON.stringify(merged);
+  var now  = new Date().toISOString();
+  
+  if (existingRow > 0) {
+    sheet.getRange(existingRow, 2, 1, 2).setValues([[json, now]]);
+  } else {
+    sheet.appendRow([id, json, now]);
+  }
+  
+  return { ok: true, id: id };
+}
+
 function salvarItemSheet(nomeAba, body) {
   Logger.log('salvarItemSheet: aba=' + nomeAba + ' id=' + body.id);
   if (!body || !body.id) return { ok: false, error: 'Body ou ID ausente' };
@@ -1149,3 +1192,23 @@ function paginaInquilino(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+// ════════════════════════════════════════════════════════════
+//  DEBUG — execute no editor para testar salvarItemSheet
+// ════════════════════════════════════════════════════════════
+function testarSalvarContrato() {
+  var teste = {
+    id: 'TESTE-'+Date.now(),
+    inqNome: 'Inquilino Teste',
+    locNome: 'Locador Teste',
+    imovel:  'Sala 01',
+    valor:   1500,
+    inicio:  '2026-05-01',
+    diaPgto: '10',
+    tipo:    'comercial'
+  };
+  var resultado = salvarItemSheet('Contratos', teste);
+  Logger.log('Resultado: ' + JSON.stringify(resultado));
+  // Verificar se foi criado
+  var sheet = ss().getSheetByName('Contratos');
+  Logger.log('Linhas na aba Contratos: ' + (sheet ? sheet.getLastRow() : 'aba não existe'));
+}
