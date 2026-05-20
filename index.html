@@ -149,6 +149,10 @@ html,body{
 
 /* Fin tabs */
 #fin-tabs{display:flex;gap:5px}
+.pm-btn{flex:1;padding:7px 4px;border:1px solid var(--border);border-radius:8px;
+  background:transparent;color:var(--t3);font-size:11px;font-weight:700;
+  cursor:pointer;font-family:inherit;transition:all .15s}
+.pm-btn.on{background:var(--card2);color:var(--green);border-color:var(--green)}
 .ftab{
   flex:1;padding:8px 2px;border:1px solid var(--border);
   background:var(--card);color:var(--t3);
@@ -777,7 +781,7 @@ select option{background:#1A2A3A}
       <button class="ftab on" onclick="ftab('add')">➕ Registrar</button>
       <button class="ftab" onclick="ftab('hist')">📋 Histórico</button>
       <button class="ftab" onclick="ftab('cat')">📊 Resumo</button>
-      <button class="ftab" onclick="ftab('agenda')">📅 Agenda</button>
+      <button class="ftab" onclick="ftab('cc')">💳 Cartões</button>
     </div>
   </div>
 </div>
@@ -827,11 +831,19 @@ select option{background:#1A2A3A}
           </div>
           <div><div class="fl">Data</div><input id="tx-date" type="date"></div>
         </div>
-        <!-- Seletor de cartão — aparece só quando cat = Cartão de Crédito -->
+        <div style="margin-bottom:10px">
+          <div class="fl">Forma de pagamento</div>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="pm-btn on" id="pm-dinheiro" onclick="setPM('dinheiro')">💵 Dinheiro</button>
+            <button type="button" class="pm-btn" id="pm-cartao"   onclick="setPM('cartao')">💳 Cartão</button>
+            <button type="button" class="pm-btn" id="pm-boleto"   onclick="setPM('boleto')">📄 Boleto</button>
+            <button type="button" class="pm-btn" id="pm-pix"      onclick="setPM('pix')">⚡ Pix</button>
+          </div>
+        </div>
         <div id="tx-cartao-row" style="display:none;margin-bottom:10px">
-          <div class="fl">💳 Qual cartão?</div>
+          <div class="fl">💳 Selecione o cartão</div>
           <select id="tx-cartao-sel">
-            <option value="">— sem cartão específico —</option>
+            <option value="">— selecione —</option>
           </select>
         </div>
         <button class="btn" id="btn-add-tx" onclick="addTx()">Registrar ✓</button>
@@ -884,14 +896,10 @@ select option{background:#1A2A3A}
     <!-- AGENDA -->
     <div class="pg" id="fp-agenda">
       <div class="vtog" style="margin-top:12px">
-        <button class="vbtn on" id="fv-day"    onclick="setFinView('day')">📅 Dia</button>
-        <button class="vbtn"    id="fv-week"   onclick="setFinView('week')">🗓 Sem</button>
-        <button class="vbtn"    id="fv-month"  onclick="setFinView('month')">📆 Mês</button>
-        <button class="vbtn"    id="fv-future" onclick="setFinView('future')">🔮 Plan</button>
-      <button class="vbtn"    id="fv-cc"     onclick="abrirFaturaCC()">💳 Fatura</button>
+
       </div>
 
-      <div id="fvw-day">
+      <div id="fin-views-area" style="display:none"><div id="fvw-day">
         <div class="day-nav">
           <button class="dnav-btn" onclick="shiftFD(-1)">‹</button>
           <div class="dnav-lbl"><div class="dnav-date" id="fd-date"></div><div class="dnav-sub" id="fd-sub"></div></div>
@@ -923,7 +931,7 @@ select option{background:#1A2A3A}
         <div class="txl" id="fm-list"></div>
       </div>
 
-      <div id="fvw-future" style="display:none">
+      <div id="fvw-future">
         <div class="slbl" style="padding-top:8px">🔮 Próximos 3 meses</div>
         <div id="future-body"></div>
       </div>
@@ -1598,6 +1606,7 @@ var curRecur = false; // toggle do form
 
 var curSection  = 'fin';
 var curFinTab   = 'add';
+var curFinCCId  = '';
 var curFinView  = 'day';
 var curTaskView = 'list';
 var curTxType   = 'exp';
@@ -2017,15 +2026,19 @@ function setSection(s){
 
 function ftab(t){
   curFinTab=t;
-  ['add','hist','cat','agenda'].forEach(function(x){
-    document.getElementById('fp-'+x).classList.toggle('on', x===t);
+  ['add','hist','cat','cc'].forEach(function(x){
+    var el = document.getElementById('fin-'+x);
+    if(el) el.style.display = x===t?'block':'none';
   });
-  document.querySelectorAll('.ftab').forEach(function(b,i){
-    b.classList.toggle('on', ['add','hist','cat','agenda'][i]===t);
+  document.querySelectorAll('.ftab').forEach(function(b){
+    b.classList.remove('on');
   });
-  if(t==='hist')   renderHist();
-  if(t==='cat')    renderCat();
-  if(t==='agenda') renderFinView();
+  var tabs = document.querySelectorAll('.ftab');
+  var map  = {add:0,hist:1,cat:2,cc:3};
+  if(tabs[map[t]]) tabs[map[t]].classList.add('on');
+  if(t==='hist') renderHist();
+  if(t==='cat')  renderCat();
+  if(t==='cc')   renderFinCC();
 }
 
 
@@ -3309,6 +3322,7 @@ function renderAll(){
   if(curSection==='task')  renderTasks();
   if(curSection==='hoje')  renderHoje();
   if(curSection==='rec')   renderRecibos();
+  if(curSection==='fin' && curFinTab==='cc') renderFinCC();
   renderDocs();
   renderFixos();
 }
@@ -3324,19 +3338,28 @@ function setTxType(t){
   onTxCatChange();
 }
 
-function onTxCatChange(){
-  var cat = document.getElementById('tx-cat').value;
+var curPM = 'dinheiro';
+function setPM(pm){
+  curPM = pm;
+  ['dinheiro','cartao','boleto','pix'].forEach(function(x){
+    var b = document.getElementById('pm-'+x);
+    if(b) b.classList.toggle('on', x===pm);
+  });
   var row = document.getElementById('tx-cartao-row');
   var sel = document.getElementById('tx-cartao-sel');
   if(!row || !sel) return;
-  var isCC = cat === '💳 Cartão de Crédito';
+  var isCC = pm === 'cartao';
   row.style.display = isCC ? 'block' : 'none';
-  if(isCC && CARTOES.length){
-    sel.innerHTML = '<option value="">— sem cartão específico —</option>'+
+  if(isCC){
+    sel.innerHTML = '<option value="">— selecione o cartão —</option>'+
       CARTOES.map(function(cc){
         return '<option value="'+cc.id+'">'+esc(cc.nome)+'</option>';
       }).join('');
   }
+}
+
+function onTxCatChange(){
+  // Mantido para compatibilidade — agora forma de pagamento é independente da categoria
 }
 
 // ════════════════════════════════════════
@@ -3651,7 +3674,7 @@ function addTx(){
   if(!date){toast('⚠️ Informe a data','err');return;}
   var btn=document.getElementById('btn-add-tx'); btn.disabled=true;
   var cartaoSelEl = document.getElementById('tx-cartao-sel');
-  var cartaoId    = cartaoSelEl ? cartaoSelEl.value : '';
+  var cartaoId    = (curPM==='cartao' && cartaoSelEl) ? cartaoSelEl.value : '';
   var cartao      = cartaoId ? CARTOES.find(function(cc){ return String(cc.id)===cartaoId; }) : null;
 
   var tx={type:curTxType,desc:desc,value:val,cat:cat,date:date};
@@ -3674,6 +3697,7 @@ function addTx(){
     else{ toast(curTxType==='exp'?'✅ Despesa registrada!':'✅ Receita registrada!'); }
     btn.disabled=false;
   });
+  setPM('dinheiro');
   document.getElementById('tx-desc').value='';
   document.getElementById('tx-val').value='';
 }
@@ -3827,15 +3851,105 @@ function setFinView(v){
 }
 
 function abrirFaturaCC(){
-  // Ir direto para aba Cartão na seção CC
-  setSection('cc');
-  setCCTab('fatura');
-  // Garantir seleção de mês atual
-  var mfEl = document.getElementById('cf-mes');
-  if(mfEl && !mfEl.value){
-    var n=new Date(); mfEl.value=n.getFullYear()+'-'+pad(n.getMonth()+1);
+  ftab('cc');
+}
+
+function renderFinCC(){
+  var el = document.getElementById('fin-cc-body');
+  if(!el) return;
+  var now = new Date();
+  var mes = now.getFullYear()+'-'+pad(now.getMonth()+1);
+
+  if(!CARTOES.length){
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--t3)">'+
+      'Nenhum cartão cadastrado.<br><button onclick="setSection(\"rec\");setRecTab(\"pagadores\")" '+
+      'style="margin-top:12px;padding:10px 20px;border:none;border-radius:8px;background:var(--green);'+
+      'color:#0A1A12;font-weight:700;cursor:pointer;font-family:inherit">+ Cadastrar cartão</button></div>';
+    return;
   }
-  renderFatura();
+
+  var html = '';
+  // Seletor de cartão
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
+  CARTOES.forEach(function(cc){
+    var isOn = curFinCCId===String(cc.id) || (!curFinCCId && CARTOES[0]&&String(CARTOES[0].id)===String(cc.id));
+    html += '<button data-selcc="'+cc.id+'" style="padding:9px 14px;border:1px solid '+(isOn?'var(--green)':'var(--border)')+';border-radius:8px;background:'+(isOn?'var(--card2)':'transparent')+';color:'+(isOn?'var(--green)':'var(--t2)')+';font-weight:700;cursor:pointer;font-family:inherit;font-size:13px">'+esc(cc.nome)+'</button>';
+  });
+  html += '</div>';
+
+  var cid = curFinCCId || (CARTOES[0]?String(CARTOES[0].id):'');
+  var cc  = CARTOES.find(function(x){ return String(x.id)===cid; });
+  if(!cc){ el.innerHTML=html; return; }
+
+  // Seletor de mês
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">'+
+    '<button onclick="shiftFinCCMes(-1)" style="padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);cursor:pointer;font-family:inherit;font-size:16px">‹</button>'+
+    '<div id="fincc-mes-lbl" style="flex:1;text-align:center;font-weight:800;font-size:15px"></div>'+
+    '<button onclick="shiftFinCCMes(1)"  style="padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);cursor:pointer;font-family:inherit;font-size:16px">›</button>'+
+  '</div>';
+
+  if(!window._finCCMes) window._finCCMes = mes;
+  var moStr = window._finCCMes;
+  var partes = moStr.split('-');
+  var meses_br=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var mesLabel = meses_br[parseInt(partes[1])-1]+'/'+partes[0];
+
+  var gastos   = CGASTOS.filter(function(g){ return String(g.cartaoId)===cid && g.fatMes===moStr; });
+  var pendentes= gastos.filter(function(g){ return !g.pago; });
+  var pagos    = gastos.filter(function(g){ return g.pago; });
+  var totalPend= pendentes.reduce(function(s,g){return s+g.val;},0);
+  var totalPago= pagos.reduce(function(s,g){return s+g.val;},0);
+  var total    = totalPend + totalPago;
+
+  html += '<div class="fatura-total" style="margin-bottom:12px">'+
+    '<div class="ft-lbl">'+esc(cc.nome)+' — '+mesLabel+' · Vence dia '+cc.venc+'</div>'+
+    '<div class="ft-val">'+fmtBRL(total)+'</div>'+
+    (pagos.length?'<div style="font-size:12px;color:var(--t3);margin-top:4px">✅ '+fmtBRL(totalPago)+' pago · ⏳ '+fmtBRL(totalPend)+' pendente</div>':'')+
+  '</div>';
+
+  // Por categoria
+  if(gastos.length){
+    var porCat = {};
+    gastos.forEach(function(g){ porCat[g.cat]=(porCat[g.cat]||0)+g.val; });
+    html += '<div style="margin-bottom:10px">';
+    Object.keys(porCat).sort(function(a,b){return porCat[b]-porCat[a];}).forEach(function(cat){
+      var pct = total>0?Math.round(porCat[cat]/total*100):0;
+      html += '<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'+
+        '<span>'+esc(cat)+'</span><span style="font-weight:700">'+fmtBRL(porCat[cat])+'</span></div>'+
+        '<div style="height:4px;background:var(--bg3);border-radius:2px"><div style="height:4px;width:'+pct+'%;background:var(--blue);border-radius:2px"></div></div></div>';
+    });
+    html += '</div>';
+
+    // Lista
+    html += '<div class="slbl" style="margin-bottom:6px">Lançamentos</div>';
+    gastos.sort(function(a,b){return ymds(a.data)>ymds(b.data)?1:-1;});
+    html += gastos.map(function(g){
+      return '<div class="cc-fatura-item">'+
+        '<div style="font-size:16px">'+(g.pago?'✅':'🛍️')+'</div>'+
+        '<div class="fi-info"><div class="fi-desc">'+esc(g.desc)+'</div>'+
+        '<div class="fi-meta">'+esc(g.cat)+' · '+fmtDate(g.data)+'</div></div>'+
+        '<div class="fi-val" style="color:'+(g.pago?'var(--t3)':'var(--red)')+'">'+fmtBRL(g.val)+'</div>'+
+      '</div>';
+    }).join('');
+  } else {
+    html += '<div style="text-align:center;padding:20px;color:var(--t3)">Nenhum gasto nesta fatura</div>';
+  }
+
+  if(pendentes.length){
+    html += '<button data-fechfin="'+cid+'|'+moStr+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">💳 Fechar fatura — '+fmtBRL(totalPend)+'</button>';
+    html += '<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px">Registra uma despesa no balanço sem duplicar os gastos</div>';
+  }
+
+  el.innerHTML = html;
+  var lbl = document.getElementById('fincc-mes-lbl');
+  if(lbl) lbl.textContent = mesLabel;
+}
+
+function shiftFinCCMes(n){
+  var d = new Date((window._finCCMes||ymd(new Date()).substring(0,7))+'-01T12:00:00');
+  d.setMonth(d.getMonth()+n);
+  window._finCCMes = d.getFullYear()+'-'+pad(d.getMonth()+1);
+  renderFinCC();
 }
 
 function renderFinView(){
@@ -4307,6 +4421,8 @@ function initTaskDelegation(){
     }
     var fechfat = e.target.closest('[data-fechfat]');
     if(fechfat){ fecharFatura(fechfat.getAttribute('data-cid'), fechfat.getAttribute('data-mes')); return; }
+    var fechfin = e.target.closest('[data-fechfin]');
+    if(fechfin){ var fp=fechfin.getAttribute('data-fechfin').split('|'); fecharFatura(fp[0],fp[1]); return; }
     var delct = e.target.closest('[data-delct]');
     if(delct){ delContrato(delct.getAttribute('data-delct')); return; }
     var ctcontrato = e.target.closest('[data-ctcontrato]');
@@ -4321,6 +4437,8 @@ function initTaskDelegation(){
     if(delcc){ delCartao(delcc.getAttribute('data-delcc')); return; }
     var delcg = e.target.closest('[data-delcg]');
     if(delcg){ delGasto(delcg.getAttribute('data-delcg')); return; }
+    var selcc = e.target.closest('[data-selcc]');
+    if(selcc){ curFinCCId=selcc.getAttribute('data-selcc'); renderFinCC(); return; }
     var wpp = e.target.closest('[data-wppec]');
     if(wpp){
       var rid = wpp.getAttribute('data-wppec');
@@ -4408,13 +4526,18 @@ function renderTD(){
   var mo=dy.substring(0,7);
   document.getElementById('td-lbl').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
   var tasks=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
-  var alugDia=projecoesAluguel(mo).filter(function(t){return t.deadline===dy;});
+  var alugDia=(typeof projecoesAluguel==='function') ? projecoesAluguel(mo).filter(function(t){return t.deadline===dy;}) : [];
   var all=tasks.map(function(t){return {t:t,isA:false};}).concat(
-    alugDia.filter(function(a){return !tasks.some(function(t){return t.id===a.id;});}).map(function(a){return {t:a,isA:true};})
+    alugDia.filter(function(a){return !tasks.some(function(t){return String(t.id)===String(a.id);});}).map(function(a){return {t:a,isA:true};})
   );
-  document.getElementById('td-list').innerHTML=all.length
-    ?all.map(function(x){return x.isA?taskCardComAlug(x.t):taskCard(x.t);}).join('')
-    :emptyHTML('✨','Nenhum compromisso neste dia','Crie uma tarefa com prazo em '+fmtDate(d));
+  // Também mostrar transações do dia como referência
+  var txsDia = validTxs().filter(function(t){return ymds(t.date)===dy;});
+  var txHtml = txsDia.length ?
+    '<div class="slbl" style="margin:10px 0 6px">Lançamentos financeiros</div>'+
+    txsDia.map(function(t){return txCard(t);}).join('') : '';
+  document.getElementById('td-list').innerHTML=(all.length||txsDia.length)
+    ?(all.map(function(x){return x.isA?taskCardComAlug(x.t):taskCard(x.t);}).join('')+txHtml)
+    :emptyHTML('✨','Nenhum registro neste dia','Crie uma tarefa ou registre uma despesa com esta data');
 }
 
 function renderTW(){
