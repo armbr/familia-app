@@ -893,13 +893,14 @@ select option{background:#1A2A3A}
       <div class="catl" id="cat-list"></div>
     </div>
 
-    <!-- AGENDA -->
-    <div class="pg" id="fp-agenda">
-      <div class="vtog" style="margin-top:12px">
+    <!-- CARTÕES -->
+    <div class="pg" id="fp-cc" style="display:none">
+      <div id="fin-cc-body" style="padding-top:4px"></div>
+    </div>
 
-      </div>
-
-      <div id="fin-views-area" style="display:none"><div id="fvw-day">
+    <!-- AGENDA (oculta — mantida para compatibilidade) -->
+    <div class="pg" id="fp-agenda" style="display:none">
+      <div id="fin-views-area"><div id="fvw-day">
         <div class="day-nav">
           <button class="dnav-btn" onclick="shiftFD(-1)">‹</button>
           <div class="dnav-lbl"><div class="dnav-date" id="fd-date"></div><div class="dnav-sub" id="fd-sub"></div></div>
@@ -2005,21 +2006,22 @@ function setSection(s){
   document.getElementById('sec-hoje').style.display       = s==='hoje' ? 'block':'none';
   document.getElementById('sec-docs').style.display       = s==='docs' ? 'block':'none';
   document.getElementById('sec-rec').style.display        = s==='rec'  ? 'block':'none';
-  document.getElementById('sec-cc').style.display         = s==='cc'   ? 'block':'none';
+  var secCC = document.getElementById('sec-cc');
+  if(secCC) secCC.style.display = s==='cc' ? 'block':'none';
   document.getElementById('fin-header-extra').style.display = s==='fin' ? 'block':'none';
   document.getElementById('nb-fin').classList.toggle('on',  s==='fin');
   document.getElementById('nb-task').classList.toggle('on', s==='task');
   document.getElementById('nb-hoje').classList.toggle('on', s==='hoje');
   document.getElementById('nb-docs').classList.toggle('on', s==='docs');
   document.getElementById('nb-rec').classList.toggle('on',  s==='rec');
-  document.getElementById('nb-cc').classList.toggle('on',   s==='cc');
+  var nbCC = document.getElementById('nb-cc');
+  if(nbCC) nbCC.classList.toggle('on', s==='cc');
   if(s==='task') renderTasks();
   if(s==='hoje') renderHoje();
   if(s==='rec')  renderRecibos();
   if(s==='cc')   renderCC();
   if(s==='docs'){
     renderDocs();
-    // Sync silencioso ao abrir aba docs para garantir dados atualizados
     if(online) syncDocs();
   }
 }
@@ -2027,7 +2029,7 @@ function setSection(s){
 function ftab(t){
   curFinTab=t;
   ['add','hist','cat','cc'].forEach(function(x){
-    var el = document.getElementById('fin-'+x);
+    var el = document.getElementById('fp-'+x);
     if(el) el.style.display = x===t?'block':'none';
   });
   document.querySelectorAll('.ftab').forEach(function(b){
@@ -4811,6 +4813,13 @@ function taskWkFrom(from){
 //  HOJE — painel matinal
 // ════════════════════════════════════════
 function renderHoje(){
+  try { _renderHoje(); } catch(err) {
+    console.error('renderHoje error:', err);
+    var el = document.getElementById('sec-hoje');
+    if(el) { var d = el.querySelector('.hoje-body'); if(d) d.innerHTML='<div style="padding:20px;color:red">Erro: '+err.message+'</div>'; }
+  }
+}
+function _renderHoje(){
   var tod = ymd(new Date());
   var now = new Date(); now.setHours(0,0,0,0);
 
