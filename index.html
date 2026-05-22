@@ -3576,50 +3576,47 @@ function renderHoje(){
     var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
     console.log('🔵 F atrasados=',atrasados.length);
 
-    // Aluguéis vencidos
-    ALUGUEIS.forEach(function(a){
-      for(var mi=-2;mi<=0;mi++){
-        var md=new Date(now2.getFullYear(),now2.getMonth()+mi,1);
-        var ms=md.getFullYear()+'-'+pad(md.getMonth()+1);
-        var venc=ms+'-'+pad(a.dia);
-        if(venc>=tod) continue;
-        var pago=(a.parcelas||[]).some(function(p){return p.mesAno===ms;});
-        if(!pago){
-          var fake={id:'alug-'+a.id+'-'+ms,desc:a.nome+(a.ref?' — '+a.ref:''),
-            type:'inc',value:a.valorBase,deadline:venc,status:'pend',_isAlug:true};
-          if(!atrasados.some(function(t){return t.id===fake.id;})) atrasados.push(fake);
-        }
-      }
-    });
-
     // Contadores
     var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
     var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
     var hcrEl=document.getElementById('hc-rec');  if(hcrEl) hcrEl.textContent=recs.length;
-    var hbp=document.getElementById('hb-pgto');    if(hbp) hbp.textContent=pgtos.length;
-    var hbr=document.getElementById('hb-rec');     if(hbr) hbr.textContent=recs.length;
-    var hbt=document.getElementById('hb-task');    if(hbt) hbt.textContent=todPend.length;
-    var hba=document.getElementById('hb-atrasado');if(hba) hba.textContent=atrasados.length;
+    console.log('🔵 G contadores ok');
 
-    // Totais
-    var tH=todPend.reduce(function(s,t){return s+parseFloat(t.value||0);},0);
-    var tA=atrasados.reduce(function(s,t){return s+parseFloat(t.value||0);},0);
-    var elTH=document.getElementById('ht-task-total');    if(elTH) elTH.textContent=tH>0?fmtBRL(tH):'';
-    var elTA=document.getElementById('ht-atrasado-total');if(elTA) elTA.textContent=tA>0?fmtBRL(tA):'';
+    // Mostrar seção compromissos
+    var hsTask=document.getElementById('hs-task');
+    if(hsTask) hsTask.style.display=todTasks.length?'block':'none';
+    console.log('🔵 H hs-task=',hsTask?'ok':'null', 'todTasks=',todTasks.length);
 
-    // Mostrar seções
-    function showSec(id,list,html){
-      var s=document.getElementById(id); if(s) s.style.display=list.length?'block':'none';
-      var l=document.getElementById(id.replace('hs-','hoje-')+'-list'); if(l) l.innerHTML=html;
+    // Renderizar tarefas com try individual
+    var taskListEl=document.getElementById('hoje-task-list');
+    if(taskListEl && todTasks.length){
+      var taskHtml='';
+      todTasks.forEach(function(t){
+        try{ taskHtml+=taskCard(t); }catch(e){ taskHtml+='<div style="color:red">Erro no card: '+e.message+'</div>'; }
+      });
+      taskListEl.innerHTML=taskHtml;
     }
-    showSec('hs-task', todTasks, todTasks.map(function(t){return taskCard(t);}).join(''));
-    showSec('hs-atrasado', atrasados, atrasados.map(function(t){return taskCard(t,'ov');}).join(''));
-    showSec('hs-pgto', pgtos, pgtos.map(pgtoCard).join(''));
-    showSec('hs-rec',  recs,  recs.map(pgtoCard).join(''));
+    console.log('🔵 I tarefas renderizadas');
 
-    // Vazio
+    // Mostrar seção atrasados
+    var hsAtr=document.getElementById('hs-atrasado');
+    if(hsAtr) hsAtr.style.display=atrasados.length?'block':'none';
+    var atrListEl=document.getElementById('hoje-atrasado-list');
+    if(atrListEl && atrasados.length){
+      var atrHtml='';
+      atrasados.forEach(function(t){
+        try{ atrHtml+=taskCard(t,'ov'); }catch(e){ atrHtml+='<div style="color:red">Erro: '+e.message+'</div>'; }
+      });
+      atrListEl.innerHTML=atrHtml;
+    }
+    console.log('🔵 J atrasados renderizados');
+
+    // Estado vazio
+    var hsAll=[hsTask,hsAtr];
+    var temAlgo=todTasks.length||atrasados.length||pgtos.length||recs.length;
     var emp=document.getElementById('hoje-empty');
-    if(emp) emp.style.display=(!pgtos.length&&!recs.length&&!todTasks.length&&!atrasados.length)?'block':'none';
+    if(emp) emp.style.display=temAlgo?'none':'block';
+    console.log('🔵 K completo, temAlgo=',temAlgo);
 
   } catch(err) {
     console.error('🔴 renderHoje CATCH:', err.message, err.stack);
