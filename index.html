@@ -1603,6 +1603,14 @@ var CARTOES    = JSON.parse(localStorage.getItem('ff_cartoes')    || '[]');
 var CGASTOS    = JSON.parse(localStorage.getItem('ff_cgastos')    || '[]'); // gastos do cartão
 var CONTRATOS  = JSON.parse(localStorage.getItem('ff_contratos')  || '[]');
 var COLLAPSED_PASTAS = JSON.parse(localStorage.getItem('ff_collapsed') || '[]');
+
+// Stubs — garantem que funções existem antes do DOM carregar
+// Serão sobrescritas pelas definições reais abaixo
+var renderRecibos   = function(){ console.warn('renderRecibos ainda não carregou'); };
+var renderContratos = function(){ console.warn('renderContratos ainda não carregou'); };
+var renderPagadores = function(){ console.warn('renderPagadores ainda não carregou'); };
+var renderCC        = function(){ console.warn('renderCC ainda não carregou'); };
+var renderFinCC     = function(){ console.warn('renderFinCC ainda não carregou'); };
 var curRecur = false; // toggle do form
 
 var curSection  = 'fin';
