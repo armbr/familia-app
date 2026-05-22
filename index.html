@@ -1729,6 +1729,77 @@ function resetSetup(){
 // ════════════════════════════════════════
 //  BOOT
 // ════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════
+//  HTTP — apiCall (GET) e apiPost (GET com chunks)
+// ════════════════════════════════════════════════════════
+function apiCall(action, body, cb){
+  if(!API){ if(cb) cb(new Error('URL não configurada')); return; }
+  var url = API + '?action=' + action;
+  if(body){
+    url += '&payload=' + encodeURIComponent(JSON.stringify(body));
+  }
+  var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var tid  = ctrl ? setTimeout(function(){ ctrl.abort(); }, 15000) : null;
+  fetch(url, {
+    method: 'GET', redirect: 'follow',
+    headers: { 'Accept': 'application/json, text/plain, */*' },
+    signal: ctrl ? ctrl.signal : undefined
+  })
+  .then(function(r){ if(tid) clearTimeout(tid); return r.text(); })
+  .then(function(txt){
+    if(txt.indexOf('<html') !== -1 || txt.indexOf('<!DOCTYPE') !== -1)
+      throw new Error('Servidor retornou HTML — verifique publicação do Apps Script');
+    try { if(cb) cb(null, JSON.parse(txt)); }
+    catch(e){ if(cb) cb(new Error('JSON inválido')); }
+  })
+  .catch(function(e){
+    if(tid) clearTimeout(tid);
+    if(e.name === 'AbortError'){ if(cb) cb(new Error('Timeout')); return; }
+    // Fallback XHR
+    var xhr = new XMLHttpRequest();
+    xhr.timeout = 15000;
+    xhr.open('GET', url, true);
+    xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
+    xhr.onload = function(){
+      try { if(cb) cb(null, JSON.parse(xhr.responseText)); }
+      catch(ex){ if(cb) cb(new Error('Resposta inválida')); }
+    };
+    xhr.onerror   = function(){ if(cb) cb(new Error('Sem conexão')); };
+    xhr.ontimeout = function(){ if(cb) cb(new Error('Timeout')); };
+    xhr.send();
+  });
+}
+
+// Para payloads grandes — divide em chunks se necessário
+function apiPost(action, body, cb){
+  if(!API){ if(cb) cb(new Error('URL não configurada')); return; }
+  var payload = encodeURIComponent(JSON.stringify(body));
+  var url = API + '?action=' + action + '&payload=' + payload;
+  if(url.length <= 7000){
+    apiCall(action, body, cb);
+    return;
+  }
+  // Dividir em 3 chunks para contratos grandes
+  var chunk1 = { id:body.id, inqNome:body.inqNome, locNome:body.locNome,
+    imovel:body.imovel, valor:body.valor, inicio:body.inicio, fim:body.fim,
+    diaPgto:body.diaPgto, tipo:body.tipo, duracao:body.duracao, end:body.end,
+    ativo:body.ativo, criadoEm:body.criadoEm };
+  var chunk2 = { id:body.id, inqCpf:body.inqCpf, inqRg:body.inqRg,
+    inqEciv:body.inqEciv, inqEnd:body.inqEnd, inqNome2:body.inqNome2,
+    inqCpf2:body.inqCpf2, inqRg2:body.inqRg2, locCpf:body.locCpf,
+    locRg:body.locRg, locEciv:body.locEciv, locNome2:body.locNome2,
+    locCpf2:body.locCpf2, locRg2:body.locRg2, mat:body.mat };
+  var chunk3 = { id:body.id, vistoria:body.vistoria, itens:body.itens };
+  apiCall('salvarContratoChunk', chunk1, function(e1){
+    if(e1){ if(cb) cb(e1); return; }
+    apiCall('salvarContratoChunk', chunk2, function(e2){
+      if(e2){ if(cb) cb(e2); return; }
+      apiCall('salvarContratoChunk', chunk3, function(e3){ if(cb) cb(e3); });
+    });
+  });
+}
+
 function boot(){
   var now = new Date();
   // Resetar datas
