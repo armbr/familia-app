@@ -3785,6 +3785,752 @@ function syncDocs(){
   });
 }
 
+
+// ════════════════════════════════════════════════════════
+//  SAVE HELPERS
+// ════════════════════════════════════════════════════════
+function saveCartoes(){  localStorage.setItem('ff_cartoes',  JSON.stringify(CARTOES)); }
+function saveCGastos(){  localStorage.setItem('ff_cgastos',  JSON.stringify(CGASTOS)); }
+function saveContratos(){localStorage.setItem('ff_contratos',JSON.stringify(CONTRATOS));}
+function savePagadores(){localStorage.setItem('ff_pagadores',JSON.stringify(PAGADORES));}
+function saveAlugueis(){ localStorage.setItem('ff_alugueis', JSON.stringify(ALUGUEIS)); }
+function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS)); }
+
+// ════════════════════════════════════════════════════════
+//  PAGADORES
+// ════════════════════════════════════════════════════════
+function addPagador(){
+  var nome=(document.getElementById('pag-nome')||{}).value||'';
+  var tel =(document.getElementById('pag-tel') ||{}).value||'';
+  var doc =(document.getElementById('pag-doc') ||{}).value||'';
+  nome=nome.trim();
+  if(!nome){toast('⚠️ Informe o nome','err');return;}
+  var p={id:Date.now(),nome:nome,tel:tel,doc:doc};
+  PAGADORES.unshift(p); savePagadores();
+  apiPost('salvarPagador',p,function(){});
+  document.getElementById('pag-nome').value='';
+  document.getElementById('pag-tel').value='';
+  document.getElementById('pag-doc').value='';
+  renderRecibos(); toast('✅ Pagador salvo!');
+}
+function delPagador(id){
+  PAGADORES=PAGADORES.filter(function(p){return String(p.id)!==String(id);});
+  savePagadores(); apiCall('deletarPagador',{id:id},function(){});
+  renderRecibos(); toast('🗑️ Pagador removido');
+}
+function renderPagadores(){
+  var el=document.getElementById('pag-list'); if(!el) return;
+  var sel=document.getElementById('rec-pag');
+  if(sel) sel.innerHTML='<option value="">— selecione —</option>'+
+    PAGADORES.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>';}).join('');
+  var alugSel=document.getElementById('alug-pag');
+  if(alugSel) alugSel.innerHTML='<option value="">— selecione —</option>'+
+    PAGADORES.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>';}).join('');
+  if(!PAGADORES.length){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum pagador cadastrado</div>';return;}
+  el.innerHTML=PAGADORES.map(function(p){
+    return '<div class="taski" style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+      '<div style="font-size:22px">👤</div>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">'+esc(p.nome)+'</div>'+
+      '<div style="font-size:11px;color:var(--t3)">'+(p.tel?'📱 '+esc(p.tel):'')+(p.doc?' · '+esc(p.doc):'')+'</div></div>'+
+      '<button class="tdel2" data-delpag="'+p.id+'">🗑️</button></div>';
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  RECIBOS
+// ════════════════════════════════════════════════════════
+function emitirRecibo(){
+  var pid=(document.getElementById('rec-pag')||{}).value||'';
+  var pag=PAGADORES.find(function(p){return String(p.id)===pid;});
+  var nome=pag?pag.nome:((document.getElementById('rec-pag-nome')||{}).value||'').trim();
+  var tel=pag?pag.tel:'';
+  var cpf=pag?(pag.doc||''):((document.getElementById('rec-pag-cpf')||{}).value||'');
+  var desc=((document.getElementById('rec-desc')||{}).value||'').trim();
+  var val=parseFloat((document.getElementById('rec-val')||{}).value||0);
+  var data=(document.getElementById('rec-data')||{}).value||ymd(new Date());
+  var obs=((document.getElementById('rec-obs')||{}).value||'').trim();
+  if(!nome){toast('⚠️ Informe o pagador','err');return;}
+  if(!desc){toast('⚠️ Informe a descrição','err');return;}
+  if(!val||val<=0){toast('⚠️ Informe o valor','err');return;}
+  var codigo='REC-'+Date.now().toString(36).toUpperCase();
+  var emitidoEm=new Date().toLocaleString('pt-BR');
+  var recibo={id:Date.now(),codigo:codigo,pagador:nome,tel:tel,cpf:cpf,
+    desc:desc,valor:val,data:data,obs:obs,emitidoEm:emitidoEm};
+  RECIBOS.unshift(recibo); saveRecibos();
+  ['rec-pag','rec-pag-nome','rec-pag-cpf','rec-desc','rec-val','rec-obs','rec-data']
+    .forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderRecibos(); abrirRecibo(recibo); toast('🧾 Recibo emitido!');
+}
+function abrirRecibo(r){
+  var dataFmt=r.data?r.data.split('-').reverse().join('/') :'';
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Recibo '+r.codigo+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;display:flex;justify-content:center}'+
+    '.rec{background:#fff;max-width:520px;width:100%;border-radius:4px;box-shadow:0 2px 20px rgba(0,0,0,.12);overflow:hidden}'+
+    '.rh{background:#0a0a1a;color:#fff;padding:24px;text-align:center}'+
+    '.rh h1{font-size:22px;font-weight:900}'+
+    '.rt{background:#1a1a2e;color:#fff;padding:14px 24px;display:flex;justify-content:space-between}'+
+    '.rb{padding:24px}.rrow{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f0f0f0}'+
+    '.rl{font-size:11px;color:#999;text-transform:uppercase}.rv{font-size:14px;font-weight:600}'+
+    '.rtot{background:#f8f8f8;padding:18px 24px;text-align:center}'+
+    '.rtot-v{font-size:30px;font-weight:900}.rc{border:2px dashed #ddd;border-radius:8px;padding:14px;margin:0 24px 24px;text-align:center}'+
+    '.rc-cod{font-family:monospace;font-size:14px;font-weight:700;letter-spacing:2px}'+
+    '.btns{display:flex;gap:10px;padding:0 24px 24px}'+
+    '.bp{flex:1;padding:12px;border:none;border-radius:8px;background:#0a0a1a;color:#fff;font-weight:700;cursor:pointer}'+
+    '.bw{flex:1;padding:12px;border:none;border-radius:8px;background:#25D366;color:#fff;font-weight:700;cursor:pointer}'+
+    '@media print{.btns{display:none}}</style></head><body>'+
+    '<div class="rec">'+
+      '<div class="rh"><h1>⚡ FLUXO</h1><p style="color:#888;font-size:12px;margin-top:4px">RECIBO DE PAGAMENTO</p></div>'+
+      '<div class="rt"><span style="font-weight:700">RECIBO</span><span style="font-size:11px;color:#888;font-family:monospace">'+r.codigo+'</span></div>'+
+      '<div class="rb">'+
+        '<div class="rrow"><div><div class="rl">Recebemos de</div><div class="rv">'+esc(r.pagador)+(r.cpf?' — CPF: '+esc(r.cpf):'')+'</div></div></div>'+
+        '<div class="rrow"><div><div class="rl">Referente a</div><div class="rv">'+esc(r.desc)+'</div></div></div>'+
+        '<div class="rrow"><div><div class="rl">Data</div><div class="rv">'+dataFmt+'</div></div></div>'+
+        (r.obs?'<div class="rrow"><div><div class="rl">Obs</div><div class="rv">'+esc(r.obs)+'</div></div></div>':'')+
+      '</div>'+
+      '<div class="rtot"><div style="font-size:11px;color:#999;margin-bottom:6px">VALOR PAGO</div>'+
+        '<div class="rtot-v">'+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'</div></div>'+
+      '<div class="rc">'+
+        '<div style="font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Carimbo Digital · Fluxo App</div>'+
+        '<div class="rc-cod">'+r.codigo+'</div>'+
+        '<div style="font-size:11px;color:#999;margin-top:4px">'+r.emitidoEm+'</div>'+
+      '</div>'+
+      '<div class="btns">'+
+        '<button class="bp" onclick="window.print()">🖨️ Imprimir / PDF</button>'+
+        (r.tel?'<button class="bw" onclick="wpp()">💬 WhatsApp</button>':'<button class="bw" style="background:#ccc">💬 Sem telefone</button>')+
+      '</div>'+
+    '</div>'+
+    '<script>function wpp(){'+
+      'var linhas=["🧾 *RECIBO*","","Código: '+r.codigo+'","Pagador: '+r.pagador.replace(/'/g," ")+'",'+
+      '"Referente: '+r.desc.replace(/'/g," ")+'","Valor: '+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'",'+
+      '"Data: '+dataFmt+'","Emitido via Fluxo App"];'+
+      'window.open("https://wa.me/'+(r.tel?r.tel.replace(/\D/g,''):'')+'"+"?text="+encodeURIComponent(linhas.join("\n")),"_blank");}'+
+    '<\/script></body></html>';
+  var w=window.open('','_blank','width=600,height=800');
+  if(w){w.document.write(html);w.document.close();}
+  else toast('⚠️ Permita pop-ups','err');
+}
+function delRecibo(id){
+  RECIBOS=RECIBOS.filter(function(r){return String(r.id)!==String(id);});
+  saveRecibos(); renderRecibos(); toast('🗑️ Recibo removido');
+}
+function renderHistRecibos(){
+  var el=document.getElementById('rec-hist-list'); if(!el) return;
+  if(!RECIBOS.length){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum recibo emitido</div>';return;}
+  el.innerHTML=RECIBOS.map(function(r){
+    var dataFmt=r.data?r.data.split('-').reverse().join('/') :'';
+    return '<div class="taski" style="margin-bottom:8px">'+
+      '<div class="taski-hdr"><div style="font-size:20px">🧾</div>'+
+      '<div class="tname">'+esc(r.pagador)+'</div>'+
+      '<button class="tdel2" data-delrec="'+r.id+'">🗑️</button></div>'+
+      '<div class="tmeta"><span style="font-weight:800;color:var(--green)">'+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'</span>'+
+      '<span>'+esc(r.desc)+'</span><span>'+dataFmt+'</span>'+
+      '<span style="color:var(--t3);font-family:monospace;font-size:10px">'+r.codigo+'</span></div>'+
+      '<div style="margin-top:8px;display:flex;gap:8px">'+
+        '<button data-abrirec="'+r.id+'" style="flex:1;padding:8px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Abrir recibo</button>'+
+        (r.tel?'<button data-wppec="'+r.id+'" style="flex:1;padding:8px;border:none;border-radius:8px;background:#25D366;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">💬 WhatsApp</button>':'')+
+      '</div></div>';
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  ALUGUÉIS
+// ════════════════════════════════════════════════════════
+var MESES_BR=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function addAluguel(){
+  var pid=(document.getElementById('alug-pag')||{}).value||'';
+  var dia=parseInt((document.getElementById('alug-dia')||{}).value||1);
+  var val=parseFloat((document.getElementById('alug-val')||{}).value||0);
+  var ref=((document.getElementById('alug-ref')||{}).value||'').trim();
+  var pag=PAGADORES.find(function(p){return String(p.id)===pid;});
+  if(!pag){toast('⚠️ Selecione um inquilino','err');return;}
+  if(!val||val<=0){toast('⚠️ Informe o valor','err');return;}
+  if(ALUGUEIS.some(function(a){return String(a.pagadorId)===pid;})){toast('⚠️ Inquilino já cadastrado','err');return;}
+  var alug={id:Date.now(),pagadorId:String(pid),nome:pag.nome,tel:pag.tel||'',
+    dia:dia,valorBase:val,ref:ref,parcelas:[],criadoEm:new Date().toISOString()};
+  ALUGUEIS.unshift(alug); saveAlugueis();
+  apiPost('salvarAluguel',alug,function(){});
+  ['alug-dia','alug-val','alug-ref'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderRecibos(); toast('✅ Aluguel cadastrado!');
+}
+function delAluguel(id){
+  if(!confirm('Remover este aluguel?')) return;
+  ALUGUEIS=ALUGUEIS.filter(function(a){return String(a.id)!==String(id);});
+  saveAlugueis(); apiCall('deletarAluguel',{id:id},function(){});
+  renderRecibos(); toast('🗑️ Aluguel removido');
+}
+function faturaDoGasto(dataGasto,diaFech){
+  var d=new Date(dataGasto);
+  if(d.getDate()>diaFech)
+    return new Date(d.getFullYear(),d.getMonth()+1,1).toISOString().substring(0,7);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1);
+}
+function registrarPagamento(alugId,mesAno,valorCustom){
+  var a=ALUGUEIS.find(function(x){return String(x.id)===String(alugId);});
+  if(!a) return;
+  if((a.parcelas||[]).find(function(p){return p.mesAno===mesAno;})){toast('✅ Mês já registrado');return;}
+  var val=valorCustom||a.valorBase;
+  var agora=new Date();
+  var codigo='ALG-'+Date.now().toString(36).toUpperCase();
+  var emitidoEm=agora.toLocaleString('pt-BR');
+  var parcela={mesAno:mesAno,valor:val,dataPgto:ymd(agora),codigo:codigo,emitidoEm:emitidoEm};
+  a.parcelas.push(parcela); saveAlugueis();
+  var partes=mesAno.split('-');
+  var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+  var recibo={id:Date.now(),codigo:codigo,pagador:a.nome,tel:a.tel,cpf:'',
+    desc:'Aluguel '+(a.ref?a.ref+' — ':'')+mesLabel,valor:val,
+    data:ymd(agora),obs:'Referente ao mês de '+mesLabel,emitidoEm:emitidoEm,
+    aluguelId:String(alugId),mesAno:mesAno};
+  RECIBOS.unshift(recibo); saveRecibos();
+  apiCall('registrarPagamentoAluguel',{nome:a.nome,ref:a.ref,mesAno:mesAno,
+    valor:val,dataPgto:ymd(agora),codigo:codigo,tel:a.tel},function(){});
+  renderRecibos(); abrirRecibo(recibo); toast('✅ Pagamento registrado!');
+}
+function abrirRegistrarPagamento(alugId){
+  var a=ALUGUEIS.find(function(x){return String(x.id)===String(alugId);});
+  if(!a) return;
+  var now=new Date();
+  var mesAno=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var mesLabel=MESES_BR[now.getMonth()]+'/'+now.getFullYear();
+  if((a.parcelas||[]).find(function(p){return p.mesAno===mesAno;})){toast('✅ '+mesLabel+' já registrado');return;}
+  var val=prompt('Registrar pagamento de '+a.nome+'\nMês: '+mesLabel+'\n\nValor:',
+    a.valorBase.toFixed(2).replace('.',','));
+  if(val===null) return;
+  var valN=parseFloat(String(val).replace(',','.'));
+  if(isNaN(valN)||valN<=0) valN=a.valorBase;
+  registrarPagamento(alugId,mesAno,valN);
+}
+function renderAluguelCard(a){
+  var now=new Date();
+  var tod=ymd(now);
+  var meses=[];
+  for(var i=-5;i<=1;i++){
+    var d=new Date(now.getFullYear(),now.getMonth()+i,1);
+    meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1));
+  }
+  var parcMap={};
+  (a.parcelas||[]).forEach(function(p){parcMap[p.mesAno]=p;});
+  var parcsHTML=meses.map(function(mo){
+    var p=MESES_BR[parseInt(mo.split('-')[1])-1];
+    var parc=parcMap[mo];
+    var venc=mo+'-'+pad(a.dia);
+    var cls,title;
+    if(parc){cls='pago';title='Pago em '+parc.dataPgto;}
+    else if(venc<tod){cls='venc';title='Vencido!';}
+    else{cls='pend';title='Vence dia '+a.dia;}
+    return '<button class="parc '+cls+'" data-parc-alug="'+a.id+'" data-parc-mo="'+mo+
+      '" data-parc-done="'+(parc?'1':'0')+'" title="'+title+'">'+
+      '<span>'+p+'</span><span>'+(parc?'✓':venc<=tod?'!':'')+'</span></button>';
+  }).join('');
+  var totalPago=(a.parcelas||[]).reduce(function(s,p){return s+p.valor;},0);
+  var mesAtual=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var jaPagei=parcMap[mesAtual];
+  return '<div class="alug-card">'+
+    '<div class="alug-card-header">'+
+      '<div style="font-size:24px">🏠</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div class="alug-nome">'+esc(a.nome)+'</div>'+
+        '<div class="alug-ref">'+(a.ref?esc(a.ref)+' · ':'')+
+          'Vence dia '+a.dia+' · R$ '+a.valorBase.toFixed(2).replace('.',',')+'/mês</div>'+
+      '</div>'+
+      '<button class="tdel2" data-delalug="'+a.id+'">🗑️</button>'+
+    '</div>'+
+    '<div class="alug-parcelas">'+parcsHTML+'</div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">'+
+      'Total recebido: <strong style="color:var(--green)">R$ '+totalPago.toFixed(2).replace('.',',')+'</strong>'+
+      ' · '+(a.parcelas||[]).length+' parcela'+(a.parcelas.length!==1?'s':'')+' paga'+(a.parcelas.length!==1?'s':'')+'</div>'+
+    '<div class="alug-actions">'+
+      (!jaPagei?'<button class="alug-btn" style="background:var(--green);color:#0A1A12" data-pgtalug="'+a.id+'">💰 Registrar pagamento</button>':
+       '<button class="alug-btn" style="background:var(--bg3);color:var(--t3);cursor:default">✅ Pago este mês</button>')+
+      '<button class="alug-btn" style="background:var(--bg3);color:var(--t2)" data-fichalug="'+a.id+'">📋 Ver ficha</button>'+
+    '</div></div>';
+}
+function abrirFichaAluguel(alugId){
+  var a=ALUGUEIS.find(function(x){return String(x.id)===String(alugId);});
+  if(!a){toast('Aluguel não encontrado','err');return;}
+  var parcMap={};
+  (a.parcelas||[]).forEach(function(p){parcMap[p.mesAno]=p;});
+  var inicio=new Date(a.criadoEm||new Date());
+  var agora=new Date();
+  var meses=[];
+  var d=new Date(inicio.getFullYear(),inicio.getMonth(),1);
+  while(d<=agora){meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1));d.setMonth(d.getMonth()+1);}
+  var totalPago=(a.parcelas||[]).reduce(function(s,p){return s+p.valor;},0);
+  var totalPend=Math.max(0,meses.length*a.valorBase-totalPago);
+  var linhas=meses.map(function(mo){
+    var p=parcMap[mo];
+    var mes=MESES_BR[parseInt(mo.split('-')[1])-1]+'/'+mo.split('-')[0];
+    var venc=mo+'-'+pad(a.dia);
+    var agr=ymd(agora);
+    var status,cor,ico;
+    if(p){status='Pago em '+p.dataPgto;cor='#2ecc9a';ico='✅';}
+    else if(venc<agr){status='Vencido';cor='#FF6B6B';ico='⚠️';}
+    else{status='Pendente';cor='#888';ico='⏳';}
+    return '<tr><td style="padding:10px 12px;border-bottom:1px solid #222">'+ico+' '+mes+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-weight:700">R$ '+(p?p.valor:a.valorBase).toFixed(2).replace('.',',')+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;color:'+cor+';font-size:12px">'+status+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-family:monospace;font-size:10px;color:#555">'+(p?p.codigo:'')+'</td></tr>';
+  }).join('');
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Ficha — '+a.nome+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#0a0a14;color:#eee;padding:20px}'+
+    '.f{max-width:600px;margin:0 auto;background:#111;border-radius:12px;overflow:hidden;border:1px solid #222}'+
+    '.fh{background:#1a1a2e;padding:20px;border-bottom:1px solid #222}'+
+    '.ft{display:flex;border-bottom:1px solid #222}'+
+    '.ftot{flex:1;padding:14px;text-align:center;border-right:1px solid #222}'+
+    '.ftot:last-child{border:none}'+
+    '.ftv{font-size:18px;font-weight:900;margin-bottom:2px}'+
+    '.ftl{font-size:10px;color:#888;text-transform:uppercase}'+
+    'table{width:100%;border-collapse:collapse}td{font-size:13px}'+
+    'button{display:block;margin:16px auto;padding:10px 24px;background:#2ecc9a;color:#0a1a0a;border:none;border-radius:8px;font-weight:700;cursor:pointer}'+
+    '@media print{button{display:none}}</style></head><body>'+
+    '<div class="f"><div class="fh">'+
+      '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">⚡ Fluxo App</div>'+
+      '<div style="font-size:17px;font-weight:900">'+esc(a.nome)+'</div>'+
+      '<div style="font-size:12px;color:#888;margin-top:2px">'+(a.ref?esc(a.ref)+' · ':'')+
+        (a.tel?'📱 '+esc(a.tel)+' · ':'')+
+        'Vence dia '+a.dia+' · R$ '+a.valorBase.toFixed(2).replace('.',',')+'/mês</div>'+
+    '</div>'+
+    '<div class="ft">'+
+      '<div class="ftot"><div class="ftv" style="color:#2ecc9a">R$ '+totalPago.toFixed(2).replace('.',',')+'</div><div class="ftl">Recebido</div></div>'+
+      '<div class="ftot"><div class="ftv" style="color:#FF6B6B">R$ '+totalPend.toFixed(2).replace('.',',')+'</div><div class="ftl">Pendente</div></div>'+
+      '<div class="ftot"><div class="ftv">'+meses.length+'</div><div class="ftl">Meses</div></div>'+
+    '</div>'+
+    '<table>'+linhas+'</table></div>'+
+    '<button onclick="window.print()">🖨️ Imprimir / PDF</button>'+
+    '</body></html>';
+  var w=window.open('','_blank','width=640,height=860');
+  if(w){w.document.write(html);w.document.close();}
+  else toast('⚠️ Permita pop-ups','err');
+}
+function renderAlugueisSection(){
+  var el=document.getElementById('alug-list'); if(!el) return;
+  var sel=document.getElementById('alug-pag');
+  if(sel) sel.innerHTML='<option value="">— selecione —</option>'+
+    PAGADORES.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>';}).join('');
+  if(!ALUGUEIS.length){
+    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum aluguel cadastrado</div>';
+    return;
+  }
+  el.innerHTML=ALUGUEIS.map(renderAluguelCard).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  CARTÕES
+// ════════════════════════════════════════════════════════
+var curCCTab='gastos';
+function setCCTab(t){
+  curCCTab=t;
+  ['gastos','fatura','cartoes'].forEach(function(tab){
+    var el=document.getElementById('ccp-'+tab);
+    if(el) el.style.display=tab===t?'block':'none';
+    var btn=document.getElementById('ccb-'+tab);
+    if(btn) btn.classList.toggle('on',tab===t);
+  });
+  if(t==='fatura') renderFatura();
+}
+function addCartao(){
+  var nome=((document.getElementById('cc-nome')||{}).value||'').trim();
+  var fech=parseInt((document.getElementById('cc-fech')||{}).value||25);
+  var venc=parseInt((document.getElementById('cc-venc')||{}).value||5);
+  var limite=parseFloat((document.getElementById('cc-limite')||{}).value||0);
+  if(!nome){toast('⚠️ Informe o nome do cartão','err');return;}
+  CARTOES.push({id:Date.now(),nome:nome,fech:fech,venc:venc,limite:limite});
+  saveCartoes(); apiCall('salvarCGasto',{},function(){});
+  ['cc-nome','cc-fech','cc-venc','cc-limite'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderCC(); toast('✅ Cartão salvo!');
+}
+function delCartao(id){
+  if(!confirm('Remover este cartão?')) return;
+  CARTOES=CARTOES.filter(function(c){return String(c.id)!==String(id);});
+  saveCartoes(); renderCC(); toast('🗑️ Cartão removido');
+}
+function addGastoCartao(){
+  var cid=(document.getElementById('cg-cartao')||{}).value||'';
+  var data=(document.getElementById('cg-data')||{}).value||ymd(new Date());
+  var desc=((document.getElementById('cg-desc')||{}).value||'').trim();
+  var val=parseFloat((document.getElementById('cg-val')||{}).value||0);
+  var cat=(document.getElementById('cg-cat')||{}).value||'📦 Outros';
+  var parc=parseInt((document.getElementById('cg-parc')||{}).value||1);
+  var cartao=CARTOES.find(function(cc){return String(cc.id)===cid;});
+  if(!cartao){toast('⚠️ Selecione o cartão','err');return;}
+  if(!desc){toast('⚠️ Informe a descrição','err');return;}
+  if(!val||val<=0){toast('⚠️ Informe o valor','err');return;}
+  var valParc=val/parc;
+  var baseDate=new Date(data+'T12:00:00');
+  for(var p=0;p<parc;p++){
+    var d=new Date(baseDate.getFullYear(),baseDate.getMonth()+p,baseDate.getDate());
+    var fatMes=faturaDoGasto(d,cartao.fech);
+    var g={id:Date.now()+p,cartaoId:String(cartao.id),cartao:cartao.nome,
+      desc:desc+(parc>1?' ('+(p+1)+'/'+parc+')':''),val:valParc,cat:cat,
+      data:ymd(d),fatMes:fatMes,pago:false};
+    CGASTOS.push(g);
+    apiCall('salvarCGasto',g,function(){});
+  }
+  saveCGastos();
+  ['cg-desc','cg-val'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  var pgEl=document.getElementById('cg-parc'); if(pgEl) pgEl.value='1';
+  renderCC(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
+}
+function delGasto(id){
+  CGASTOS=CGASTOS.filter(function(g){return String(g.id)!==String(id);});
+  saveCGastos(); renderCC(); toast('🗑️ Gasto removido');
+}
+function fecharFatura(cartaoId,mesAno){
+  var cartao=CARTOES.find(function(c){return String(c.id)===cartaoId;});
+  if(!cartao) return;
+  var gastos=CGASTOS.filter(function(g){return String(g.cartaoId)===cartaoId&&g.fatMes===mesAno&&!g.pago;});
+  if(!gastos.length){toast('Nenhum gasto pendente');return;}
+  var total=gastos.reduce(function(s,g){return s+g.val;},0);
+  var partes=mesAno.split('-');
+  var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+  if(!confirm('Fechar fatura de '+cartao.nome+' — '+mesLabel+'\nTotal: '+fmtBRL(total)+'\n\nConfirmar?')) return;
+  CGASTOS.forEach(function(g){if(String(g.cartaoId)===cartaoId&&g.fatMes===mesAno) g.pago=true;});
+  saveCGastos();
+  var tx={type:'exp',desc:'Fatura '+cartao.nome+' '+mesLabel,value:total,cat:'💳 Cartão de Crédito',date:ymd(new Date())};
+  var tmp=Date.now(); TXS.unshift(Object.assign({id:tmp},tx)); save();
+  apiCall('addTransaction',tx,function(err){if(err){TXS=TXS.filter(function(t){return t.id!==tmp;});save();}});
+  renderCC(); renderBal(); toast('✅ Fatura fechada! '+fmtBRL(total));
+}
+function renderListaCartoes(){
+  var el=document.getElementById('cc-list'); if(!el) return;
+  if(!CARTOES.length){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum cartão cadastrado</div>';return;}
+  el.innerHTML=CARTOES.map(function(cc){
+    var gastosPend=CGASTOS.filter(function(g){return String(g.cartaoId)===String(cc.id)&&!g.pago;});
+    var total=gastosPend.reduce(function(s,g){return s+g.val;},0);
+    var pct=cc.limite>0?Math.min(100,Math.round(total/cc.limite*100)):0;
+    return '<div class="cc-card-item">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">'+
+        '<div style="font-size:24px">💳</div>'+
+        '<div style="flex:1"><div style="font-size:15px;font-weight:800">'+esc(cc.nome)+'</div>'+
+        '<div style="font-size:11px;color:var(--t3)">Fecha dia '+cc.fech+' · Vence dia '+cc.venc+
+          (cc.limite?' · Limite '+fmtBRL(cc.limite):'')+
+        '</div></div>'+
+        '<button class="tdel2" data-delcc="'+cc.id+'">🗑️</button>'+
+      '</div>'+
+      (cc.limite>0?
+        '<div style="height:5px;background:var(--bg3);border-radius:3px;margin-bottom:4px">'+
+          '<div style="height:5px;width:'+pct+'%;background:'+(pct>80?'var(--red)':'var(--green)')+';border-radius:3px"></div>'+
+        '</div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+fmtBRL(total)+' de '+fmtBRL(cc.limite)+' ('+pct+'%)</div>':
+        '<div style="font-size:12px;color:var(--t3)">'+fmtBRL(total)+' em gastos pendentes</div>')+
+    '</div>';
+  }).join('');
+}
+function renderListaGastos(){
+  var el=document.getElementById('cg-list'); if(!el) return;
+  var now=new Date();
+  var mes=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var recentes=CGASTOS.filter(function(g){return !g.pago||g.fatMes===mes;}).slice(0,30);
+  if(!recentes.length){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum gasto registrado</div>';return;}
+  recentes.sort(function(a,b){return ymds(b.data)>ymds(a.data)?1:-1;});
+  el.innerHTML=recentes.map(function(g){
+    return '<div class="cc-fatura-item"+(g.pago?" pago":"")>'+
+      '<div style="font-size:20px">'+(g.pago?'✅':'🛍️')+'</div>'+
+      '<div class="fi-info"><div class="fi-desc">'+esc(g.desc)+'</div>'+
+      '<div class="fi-meta">'+esc(g.cartao)+' · '+esc(g.cat)+' · '+fmtDate(g.data)+'</div></div>'+
+      '<div class="fi-val">'+fmtBRL(g.val)+'</div>'+
+      (!g.pago?'<button class="tdel2" data-delcg="'+g.id+'">🗑️</button>':'')+
+    '</div>';
+  }).join('');
+}
+function renderFatura(){
+  var cartaoId=(document.getElementById('cf-cartao')||{}).value||'';
+  var mesAno=(document.getElementById('cf-mes')||{}).value||'';
+  var el=document.getElementById('cf-body'); if(!el) return;
+  if(!cartaoId||!mesAno){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:24px">Selecione o cartão e o mês</div>';return;}
+  var cartao=CARTOES.find(function(c){return String(c.id)===cartaoId;});
+  if(!cartao){el.innerHTML='';return;}
+  var gastos=CGASTOS.filter(function(g){return String(g.cartaoId)===cartaoId&&g.fatMes===mesAno;});
+  var pendentes=gastos.filter(function(g){return !g.pago;});
+  var total=gastos.reduce(function(s,g){return s+g.val;},0);
+  var totalPend=pendentes.reduce(function(s,g){return s+g.val;},0);
+  var partes=mesAno.split('-');
+  var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+  var porCat={};
+  gastos.forEach(function(g){porCat[g.cat]=(porCat[g.cat]||0)+g.val;});
+  var html='<div class="fatura-total"><div class="ft-lbl">'+esc(cartao.nome)+' — '+mesLabel+'</div>'+
+    '<div class="ft-val">'+fmtBRL(total)+'</div></div>';
+  if(Object.keys(porCat).length){
+    html+='<div style="margin-bottom:10px">';
+    Object.keys(porCat).sort(function(a,b){return porCat[b]-porCat[a];}).forEach(function(cat){
+      var pct=total>0?Math.round(porCat[cat]/total*100):0;
+      html+='<div style="margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'+
+        '<span>'+esc(cat)+'</span><span style="font-weight:700">'+fmtBRL(porCat[cat])+'</span></div>'+
+        '<div style="height:4px;background:var(--bg3);border-radius:2px">'+
+          '<div style="height:4px;width:'+pct+'%;background:var(--blue);border-radius:2px"></div></div></div>';
+    });
+    html+='</div>';
+  }
+  if(gastos.length){
+    html+='<div class="slbl" style="margin-bottom:6px">Lançamentos</div>';
+    gastos.sort(function(a,b){return ymds(a.data)>ymds(b.data)?1:-1;});
+    html+=gastos.map(function(g){
+      return '<div class="cc-fatura-item"><div style="font-size:16px">'+(g.pago?'✅':'🛍️')+'</div>'+
+        '<div class="fi-info"><div class="fi-desc">'+esc(g.desc)+'</div>'+
+        '<div class="fi-meta">'+esc(g.cat)+' · '+fmtDate(g.data)+'</div></div>'+
+        '<div class="fi-val" style="color:'+(g.pago?'var(--t3)':'var(--red)')+'">'+fmtBRL(g.val)+'</div></div>';
+    }).join('');
+  }
+  if(pendentes.length){
+    html+='<button data-fechfin="'+cartaoId+'|'+mesAno+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">💳 Fechar fatura — '+fmtBRL(totalPend)+'</button>';
+  }
+  el.innerHTML=html;
+}
+function renderCC(){
+  var opts='<option value="">— selecione —</option>'+
+    CARTOES.map(function(cc){return '<option value="'+cc.id+'">'+esc(cc.nome)+'</option>';}).join('');
+  ['cg-cartao','cf-cartao'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el){var v=el.value;el.innerHTML=opts;if(v)el.value=v;}
+  });
+  var dgEl=document.getElementById('cg-data'); if(dgEl&&!dgEl.value) dgEl.value=ymd(new Date());
+  var mfEl=document.getElementById('cf-mes');
+  if(mfEl&&!mfEl.value){var n=new Date();mfEl.value=n.getFullYear()+'-'+pad(n.getMonth()+1);}
+  renderListaCartoes(); renderListaGastos();
+  if(curCCTab==='fatura') renderFatura();
+}
+
+// ════════════════════════════════════════════════════════
+//  CONTRATOS
+// ════════════════════════════════════════════════════════
+var curRecTab='contratos';
+function setRecTab(t){
+  curRecTab=t;
+  ['pagadores','alugueis','contratos','recibos'].forEach(function(tab){
+    var el=document.getElementById('rp-'+tab);
+    if(el) el.style.display=tab===t?'block':'none';
+    var btn=document.getElementById('rb-'+tab);
+    if(btn) btn.classList.toggle('on',tab===t);
+  });
+  renderRecibos();
+}
+function renderRecibos(){
+  try{renderAlugueisSection();}catch(e){console.error('renderAlugueisSection',e);}
+  try{renderPagadores();}catch(e){console.error('renderPagadores',e);}
+  try{if(curRecTab==='contratos') renderContratos();}catch(e){console.error('renderContratos',e);}
+  try{renderHistRecibos();}catch(e){console.error('renderHistRecibos',e);}
+  var dataEl=document.getElementById('rec-data');
+  if(dataEl&&!dataEl.value) dataEl.value=ymd(new Date());
+}
+function abrirLinkInquilino(ctId){
+  var ct=CONTRATOS.find(function(x){return String(x.id)===String(ctId);});
+  if(!ct){toast('⚠️ Contrato não encontrado','err');return;}
+  if(!API){toast('⚠️ Configure a URL do Apps Script','err');return;}
+  var baseUrl=API.split('?')[0];
+  var url=baseUrl+'?action=paginaInquilino&ctId='+encodeURIComponent(String(ct.id));
+  if(navigator.clipboard) navigator.clipboard.writeText(url).then(function(){toast('🔗 Link copiado!');}).catch(function(){});
+  window.open(url,'_blank');
+}
+
+
+// ════════════════════════════════════════════════════════
+//  CONTRATOS
+// ════════════════════════════════════════════════════════
+function saveContratos(){ localStorage.setItem('ff_contratos',JSON.stringify(CONTRATOS)); }
+
+function toggleCampo(id,show){
+  var el=document.getElementById(id);
+  if(el) el.style.display=show?'block':'none';
+}
+
+function salvarContrato(){
+  var g=function(id){return ((document.getElementById(id)||{}).value||'').trim();};
+  var ct={
+    id: Date.now(),
+    locNome:g('ct-loc-nome'),  locCpf:g('ct-loc-cpf'),   locRg:g('ct-loc-rg'),
+    locEciv:g('ct-loc-eciv'),  locEnd:g('ct-loc-end'),
+    locNome2:g('ct-loc2-nome'),locCpf2:g('ct-loc2-cpf'),  locRg2:g('ct-loc2-rg'),
+    inqNome:g('ct-inq-nome'),  inqCpf:g('ct-inq-cpf'),   inqRg:g('ct-inq-rg'),
+    inqEciv:g('ct-inq-eciv'),  inqEnd:g('ct-inq-end'),
+    inqNome2:g('ct-inq2-nome'),inqCpf2:g('ct-inq2-cpf'), inqRg2:g('ct-inq2-rg'),
+    tipo:g('ct-tipo'),         imovel:g('ct-imovel'),      end:g('ct-end'),
+    mat:g('ct-mat'),           valor:parseFloat(g('ct-valor').replace(',','.'))||0,
+    inicio:g('ct-inicio'),     fim:g('ct-fim'),             duracao:g('ct-duracao'),
+    diaPgto:g('ct-diapgto'),   vistoria:g('ct-vistoria'),  itens:g('ct-itens'),
+    ativo:true, criadoEm:new Date().toISOString()
+  };
+  if(!ct.locNome){toast('⚠️ Informe o nome do locador','err');return;}
+  if(!ct.inqNome){toast('⚠️ Informe o nome do inquilino','err');return;}
+  if(!ct.imovel) {toast('⚠️ Informe o imóvel','err');return;}
+  CONTRATOS.unshift(ct); saveContratos();
+
+  apiPost('salvarContrato',ct,function(err){
+    if(err) toast('⚠️ Erro ao salvar na planilha: '+(err.message||''),'err');
+    else    toast('✅ Contrato salvo na planilha!');
+  });
+  apiPost('criarPlanilhaContrato',ct,function(err){
+    if(!err) toast('📊 Ficha de pagamentos criada!');
+  });
+
+  // Adicionar inquilino como pagador
+  if(ct.inqNome && !PAGADORES.some(function(p){return p.nome===ct.inqNome;})){
+    var p={id:Date.now()+1,nome:ct.inqNome,tel:'',doc:ct.inqCpf||''};
+    PAGADORES.unshift(p); savePagadores();
+    apiPost('salvarPagador',p,function(){});
+  }
+
+  // Criar aluguel recorrente
+  if(ct.valor>0 && ct.diaPgto && !ALUGUEIS.some(function(a){return a.nome===ct.inqNome;})){
+    var pag=PAGADORES.find(function(p){return p.nome===ct.inqNome;});
+    if(pag){
+      var alug={id:Date.now()+2,pagadorId:String(pag.id),nome:ct.inqNome,
+        tel:pag.tel||'',dia:parseInt(ct.diaPgto)||10,valorBase:ct.valor,
+        ref:ct.imovel,parcelas:[],criadoEm:new Date().toISOString()};
+      ALUGUEIS.unshift(alug); saveAlugueis();
+      apiPost('salvarAluguel',alug,function(){});
+    }
+  }
+
+  renderContratos();
+  toggleCampo('ct-loc2-campos',false);
+  toggleCampo('ct-inq2-campos',false);
+}
+
+function delContrato(id){
+  CONTRATOS=CONTRATOS.filter(function(c){return String(c.id)!==String(id);});
+  saveContratos(); apiCall('deletarContrato',{id:id},function(){});
+  renderContratos(); toast('🗑️ Contrato removido');
+}
+
+function renderContratos(){
+  var el=document.getElementById('ct-list'); if(!el) return;
+  if(!CONTRATOS.length){
+    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:20px;font-size:13px">Nenhum contrato cadastrado.<br>Preencha o formulário acima.</div>';
+    return;
+  }
+  el.innerHTML=CONTRATOS.map(function(ct){
+    var dataFmt=ct.inicio?ct.inicio.split('-').reverse().join('/') :'—';
+    return '<div class="taski" style="margin-bottom:10px">'+
+      '<div class="taski-hdr">'+
+        '<div style="font-size:22px">📄</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="tname">'+esc(ct.inqNome||'—')+'</div>'+
+          '<div style="font-size:11px;color:var(--t3)">'+
+            esc(ct.tipo||'')+' '+esc(ct.imovel||'')+'</div>'+
+        '</div>'+
+        '<button class="tdel2" data-delct="'+ct.id+'">🗑️</button>'+
+      '</div>'+
+      '<div class="tmeta">'+
+        '<span style="font-weight:800;color:var(--green)">'+
+          (ct.valor?'R$ '+Number(ct.valor).toFixed(2).replace('.',',')+'/ mês':'')+
+        '</span>'+
+        '<span>Vence dia '+(ct.diaPgto||'—')+'</span>'+
+        '<span>Início: '+dataFmt+'</span>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
+        '<button data-ctcontrato="'+ct.id+'" style="flex:1;min-width:70px;padding:8px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📄 Contrato</button>'+
+        '<button data-ctvistoria="'+ct.id+'" style="flex:1;min-width:70px;padding:8px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔍 Vistoria</button>'+
+        '<button data-ctpgto="'+ct.id+'" style="flex:1;min-width:70px;padding:8px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">💰 Pgto</button>'+
+        '<button data-ctlink="'+ct.id+'" style="flex:1;min-width:70px;padding:8px;border:none;border-radius:8px;background:rgba(100,160,255,.2);color:#64A0FF;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Link</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function gerarContrato(ctId){
+  var ct=CONTRATOS.find(function(x){return String(x.id)===String(ctId);});
+  if(!ct){toast('Contrato não encontrado','err');return;}
+  var dataFmt=function(s){if(!s)return '___/___/______';var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];};
+  var fmtV=function(v){return 'R$ '+Number(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');};
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<title>Contrato — '+esc(ct.inqNome)+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}'+
+    'body{font-family:"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#000;padding:40px;max-width:800px;margin:0 auto}'+
+    'h1{text-align:center;font-size:14pt;margin-bottom:4px}'+
+    '.sub{text-align:center;font-size:11pt;margin-bottom:24px}'+
+    'h2{font-size:12pt;margin:20px 0 8px;border-bottom:1px solid #000}'+
+    'p{margin-bottom:8px;text-align:justify}'+
+    '.ass{display:flex;gap:40px;margin-top:40px;flex-wrap:wrap}'+
+    '.ass-item{flex:1;min-width:200px;text-align:center}'+
+    '.ass-linha{border-top:1px solid #000;margin-bottom:6px;margin-top:50px}'+
+    'button{display:block;margin:20px auto;padding:10px 24px;background:#0F2438;color:#fff;border:none;border-radius:8px;font-size:12pt;cursor:pointer}'+
+    '@media print{button{display:none}}</style></head><body>'+
+    '<h1>CONTRATO DE LOCAÇÃO</h1>'+
+    '<div class="sub">'+(ct.tipo||'Imóvel')+'</div>'+
+    '<h2>I — DAS PARTES</h2>'+
+    '<p><strong>LOCADOR:</strong> '+esc(ct.locNome)+(ct.locCpf?', CPF: '+esc(ct.locCpf):'')+
+      (ct.locRg?', RG: '+esc(ct.locRg):'')+', residente em '+esc(ct.locEnd||'____')+'.</p>'+
+    (ct.locNome2?'<p><strong>LOCADOR 2:</strong> '+esc(ct.locNome2)+(ct.locCpf2?', CPF: '+esc(ct.locCpf2):'')+'.</p>':'')+
+    '<p><strong>LOCATÁRIO:</strong> '+esc(ct.inqNome)+(ct.inqCpf?', CPF: '+esc(ct.inqCpf):'')+
+      (ct.inqRg?', RG: '+esc(ct.inqRg):'')+', residente em '+esc(ct.inqEnd||'____')+'.</p>'+
+    (ct.inqNome2?'<p><strong>LOCATÁRIO 2:</strong> '+esc(ct.inqNome2)+(ct.inqCpf2?', CPF: '+esc(ct.inqCpf2):'')+'.</p>':'')+
+    '<h2>II — DO IMÓVEL</h2>'+
+    '<p>Imóvel: <strong>'+esc(ct.imovel||'____')+'</strong>, situado em '+esc(ct.end||'____')+(ct.mat?', matrícula nº '+esc(ct.mat):'')+'.</p>'+
+    '<h2>III — DA VIGÊNCIA E DO VALOR</h2>'+
+    '<p>Início: <strong>'+dataFmt(ct.inicio)+'</strong> · Término: <strong>'+
+      (ct.fim?dataFmt(ct.fim):'Indeterminado')+'</strong>'+(ct.duracao?' · Duração: '+ct.duracao+' meses.':'.')+'</p>'+
+    '<p>Valor: <strong>'+fmtV(ct.valor)+' mensais</strong>, pagos até o dia <strong>'+
+      (ct.diaPgto||'___')+'</strong> de cada mês.</p>'+
+    '<h2>IV — DA VISTORIA</h2>'+
+    '<p>'+(ct.vistoria||'O imóvel é entregue nas condições acordadas entre as partes.')+'</p>'+
+    (ct.itens?'<p><strong>Itens:</strong> '+esc(ct.itens)+'</p>':'')+
+    '<h2>V — DAS CLÁUSULAS</h2>'+
+    '<p>1. O atraso no pagamento sujeitará multa de 10% e juros de 1% ao mês.</p>'+
+    '<p>2. Proibida sublocação sem autorização escrita do locador.</p>'+
+    '<p>3. Obras e reformas dependem de autorização prévia por escrito.</p>'+
+    '<p>4. Rescisão mediante aviso prévio de 30 dias por qualquer parte.</p>'+
+    '<p>5. O locatário devolverá o imóvel nas condições da vistoria inicial.</p>'+
+    '<p>6. Foro: Chapecó/SC.</p>'+
+    '<p style="margin-top:16px">Chapecó, '+new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})+'.</p>'+
+    '<div class="ass">'+
+      '<div class="ass-item"><div class="ass-linha"></div><div>'+esc(ct.locNome)+'</div><div style="font-size:10pt;color:#666">Locador</div></div>'+
+      '<div class="ass-item"><div class="ass-linha"></div><div>'+esc(ct.inqNome)+'</div><div style="font-size:10pt;color:#666">Locatário</div></div>'+
+      (ct.inqNome2?'<div class="ass-item"><div class="ass-linha"></div><div>'+esc(ct.inqNome2)+'</div><div style="font-size:10pt;color:#666">Locatário</div></div>':'')+
+    '</div>'+
+    '<button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>'+
+    '</body></html>';
+  var w=window.open('','_blank','width=840,height=900');
+  if(w){w.document.write(html);w.document.close();}
+  else toast('⚠️ Permita pop-ups','err');
+}
+
+function gerarVistoria(ctId){
+  var ct=CONTRATOS.find(function(x){return String(x.id)===String(ctId);});
+  if(!ct){toast('Contrato não encontrado','err');return;}
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<title>Vistoria</title>'+
+    '<style>body{font-family:Arial,sans-serif;padding:32px;max-width:700px;margin:0 auto}'+
+    'h1{font-size:16pt;margin-bottom:4px}p{margin-bottom:8px}'+
+    'button{display:block;margin:20px auto;padding:10px 24px;background:#0F2438;color:#fff;border:none;border-radius:8px;cursor:pointer}'+
+    '@media print{button{display:none}}</style></head><body>'+
+    '<h1>RELATÓRIO DE VISTORIA</h1>'+
+    '<p><strong>Imóvel:</strong> '+esc(ct.imovel||'—')+'</p>'+
+    '<p><strong>Inquilino:</strong> '+esc(ct.inqNome||'—')+'</p>'+
+    '<p><strong>Data:</strong> '+new Date().toLocaleDateString('pt-BR')+'</p>'+
+    '<hr style="margin:16px 0">'+
+    '<p><strong>Estado geral:</strong></p><p>'+(ct.vistoria||'—')+'</p>'+
+    '<p><strong>Itens e condições:</strong></p><p>'+(ct.itens||'—')+'</p>'+
+    '<button onclick="window.print()">🖨️ Imprimir</button>'+
+    '</body></html>';
+  var w=window.open('','_blank','width=720,height=600');
+  if(w){w.document.write(html);w.document.close();}
+}
+
+function registrarPgtoContrato(ctId){
+  var ct=CONTRATOS.find(function(x){return String(x.id)===String(ctId);});
+  if(!ct){toast('Contrato não encontrado','err');return;}
+  var now=new Date();
+  var mesAno=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var mesLabel=MESES_BR[now.getMonth()]+'/'+now.getFullYear();
+  var val=prompt('Registrar pagamento de '+ct.inqNome+'\nMês: '+mesLabel+'\n\nValor:',
+    Number(ct.valor||0).toFixed(2).replace('.',','));
+  if(val===null) return;
+  var valN=parseFloat(String(val).replace(',','.'));
+  if(isNaN(valN)||valN<=0){toast('⚠️ Valor inválido','err');return;}
+  var codigo='CTPGTO-'+Date.now().toString(36).toUpperCase();
+  var emitidoEm=now.toLocaleString('pt-BR');
+  var recibo={id:Date.now(),codigo:codigo,pagador:ct.inqNome,tel:'',cpf:ct.inqCpf||'',
+    desc:'Aluguel '+esc(ct.imovel||'')+' — '+mesLabel,
+    valor:valN,data:ymd(now),obs:'Contrato: '+String(ct.id),emitidoEm:emitidoEm};
+  RECIBOS.unshift(recibo); saveRecibos();
+  apiCall('registrarPagamentoContrato',{inqNome:ct.inqNome,mesAno:mesAno,
+    valor:valN,dataPgto:ymd(now),codigo:codigo},function(){});
+  renderRecibos(); abrirRecibo(recibo); toast('✅ Pagamento registrado!');
+}
+
 function renderDocs(){
   var el = document.getElementById('docs-list');
   if(!DOCS.length){
