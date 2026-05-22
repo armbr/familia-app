@@ -790,7 +790,7 @@ select option{background:#1A2A3A}
 <div id="content" style="display:none">
 
   <!-- ── FINANCE ── -->
-  <div id="sec-fin">
+  <div id="sec-fin" style="display:none">
 
     <!-- ADD -->
     <div class="pg on" id="fp-add">
@@ -1982,24 +1982,31 @@ function syncAll(){
 //  NAVIGATION
 // ════════════════════════════════════════
 function setSection(s){
-  curSection=s;
-  var secs=['fin','task','hoje','docs','rec','cc'];
-  secs.forEach(function(x){
-    var el=document.getElementById('sec-'+x);
-    if(el) el.style.display=(x===s)?'block':'none';
+  curSection = s;
+
+  // Mostrar/ocultar seções
+  var allSecs = ['fin','task','hoje','docs','rec','cc'];
+  allSecs.forEach(function(x){
+    var el = document.getElementById('sec-'+x);
+    if(el) el.style.display = (x===s) ? 'block' : 'none';
   });
-  var fhe=document.getElementById('fin-header-extra');
-  if(fhe) fhe.style.display=(s==='fin')?'block':'none';
-  var nbs=['hoje','fin','task','rec','docs'];
-  nbs.forEach(function(x){
-    var b=document.getElementById('nb-'+x);
-    if(b) b.classList.toggle('on',x===s);
+
+  // Header extra finanças
+  var fhe = document.getElementById('fin-header-extra');
+  if(fhe) fhe.style.display = (s==='fin') ? 'block' : 'none';
+
+  // Nav buttons
+  ['hoje','fin','task','rec','docs'].forEach(function(x){
+    var b = document.getElementById('nb-'+x);
+    if(b) b.classList.toggle('on', x===s);
   });
-  if(s==='hoje') { if(typeof renderHoje==='function') try{renderHoje();}catch(e){console.error(e);} }
-  if(s==='task') { if(typeof renderTasks==='function') try{renderTasks();}catch(e){console.error(e);} }
-  if(s==='rec')  { if(typeof renderRecibos==='function') renderRecibos(); else console.error('renderRecibos não definida'); }
-  if(s==='docs') { try{renderDocs();}catch(e){}; if(online) try{syncDocs();}catch(e){} }
-  if(s==='fin')  { if(typeof renderBal==='function') try{renderBal();renderHist();}catch(e){console.error(e);} }
+
+  // Render da seção
+  if(s==='hoje') { try{ renderHoje();  }catch(e){ console.error('hoje:',e);  } }
+  if(s==='task') { try{ renderTasks(); }catch(e){ console.error('task:',e);  } }
+  if(s==='fin')  { try{ renderBal(); renderHist(); }catch(e){ console.error('fin:',e); } }
+  if(s==='rec')  { try{ renderRecibos(); }catch(e){ console.error('rec:',e); } }
+  if(s==='docs') { try{ renderDocs(); }catch(e){}; try{ if(online) syncDocs(); }catch(e){} }
 }
 
 function ftab(t){
