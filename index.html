@@ -3552,8 +3552,11 @@ function taskWkFrom(from){
 //  HOJE — painel matinal
 // ════════════════════════════════════════
 function renderHoje(){
+  console.log('🔵 DENTRO de renderHoje');
   try {
+    console.log('🔵 try iniciado');
     var tod  = ymd(new Date());
+    console.log('🔵 tod=', tod);
     var now2 = new Date();
     var h    = now2.getHours();
     var greeting = h<12?'☀️ Bom dia!':h<18?'🌤️ Boa tarde!':'🌙 Boa noite!';
@@ -3614,7 +3617,8 @@ function renderHoje(){
     if(emp) emp.style.display=(!pgtos.length&&!recs.length&&!todTasks.length&&!atrasados.length)?'block':'none';
 
   } catch(err) {
-    console.error('renderHoje erro:', err.message, err);
+    console.error('🔴 renderHoje CATCH:', err.message, err.stack);
+    document.getElementById('sec-hoje').innerHTML = '<div style="color:red;padding:20px">ERRO: '+err.message+'</div>';
   }
 }
 
