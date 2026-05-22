@@ -1548,6 +1548,7 @@ window.onerror = function(msg, src, line, col, err){
 // ════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════
+console.log('🟡 Script iniciando...');
 var API = ''; // will be loaded in init() after DOM ready
 var TXS   = (function(){
   var raw = JSON.parse(localStorage.getItem('ff_txs') || '[]');
@@ -1846,12 +1847,15 @@ function boot(){
     if(cml) cml.textContent=now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
   } catch(e){}
 
+  console.log('🟡 boot: chamando initTaskDelegation');
   try{ initTaskDelegation(); }catch(e){ console.error('initTaskDelegation:',e); }
 
-  // Render inicial direto - sem depender de setSection
+  console.log('🟡 boot: chamando renderHoje');
   try{ renderHoje();  }catch(e){ console.error('renderHoje no boot:',e); }
+  console.log('🟡 boot: chamando renderBal');
   try{ renderBal();   }catch(e){ console.error('renderBal no boot:',e); }
   try{ renderFixos(); }catch(e){}
+  console.log('🟡 boot: completo');
 
   // Sync em background
   if(online) setTimeout(function(){
@@ -3547,13 +3551,15 @@ function taskWkFrom(from){
 //  HOJE — painel matinal
 // ════════════════════════════════════════
 function renderHoje(){
+  console.log('🟡 renderHoje chamado, sec-hoje:', document.getElementById('sec-hoje') ? 'encontrado' : 'NÃO ENCONTRADO');
   try { _renderHoje(); } catch(err) {
     console.error('renderHoje error:', err);
     var el = document.getElementById('sec-hoje');
-    if(el) { var d = el.querySelector('.hoje-body'); if(d) d.innerHTML='<div style="padding:20px;color:red">Erro: '+err.message+'</div>'; }
+    if(el) el.innerHTML='<div style="padding:20px;color:red;font-size:14px">Erro no renderHoje: '+err.message+'</div>';
   }
 }
 function _renderHoje(){
+  console.log('🟡 _renderHoje iniciando');
   var tod = ymd(new Date());
   var now = new Date(); now.setHours(0,0,0,0);
 
@@ -4681,14 +4687,13 @@ function emptyHTML(icon,title,desc){
 //  INIT
 // ════════════════════════════════════════
 function init(){
-  // Try to read saved API URL
+  console.log('🟡 init() chamado');
   try{ API = localStorage.getItem('ff_api') || ''; }catch(e){ API=''; }
-
+  console.log('🟡 API:', API ? 'configurada' : 'VAZIA - vai mostrar setup');
   if(API){
     document.getElementById('setup').style.display='none';
     boot();
   } else {
-    // Show setup - already visible by default, just make sure
     document.getElementById('setup').style.display='flex';
   }
 }
