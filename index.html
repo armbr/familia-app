@@ -1537,6 +1537,14 @@ select option{background:#1A2A3A}
 </div><!-- /app -->
 
 <script>
+// Capturar erros globais e mostrar na tela
+window.onerror = function(msg, src, line, col, err){
+  var div = document.createElement('div');
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#FF6B6B;color:#fff;padding:12px;font-size:13px;z-index:9999;font-family:monospace';
+  div.textContent = '❌ Erro JS linha ' + line + ': ' + msg;
+  document.body.appendChild(div);
+  return false;
+};
 // ════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════
@@ -4331,7 +4339,6 @@ function abrirLinkInquilino(ctId){
 // ════════════════════════════════════════════════════════
 //  CONTRATOS
 // ════════════════════════════════════════════════════════
-function saveContratos(){ localStorage.setItem('ff_contratos',JSON.stringify(CONTRATOS)); }
 
 function toggleCampo(id,show){
   var el=document.getElementById(id);
