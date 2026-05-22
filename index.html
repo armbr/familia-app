@@ -3557,19 +3557,24 @@ function renderHoje(){
     console.log('🔵 try iniciado');
     var tod  = ymd(new Date());
     console.log('🔵 tod=', tod);
+    console.log('🔵 A');
     var now2 = new Date();
     var h    = now2.getHours();
-    var greeting = h<12?'☀️ Bom dia!':h<18?'🌤️ Boa tarde!':'🌙 Boa noite!';
-    var gEl=document.getElementById('hoje-greeting'); if(gEl) gEl.textContent=greeting+' Seu resumo de hoje';
+    var greeting = h<12?'Bom dia!':h<18?'Boa tarde!':'Boa noite!';
+    console.log('🔵 B greeting=',greeting);
+    var gEl=document.getElementById('hoje-greeting'); if(gEl) gEl.textContent=greeting;
     var dlEl=document.getElementById('hoje-date-lbl');
-    if(dlEl) dlEl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
+    if(dlEl) dlEl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+    console.log('🔵 C txValida=',typeof txValida);
     var todTxs=TXS.filter(function(t){ return ymds(t.date)===tod&&txValida(t)&&!t.fromAgenda; });
+    console.log('🔵 D todTxs=',todTxs.length);
     var pgtos =todTxs.filter(function(t){ return t.type==='exp'; });
     var recs  =todTxs.filter(function(t){ return t.type==='inc'; });
+    console.log('🔵 E TASKS=',TASKS.length);
     var todTasks=TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
     var todPend =todTasks.filter(function(t){ return t.status!=='done'; });
     var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
+    console.log('🔵 F atrasados=',atrasados.length);
 
     // Aluguéis vencidos
     ALUGUEIS.forEach(function(a){
