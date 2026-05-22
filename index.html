@@ -1604,13 +1604,7 @@ var CGASTOS    = JSON.parse(localStorage.getItem('ff_cgastos')    || '[]'); // g
 var CONTRATOS  = JSON.parse(localStorage.getItem('ff_contratos')  || '[]');
 var COLLAPSED_PASTAS = JSON.parse(localStorage.getItem('ff_collapsed') || '[]');
 
-// Stubs — garantem que funções existem antes do DOM carregar
-// Serão sobrescritas pelas definições reais abaixo
-var renderRecibos   = function(){ console.warn('renderRecibos ainda não carregou'); };
-var renderContratos = function(){ console.warn('renderContratos ainda não carregou'); };
-var renderPagadores = function(){ console.warn('renderPagadores ainda não carregou'); };
-var renderCC        = function(){ console.warn('renderCC ainda não carregou'); };
-var renderFinCC     = function(){ console.warn('renderFinCC ainda não carregou'); };
+
 var curRecur = false; // toggle do form
 
 var curSection  = 'fin';
@@ -1993,11 +1987,11 @@ function setSection(s){
     var b=document.getElementById('nb-'+x);
     if(b) b.classList.toggle('on',x===s);
   });
-  if(s==='hoje') { try{renderHoje();}catch(e){console.error('renderHoje',e);} }
-  if(s==='task') { try{renderTasks();}catch(e){console.error('renderTasks',e);} }
-  if(s==='rec')  { try{renderRecibos();}catch(e){console.error('renderRecibos',e);} }
+  if(s==='hoje') { if(typeof renderHoje==='function') try{renderHoje();}catch(e){console.error(e);} }
+  if(s==='task') { if(typeof renderTasks==='function') try{renderTasks();}catch(e){console.error(e);} }
+  if(s==='rec')  { if(typeof renderRecibos==='function') renderRecibos(); else console.error('renderRecibos não definida'); }
   if(s==='docs') { try{renderDocs();}catch(e){}; if(online) try{syncDocs();}catch(e){} }
-  if(s==='fin')  { try{renderBal();renderHist();}catch(e){console.error('fin',e);} }
+  if(s==='fin')  { if(typeof renderBal==='function') try{renderBal();renderHist();}catch(e){console.error(e);} }
 }
 
 function ftab(t){
