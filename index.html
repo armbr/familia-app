@@ -3552,10 +3552,10 @@ function taskWkFrom(from){
 // ════════════════════════════════════════
 function renderHoje(){
   console.log('🟡 renderHoje chamado, sec-hoje:', document.getElementById('sec-hoje') ? 'encontrado' : 'NÃO ENCONTRADO');
-  try { _renderHoje(); } catch(err) {
-    console.error('renderHoje error:', err);
+  try { _renderHoje(); console.log('🟢 _renderHoje concluído'); } catch(err) {
+    console.error('❌ renderHoje ERRO:', err.message, err.stack);
     var el = document.getElementById('sec-hoje');
-    if(el) el.innerHTML='<div style="padding:20px;color:red;font-size:14px">Erro no renderHoje: '+err.message+'</div>';
+    if(el) el.innerHTML='<div style="padding:20px;color:#FF6B6B;font-size:14px;font-family:monospace">❌ Erro: '+err.message+'<br><small>'+err.stack+'</small></div>';
   }
 }
 function _renderHoje(){
@@ -3604,14 +3604,14 @@ function _renderHoje(){
   var greeting = h < 12 ? '☀️ Bom dia!' : h < 18 ? '🌤️ Boa tarde!' : '🌙 Boa noite!';
   var gEl = document.getElementById('hoje-greeting');
   if(gEl) gEl.textContent = greeting + ' Seu resumo de hoje';
-  document.getElementById('hoje-date-lbl').textContent =
-    now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var hdl=document.getElementById('hoje-date-lbl');
+  if(hdl) hdl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
   // Contadores
   var todPend = todTasks.filter(function(t){ return t.status !== 'done'; });
-  document.getElementById('hc-pgto').textContent = pgtos.length;
-  document.getElementById('hc-task').textContent = todPend.length;
-  document.getElementById('hc-rec').textContent  = recs.length;
+  var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
+  var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
+  var hcrEl=document.getElementById('hc-rec'); if(hcrEl) hcrEl.textContent=recs.length;
 
   // Badges
   (document.getElementById('hb-pgto')||{textContent:''}).textContent     = pgtos.length;
