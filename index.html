@@ -1890,6 +1890,16 @@ function boot(){
     if(banner) {
       var bs = window.getComputedStyle(banner);
       console.log('🟣 debug-banner computed display:', bs.display);
+    // Verificar TODOS os pais de sec-hoje
+    var el = sc;
+    var depth = 0;
+    while(el && el !== document.body && depth < 10){
+      var cs2 = window.getComputedStyle(el);
+      console.log('🟣 pai['+depth+'] tag='+el.tagName+' id='+(el.id||'-')+
+        ' display='+cs2.display+' height='+el.offsetHeight+' overflow='+cs2.overflow);
+      el = el.parentElement;
+      depth++;
+    }
     }
   }, 1000);
 
