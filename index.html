@@ -3551,118 +3551,69 @@ function taskWkFrom(from){
 //  HOJE — painel matinal
 // ════════════════════════════════════════
 function renderHoje(){
-  console.log('🟡 renderHoje chamado, sec-hoje:', document.getElementById('sec-hoje') ? 'encontrado' : 'NÃO ENCONTRADO');
-  try { _renderHoje(); console.log('🟢 _renderHoje concluído'); } catch(err) {
-    console.error('❌ renderHoje ERRO:', err.message, err.stack);
-    var el = document.getElementById('sec-hoje');
-    if(el) el.innerHTML='<div style="padding:20px;color:#FF6B6B;font-size:14px;font-family:monospace">❌ Erro: '+err.message+'<br><small>'+err.stack+'</small></div>';
-  }
-}
-function _renderHoje(){
-  console.log('🟡 _renderHoje iniciando');
-  var tod = ymd(new Date());
-  var now = new Date(); now.setHours(0,0,0,0);
+  try {
+    var tod  = ymd(new Date());
+    var now2 = new Date();
+    var h    = now2.getHours();
+    var greeting = h<12?'☀️ Bom dia!':h<18?'🌤️ Boa tarde!':'🌙 Boa noite!';
+    var gEl=document.getElementById('hoje-greeting'); if(gEl) gEl.textContent=greeting+' Seu resumo de hoje';
+    var dlEl=document.getElementById('hoje-date-lbl');
+    if(dlEl) dlEl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-  // Transações de hoje — só as registradas diretamente em Finanças
-  // Só lançamentos reais de Finanças (txValida) registrados hoje
-  var todTxs = TXS.filter(function(t){
-    return ymds(t.date) === tod && txValida(t) && !t.fromAgenda;
-  });
-  var pgtos  = todTxs.filter(function(t){ return t.type === 'exp'; });
-  var recs   = todTxs.filter(function(t){ return t.type === 'inc'; });
+    var todTxs=TXS.filter(function(t){ return ymds(t.date)===tod&&txValida(t)&&!t.fromAgenda; });
+    var pgtos =todTxs.filter(function(t){ return t.type==='exp'; });
+    var recs  =todTxs.filter(function(t){ return t.type==='inc'; });
+    var todTasks=TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
+    var todPend =todTasks.filter(function(t){ return t.status!=='done'; });
+    var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
 
-  // Tarefas de hoje: TODAS (pendentes e concluídas) com prazo hoje
-  var todTasks = TASKS.filter(function(t){
-    return ymds(t.deadline) === tod;
-  });
-
-  // Atrasados: transações e tarefas de dias anteriores não "concluídas"
-  // Para finanças: gastos futuros com data passada (não marcados como pagos)
-  // Para tarefas: deadline passou e status != done
-  var atrasadoTasks = TASKS.filter(function(t){
-    return t.deadline && ymds(t.deadline) < tod && t.status !== 'done';
-  });
-  // Aluguéis vencidos e não pagos
-  var _n2=new Date();
-  ALUGUEIS.forEach(function(a){
-    for(var _mi=-2;_mi<=0;_mi++){
-      var _md=new Date(_n2.getFullYear(),_n2.getMonth()+_mi,1);
-      var _ms=_md.getFullYear()+'-'+pad(_md.getMonth()+1);
-      var _venc=_ms+'-'+pad(a.dia);
-      if(_venc>=tod) continue;
-      var _pg=(a.parcelas||[]).some(function(p){return p.mesAno===_ms;});
-      if(!_pg){
-        var _pr=projecoesAluguel(_ms).find(function(t){return String(t._alugId)===String(a.id);});
-        if(_pr&&!atrasadoTasks.some(function(t){return t.id===_pr.id;})) atrasadoTasks.push(_pr);
+    // Aluguéis vencidos
+    ALUGUEIS.forEach(function(a){
+      for(var mi=-2;mi<=0;mi++){
+        var md=new Date(now2.getFullYear(),now2.getMonth()+mi,1);
+        var ms=md.getFullYear()+'-'+pad(md.getMonth()+1);
+        var venc=ms+'-'+pad(a.dia);
+        if(venc>=tod) continue;
+        var pago=(a.parcelas||[]).some(function(p){return p.mesAno===ms;});
+        if(!pago){
+          var fake={id:'alug-'+a.id+'-'+ms,desc:a.nome+(a.ref?' — '+a.ref:''),
+            type:'inc',value:a.valorBase,deadline:venc,status:'pend',_isAlug:true};
+          if(!atrasados.some(function(t){return t.id===fake.id;})) atrasados.push(fake);
+        }
       }
+    });
+
+    // Contadores
+    var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
+    var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
+    var hcrEl=document.getElementById('hc-rec');  if(hcrEl) hcrEl.textContent=recs.length;
+    var hbp=document.getElementById('hb-pgto');    if(hbp) hbp.textContent=pgtos.length;
+    var hbr=document.getElementById('hb-rec');     if(hbr) hbr.textContent=recs.length;
+    var hbt=document.getElementById('hb-task');    if(hbt) hbt.textContent=todPend.length;
+    var hba=document.getElementById('hb-atrasado');if(hba) hba.textContent=atrasados.length;
+
+    // Totais
+    var tH=todPend.reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+    var tA=atrasados.reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+    var elTH=document.getElementById('ht-task-total');    if(elTH) elTH.textContent=tH>0?fmtBRL(tH):'';
+    var elTA=document.getElementById('ht-atrasado-total');if(elTA) elTA.textContent=tA>0?fmtBRL(tA):'';
+
+    // Mostrar seções
+    function showSec(id,list,html){
+      var s=document.getElementById(id); if(s) s.style.display=list.length?'block':'none';
+      var l=document.getElementById(id.replace('hs-','hoje-')+'-list'); if(l) l.innerHTML=html;
     }
-  });
+    showSec('hs-task', todTasks, todTasks.map(function(t){return taskCard(t);}).join(''));
+    showSec('hs-atrasado', atrasados, atrasados.map(function(t){return taskCard(t,'ov');}).join(''));
+    showSec('hs-pgto', pgtos, pgtos.map(pgtoCard).join(''));
+    showSec('hs-rec',  recs,  recs.map(pgtoCard).join(''));
 
-  // Atualizar cabeçalho
-  var now2 = new Date();
-  var h = now2.getHours();
-  var greeting = h < 12 ? '☀️ Bom dia!' : h < 18 ? '🌤️ Boa tarde!' : '🌙 Boa noite!';
-  var gEl = document.getElementById('hoje-greeting');
-  if(gEl) gEl.textContent = greeting + ' Seu resumo de hoje';
-  var hdl=document.getElementById('hoje-date-lbl');
-  if(hdl) hdl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    // Vazio
+    var emp=document.getElementById('hoje-empty');
+    if(emp) emp.style.display=(!pgtos.length&&!recs.length&&!todTasks.length&&!atrasados.length)?'block':'none';
 
-  // Contadores
-  var todPend = todTasks.filter(function(t){ return t.status !== 'done'; });
-  var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
-  var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
-  var hcrEl=document.getElementById('hc-rec'); if(hcrEl) hcrEl.textContent=recs.length;
-
-  // Badges
-  (document.getElementById('hb-pgto')||{textContent:''}).textContent     = pgtos.length;
-  (document.getElementById('hb-rec')||{textContent:''}).textContent      = recs.length;
-  (document.getElementById('hb-task')||{textContent:''}).textContent     = todPend.length;
-  (document.getElementById('hb-atrasado')||{textContent:''}).textContent = atrasadoTasks.length;
-
-  // Totais — soma dos valores pendentes
-  var totalHoje = todPend.reduce(function(s,t){
-    return s + (t.type !== 'task' ? parseFloat(t.value||0) : 0);
-  }, 0);
-  var totalAtrasado = atrasadoTasks.reduce(function(s,t){
-    return s + (t.type !== 'task' ? parseFloat(t.value||0) : 0);
-  }, 0);
-  var elTotHoje = document.getElementById('ht-task-total');
-  var elTotAtr  = document.getElementById('ht-atrasado-total');
-  if(elTotHoje) elTotHoje.textContent = totalHoje > 0 ? fmtBRL(totalHoje) : '';
-  if(elTotAtr)  elTotAtr.textContent  = totalAtrasado > 0 ? fmtBRL(totalAtrasado) : '';
-
-  // Mostrar/ocultar seções vazias
-  (document.getElementById('hs-pgto')||{style:{}}).style.display    = pgtos.length    ? 'block':'none';
-  (document.getElementById('hs-rec')||{style:{}}).style.display     = recs.length     ? 'block':'none';
-  (document.getElementById('hs-task')||{style:{}}).style.display    = todTasks.length ? 'block':'none'; // inclui concluídas
-  (document.getElementById('hs-atrasado')||{style:{}}).style.display = atrasadoTasks.length ? 'block':'none';
-
-  // Render pagamentos
-  (document.getElementById('hoje-pgto-list')||{innerHTML:''}).innerHTML = pgtos.length
-    ? pgtos.map(function(t){ return pgtoCard(t); }).join('')
-    : '';
-
-  // Render recebimentos
-  (document.getElementById('hoje-rec-list')||{innerHTML:''}).innerHTML = recs.length
-    ? recs.map(function(t){ return pgtoCard(t); }).join('')
-    : '';
-
-  // Render tarefas de hoje
-  (document.getElementById('hoje-task-list')||{innerHTML:''}).innerHTML = todTasks.length
-    ? todTasks.map(function(t){ return taskCard(t); }).join('')
-    : '';
-
-  // Render atrasados
-  (document.getElementById('hoje-atrasado-list')||{innerHTML:''}).innerHTML = atrasadoTasks.length
-    ? atrasadoTasks.map(function(t){ return t._isAlug?taskCardComAlug(t):taskCard(t,'ov'); }).join('')
-    : '';
-
-  // Se tudo vazio, mostrar mensagem de parabéns
-  var todPendTasks = todTasks.filter(function(t){ return t.status !== 'done'; });
-  if(!pgtos.length && !recs.length && !todPendTasks.length && !atrasadoTasks.length && !todTasks.filter(function(t){return t.status==='done';}).length){
-    (document.getElementById('hs-pgto')||{style:{}}).style.display = 'block';
-    (document.getElementById('hoje-pgto-list')||{innerHTML:''}).innerHTML =
-      '<div class="hoje-empty"><div class="he-icon">🎉</div><div class="he-txt">Dia livre! Nenhum compromisso hoje.</div></div>';
+  } catch(err) {
+    console.error('renderHoje erro:', err.message, err);
   }
 }
 
