@@ -1865,6 +1865,34 @@ function boot(){
   try{ renderFixos(); }catch(e){}
   console.log('🟡 boot: completo');
 
+  // Debug: verificar estado visual
+  setTimeout(function(){
+    var sc = document.getElementById('sec-hoje');
+    var ct = document.getElementById('content');
+    var hd = document.getElementById('hdr');
+    var nv = document.getElementById('nav');
+    console.log('🟣 sec-hoje display:', sc ? sc.style.display : 'NULL');
+    console.log('🟣 sec-hoje offsetHeight:', sc ? sc.offsetHeight : 'NULL');
+    console.log('🟣 content display:', ct ? ct.style.display : 'NULL');
+    console.log('🟣 hdr display:', hd ? hd.style.display : 'NULL');
+    console.log('🟣 nav display:', nv ? nv.style.display : 'NULL');
+    // Verificar computed style
+    if(sc) {
+      var cs = window.getComputedStyle(sc);
+      console.log('🟣 sec-hoje computed display:', cs.display);
+      console.log('🟣 sec-hoje computed visibility:', cs.visibility);
+      console.log('🟣 sec-hoje computed opacity:', cs.opacity);
+      console.log('🟣 sec-hoje computed height:', cs.height);
+    }
+    // Verificar debug banner
+    var banner = document.getElementById('debug-banner');
+    console.log('🟣 debug-banner existe:', banner ? 'SIM' : 'NÃO');
+    if(banner) {
+      var bs = window.getComputedStyle(banner);
+      console.log('🟣 debug-banner computed display:', bs.display);
+    }
+  }, 1000);
+
   // Sync em background
   if(online) setTimeout(function(){
     try{ syncAll(); }catch(e){ console.error('syncAll:',e); }
