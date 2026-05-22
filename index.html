@@ -1308,9 +1308,9 @@ select option{background:#1A2A3A}
     <div id="rec-hist-list"></div>
   </div>
 
+</div>
 
-  <!-- ══ CC ══ -->
-  <div id="sec-cc" style="display:none;padding:0 16px 100px">
+<div id="sec-cc" style="display:none;padding:0 16px 100px">
 
   <!-- ABAS internas -->
   <div style="display:flex;gap:8px;margin-bottom:14px">
@@ -1400,11 +1400,9 @@ select option{background:#1A2A3A}
     <div id="cc-list"></div>
   </div>
 
+</div>
 
-  </div><!-- /sec-cc -->
-
-  <!-- ══ DOCS ══ -->
-  <div id="sec-docs" style="display:none">
+<div id="sec-docs" style="display:none">
 
     <!-- form adicionar link -->
     <div class="docs-add">
@@ -1462,7 +1460,7 @@ select option{background:#1A2A3A}
 </div><!-- /content -->
 
 <!-- ══ MODAL COMPROVANTE TAREFA ══ -->
-<div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;align-items:flex-end;justify-content:center">
+<div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;display:none;align-items:flex-end;justify-content:center">
   <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto">
     <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:4px">✅ Marcar como concluída</div>
     <div style="font-size:12px;color:var(--t3);margin-bottom:16px">Deseja anexar o comprovante de pagamento?</div>
@@ -1732,137 +1730,38 @@ function resetSetup(){
 //  BOOT
 // ════════════════════════════════════════
 function boot(){
-  var now=new Date();
-  selMonth=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var now = new Date();
+  // Resetar datas
+  try { tdDate=today0(); twStart=weekStart(now); tmDate=new Date();
+        fdDate=today0(); fwStart=weekStart(now); fmDate=new Date(); } catch(e){}
 
-  document.getElementById('month-chip').textContent=
-    now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-  document.getElementById('cat-month-lbl').textContent=
-    now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  // Mostrar UI
+  var hdr=document.getElementById('hdr');
+  var nav=document.getElementById('nav');
+  var cnt=document.getElementById('content');
+  if(hdr) hdr.style.display='block';
+  if(nav) nav.style.display='flex';
+  if(cnt) cnt.style.display='block';
+  document.getElementById('setup').style.display='none';
 
-  document.getElementById('tx-date').value = ymd(now);
-  document.getElementById('t-dead').value  = ymd(now);
+  // Datas padrão nos formulários
+  try {
+    var d=ymd(now);
+    var txd=document.getElementById('tx-date'); if(txd) txd.value=d;
+    var tdd=document.getElementById('t-dead');  if(tdd) tdd.value=d;
+    var rcd=document.getElementById('rec-data');if(rcd) rcd.value=d;
+    var cgd=document.getElementById('cg-data'); if(cgd) cgd.value=d;
+    var selMonth_init=now.getFullYear()+'-'+pad(now.getMonth()+1);
+    selMonth=selMonth_init;
+    var cml=document.getElementById('cat-month-lbl');
+    if(cml) cml.textContent=now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  } catch(e){}
 
-  document.getElementById('hdr').style.display='block';
-  document.getElementById('content').style.display='block';
-  document.getElementById('nav').style.display='flex';
-
-  // Limpar recorrências e tarefas duplicadas automaticamente
-  limparRecurDuplicados();
-
-  // Resetar datas de navegação sempre que a página carrega
-  tdDate  = today0();
-  twStart = weekStart(new Date());
-  tmDate  = new Date();
-  fdDate  = today0();
-  fwStart = weekStart(new Date());
-  fmDate  = new Date();
-
-  // Delegação global de eventos das tarefas (feito uma vez)
   initTaskDelegation();
-
-  // Renderizar imediatamente com dados do cache local
   setSection('hoje');
-  renderAll();
-  renderHoje();
 
-  // Sync automático em background após render inicial
-  if(online){
-    setTimeout(function(){ syncAll(); }, 500);
-  }
-}
-
-window.addEventListener('online',  function(){ online=true;  document.getElementById('offline-badge').style.display='none'; });
-window.addEventListener('offline', function(){ online=false; document.getElementById('offline-badge').style.display='inline'; });
-
-// ════════════════════════════════════════
-//  API
-// ════════════════════════════════════════
-function apiCall(action, body, cb){
-  if(!API){ cb(new Error('URL não configurada')); return; }
-  var url = API + '?action=' + action;
-  if(body){
-    url += '&payload=' + encodeURIComponent(JSON.stringify(body));
-  }
-  var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  var tid  = ctrl ? setTimeout(function(){ ctrl.abort(); }, 15000) : null;
-  fetch(url, {
-    method:'GET', redirect:'follow',
-    headers:{'Accept':'application/json, text/plain, */*'},
-    signal: ctrl ? ctrl.signal : undefined
-  })
-  .then(function(r){ if(tid) clearTimeout(tid); return r.text(); })
-  .then(function(txt){
-    if(txt.indexOf('<html')!==-1||txt.indexOf('<!DOCTYPE')!==-1)
-      throw new Error('Servidor retornou HTML');
-    try{ cb(null, JSON.parse(txt)); }
-    catch(e){ cb(new Error('JSON inválido')); }
-  })
-  .catch(function(e){
-    if(tid) clearTimeout(tid);
-    if(e.name==='AbortError'){ cb(new Error('Timeout — servidor demorou mais de 15s')); return; }
-    var xhr=new XMLHttpRequest();
-    xhr.timeout = 15000;
-    xhr.open('GET',url,true);
-    xhr.setRequestHeader('Accept','application/json, text/plain, */*');
-    xhr.onload=function(){
-      try{ cb(null,JSON.parse(xhr.responseText)); }
-      catch(ex){ cb(new Error('Resposta inválida')); }
-    };
-    xhr.onerror=function(){ cb(new Error('Sem conexão')); };
-    xhr.ontimeout=function(){ cb(new Error('Timeout')); };
-    xhr.send();
-  });
-}
-
-// Para uploads (base64) — usa POST para evitar limite de URL
-// apiPost: sempre usa GET (Apps Script não aceita POST externo via CORS)
-// Para objetos grandes, divide em chunks automaticamente
-function apiPost(action, body, cb){
-  if(!API){ cb(new Error('URL não configurada')); return; }
-
-  var payload = encodeURIComponent(JSON.stringify(body));
-  var url = API + '?action=' + action + '&payload=' + payload;
-
-  if(url.length <= 7000){
-    // Cabe numa URL — enviar direto
-    apiCall(action, body, cb);
-    return;
-  }
-
-  // Objeto grande: dividir em chunks e usar salvarContratoChunk
-  var id = body.id || Date.now();
-  var chunk1 = {
-    id:body.id, inqNome:body.inqNome, locNome:body.locNome,
-    imovel:body.imovel, valor:body.valor, inicio:body.inicio,
-    fim:body.fim, diaPgto:body.diaPgto, tipo:body.tipo,
-    duracao:body.duracao, end:body.end, ativo:body.ativo,
-    criadoEm:body.criadoEm
-  };
-  var chunk2 = {
-    id:body.id,
-    inqCpf:body.inqCpf, inqRg:body.inqRg, inqEciv:body.inqEciv,
-    inqEnd:body.inqEnd, inqNome2:body.inqNome2, inqCpf2:body.inqCpf2,
-    inqRg2:body.inqRg2,
-    locCpf:body.locCpf, locRg:body.locRg, locEciv:body.locEciv,
-    locNome2:body.locNome2, locCpf2:body.locCpf2, locRg2:body.locRg2,
-    mat:body.mat
-  };
-  var chunk3 = {
-    id:body.id,
-    vistoria:body.vistoria, itens:body.itens,
-    pagamentos:[]
-  };
-
-  apiCall('salvarContratoChunk', chunk1, function(e1){
-    if(e1){ cb(e1); return; }
-    apiCall('salvarContratoChunk', chunk2, function(e2){
-      if(e2){ cb(e2); return; }
-      apiCall('salvarContratoChunk', chunk3, function(e3){
-        cb(e3);
-      });
-    });
-  });
+  // Sync em background
+  if(online) setTimeout(syncAll, 600);
 }
 
 function syncAll(){
@@ -2003,1337 +1902,53 @@ function syncAll(){
 // ════════════════════════════════════════
 function setSection(s){
   curSection=s;
-  document.getElementById('sec-fin').style.display        = s==='fin'  ? 'block':'none';
-  document.getElementById('sec-task').style.display       = s==='task' ? 'block':'none';
-  document.getElementById('sec-hoje').style.display       = s==='hoje' ? 'block':'none';
-  document.getElementById('sec-docs').style.display       = s==='docs' ? 'block':'none';
-  document.getElementById('sec-rec').style.display        = s==='rec'  ? 'block':'none';
-  var secCC = document.getElementById('sec-cc');
-  if(secCC) secCC.style.display = s==='cc' ? 'block':'none';
-  document.getElementById('fin-header-extra').style.display = s==='fin' ? 'block':'none';
-  document.getElementById('nb-fin').classList.toggle('on',  s==='fin');
-  document.getElementById('nb-task').classList.toggle('on', s==='task');
-  document.getElementById('nb-hoje').classList.toggle('on', s==='hoje');
-  document.getElementById('nb-docs').classList.toggle('on', s==='docs');
-  document.getElementById('nb-rec').classList.toggle('on',  s==='rec');
-  var nbCC = document.getElementById('nb-cc');
-  if(nbCC) nbCC.classList.toggle('on', s==='cc');
-  if(s==='task') renderTasks();
-  if(s==='hoje') renderHoje();
-  if(s==='rec')  renderRecibos();
-  if(s==='cc')   renderCC();
-  if(s==='docs'){
-    renderDocs();
-    if(online) syncDocs();
-  }
+  var secs=['fin','task','hoje','docs','rec','cc'];
+  secs.forEach(function(x){
+    var el=document.getElementById('sec-'+x);
+    if(el) el.style.display=(x===s)?'block':'none';
+  });
+  var fhe=document.getElementById('fin-header-extra');
+  if(fhe) fhe.style.display=(s==='fin')?'block':'none';
+  var nbs=['hoje','fin','task','rec','docs'];
+  nbs.forEach(function(x){
+    var b=document.getElementById('nb-'+x);
+    if(b) b.classList.toggle('on',x===s);
+  });
+  if(s==='hoje') { try{renderHoje();}catch(e){console.error('renderHoje',e);} }
+  if(s==='task') { try{renderTasks();}catch(e){console.error('renderTasks',e);} }
+  if(s==='rec')  { try{renderRecibos();}catch(e){console.error('renderRecibos',e);} }
+  if(s==='docs') { try{renderDocs();}catch(e){}; if(online) try{syncDocs();}catch(e){} }
+  if(s==='fin')  { try{renderBal();renderHist();}catch(e){console.error('fin',e);} }
 }
 
 function ftab(t){
   curFinTab=t;
-  ['add','hist','cat','cc'].forEach(function(x){
-    var el = document.getElementById('fp-'+x);
-    if(el) el.style.display = x===t?'block':'none';
+  var pages=['add','hist','cat','cc'];
+  pages.forEach(function(x){
+    var el=document.getElementById('fp-'+x);
+    if(el) el.style.display=(x===t)?'block':'none';
   });
-  document.querySelectorAll('.ftab').forEach(function(b){
-    b.classList.remove('on');
-  });
-  var tabs = document.querySelectorAll('.ftab');
-  var map  = {add:0,hist:1,cat:2,cc:3};
-  if(tabs[map[t]]) tabs[map[t]].classList.add('on');
-  if(t==='hist') renderHist();
-  if(t==='cat')  renderCat();
-  if(t==='cc')   renderFinCC();
+  document.querySelectorAll('.ftab').forEach(function(b){ b.classList.remove('on'); });
+  var idx={add:0,hist:1,cat:2,cc:3};
+  var tabs=document.querySelectorAll('.ftab');
+  if(tabs[idx[t]]) tabs[idx[t]].classList.add('on');
+  if(t==='hist') try{renderHist();}catch(e){}
+  if(t==='cat')  try{renderCat();}catch(e){}
+  if(t==='cc')   try{renderFinCC();}catch(e){console.error('renderFinCC',e);}
 }
 
-
-// ════════════════════════════════════════════════════════
-//  PAGADORES
-// ════════════════════════════════════════════════════════
-function savePagadores(){ localStorage.setItem('ff_pagadores', JSON.stringify(PAGADORES)); }
-function saveRecibos(){   localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS));   }
-
-function addPagador(){
-  var nome = document.getElementById('pag-nome').value.trim();
-  var tel  = document.getElementById('pag-tel').value.trim();
-  var doc  = document.getElementById('pag-doc').value.trim();
-  if(!nome){ toast('⚠️ Informe o nome','err'); return; }
-  var p = { id: Date.now(), nome: nome, tel: tel, doc: doc };
-  PAGADORES.unshift(p);
-  savePagadores();
-  apiPost('salvarPagador', p, function(){});
-  document.getElementById('pag-nome').value = '';
-  document.getElementById('pag-tel').value  = '';
-  document.getElementById('pag-doc').value  = '';
-  renderRecibos();
-  toast('✅ Pagador salvo!');
-}
-
-function delPagador(id){
-  PAGADORES = PAGADORES.filter(function(p){ return String(p.id)!==String(id); });
-  savePagadores();
-  apiCall('deletarPagador', {id:id}, function(){});
-  renderRecibos();
-  toast('🗑️ Pagador removido');
-}
-
-
-// ════════════════════════════════════════════════════════
-//  ALUGUÉIS
-// ════════════════════════════════════════════════════════
-function saveAlugueis(){ localStorage.setItem('ff_alugueis', JSON.stringify(ALUGUEIS)); }
-
-var MESES_BR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
-function addAluguel(){
-  var pid = document.getElementById('alug-pag').value;
-  var dia = parseInt(document.getElementById('alug-dia').value)||1;
-  var val = parseFloat(document.getElementById('alug-val').value)||0;
-  var ref = document.getElementById('alug-ref').value.trim();
-  var pag = PAGADORES.find(function(p){ return String(p.id)===pid; });
-  if(!pag){ toast('⚠️ Selecione um inquilino','err'); return; }
-  if(!val||val<=0){ toast('⚠️ Informe o valor','err'); return; }
-  // Verificar duplicata
-  if(ALUGUEIS.some(function(a){ return String(a.pagadorId)===pid; })){
-    toast('⚠️ Inquilino já cadastrado','err'); return;
-  }
-  var now = new Date();
-  var alug = {
-    id: Date.now(),
-    pagadorId: String(pid),
-    nome:      pag.nome,
-    tel:       pag.tel||'',
-    dia:       dia,
-    valorBase: val,
-    ref:       ref,
-    parcelas:  [],
-    criadoEm:  now.toISOString()
-  };
-  ALUGUEIS.unshift(alug);
-  saveAlugueis();
-  apiPost('salvarAluguel', alug, function(){});
-  document.getElementById('alug-dia').value = '';
-  document.getElementById('alug-val').value = '';
-  document.getElementById('alug-ref').value = '';
-  renderRecibos();
-  sincronizarFichaGoogleSheets(alug);
-  toast('✅ Aluguel cadastrado!');
-}
-
-function delAluguel(id){
-  if(!confirm('Remover este aluguel? O histórico de parcelas será perdido.')) return;
-  ALUGUEIS = ALUGUEIS.filter(function(a){ return String(a.id)!==String(id); });
-  saveAlugueis();
-  apiCall('deletarAluguel', {id:id}, function(){});
-  renderRecibos();
-  toast('🗑️ Aluguel removido');
-}
-
-function registrarPagamento(alugId, mesAno, valorCustom){
-  var a = ALUGUEIS.find(function(x){ return String(x.id)===String(alugId); });
-  if(!a) return;
-  // Verificar se já pago
-  var jaExiste = a.parcelas.find(function(p){ return p.mesAno===mesAno; });
-  if(jaExiste){ toast('⚠️ Mês já registrado como pago'); return; }
-
-  var val = valorCustom || a.valorBase;
-  var agora = new Date();
-  var codigo = 'ALG-'+Date.now().toString(36).toUpperCase();
-  var emitidoEm = agora.toLocaleString('pt-BR');
-  var dataPgto  = ymd(agora);
-  var partes    = mesAno.split('-');
-  var mesLabel  = MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
-
-  var parcela = {
-    mesAno:    mesAno,
-    valor:     val,
-    dataPgto:  dataPgto,
-    codigo:    codigo,
-    emitidoEm: emitidoEm
-  };
-  a.parcelas.push(parcela);
-  saveAlugueis();
-
-  // Salvar recibo automaticamente
-  var recibo = {
-    id:        Date.now(),
-    codigo:    codigo,
-    pagador:   a.nome,
-    tel:       a.tel,
-    desc:      'Aluguel '+(a.ref?a.ref+' — ':'')+mesLabel,
-    valor:     val,
-    data:      dataPgto,
-    obs:       'Referente ao mês de '+mesLabel,
-    emitidoEm: emitidoEm,
-    aluguelId: String(alugId),
-    mesAno:    mesAno
-  };
-  RECIBOS.unshift(recibo);
-  saveRecibos();
-
-  // Enviar para planilha
-  apiCall('registrarPagamentoAluguel', {
-    nome: a.nome, ref: a.ref, mesAno: mesAno, valor: val,
-    dataPgto: dataPgto, codigo: codigo, tel: a.tel
-  }, function(){});
-
-  renderRecibos();
-  // Abrir recibo automaticamente
-  abrirRecibo(recibo);
-  toast('✅ Pagamento registrado — recibo gerado!');
-}
-
-function abrirRegistrarPagamento(alugId){
-  var a = ALUGUEIS.find(function(x){ return String(x.id)===String(alugId); });
-  if(!a) return;
-  var now    = new Date();
-  var mesAno = now.getFullYear()+'-'+pad(now.getMonth()+1);
-  var mesLabel = MESES_BR[now.getMonth()]+'/'+now.getFullYear();
-
-  // Verificar se já pago
-  var jaExiste = a.parcelas.find(function(p){ return p.mesAno===mesAno; });
-  if(jaExiste){ toast('✅ '+mesLabel+' já registrado'); return; }
-
-  // Pedir valor (pode ser diferente do base)
-  var val = prompt(
-    'Registrar pagamento de '+a.nome+'\nMês: '+mesLabel+'\n\nValor (deixe em branco para R$ '+a.valorBase.toFixed(2).replace('.',',')+'):',
-    a.valorBase.toFixed(2).replace('.',',')
-  );
-  if(val === null) return; // cancelou
-  var valNum = parseFloat(String(val).replace(',','.'));
-  if(isNaN(valNum)||valNum<=0) valNum = a.valorBase;
-  registrarPagamento(alugId, mesAno, valNum);
-}
-
-function sincronizarFichaGoogleSheets(a){
-  apiCall('criarFichaAluguel', {
-    nome: a.nome, tel: a.tel, ref: a.ref,
-    dia: a.dia, valorBase: a.valorBase
-  }, function(){});
-}
-
-function renderAluguelCard(a){
-  var now    = new Date();
-  var mesAtual = now.getFullYear()+'-'+pad(now.getMonth()+1);
-
-  // Gerar últimos 6 meses + próximo
-  var meses = [];
-  for(var i=-5; i<=1; i++){
-    var d = new Date(now.getFullYear(), now.getMonth()+i, 1);
-    meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1));
-  }
-
-  var parcMap = {};
-  (a.parcelas||[]).forEach(function(p){ parcMap[p.mesAno]=p; });
-
-  var parcsHTML = meses.map(function(mo){
-    var p = MESES_BR[parseInt(mo.split('-')[1])-1];
-    var parc = parcMap[mo];
-    var hoje = ymd(now);
-    var venc = mo+'-'+pad(a.dia);
-    var cls, title;
-    if(parc){
-      cls='pago'; title='Pago em '+parc.dataPgto;
-    } else if(mo < mesAtual || (mo===mesAtual && hoje>venc)){
-      cls='venc'; title='Vencido!';
-    } else {
-      cls='pend'; title=mo===mesAtual?'Vence dia '+a.dia:'Futuro';
-    }
-    return '<button class="parc '+cls+'" data-parc-alug="'+a.id+'" data-parc-mo="'+mo+'" data-parc-done="'+(parc?'1':'0')+'" title="'+title+'">'+
-      '<span>'+p+'</span>'+
-      '<span>'+(parc?'✓':mo<=mesAtual?'!':'')+'</span>'+
-    '</button>';
-  }).join('');
-
-  var jaPageiHoje = parcMap[mesAtual];
-  var totalPago  = (a.parcelas||[]).reduce(function(s,p){ return s+p.valor; },0);
-
-  return '<div class="alug-card" data-alug-id="'+a.id+'">'+
-    '<div class="alug-card-header">'+
-      '<div style="font-size:24px">🏠</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div class="alug-nome">'+esc(a.nome)+'</div>'+
-        '<div class="alug-ref">'+(a.ref?esc(a.ref)+' · ':'')+
-          'Vence dia '+a.dia+' · R$ '+a.valorBase.toFixed(2).replace('.',',')+'/mês'+
-        '</div>'+
-      '</div>'+
-      '<button class="tdel2" data-delalug="'+a.id+'">🗑️</button>'+
-    '</div>'+
-    '<div class="alug-parcelas">'+parcsHTML+'</div>'+
-    '<div style="font-size:11px;color:var(--t3);margin-bottom:8px">'+
-      'Total recebido: <strong style="color:var(--green)">R$ '+totalPago.toFixed(2).replace('.',',')+'</strong>'+
-      ' · '+(a.parcelas||[]).length+' parcela'+(a.parcelas.length!==1?'s':'')+' paga'+(a.parcelas.length!==1?'s':'')+
-    '</div>'+
-    '<div class="alug-actions">'+
-      (!jaPageiHoje
-        ? '<button class="alug-btn" style="background:var(--green);color:#0A1A12" data-pgtalug="'+a.id+'">💰 Registrar pagamento</button>'
-        : '<button class="alug-btn" style="background:var(--bg3);color:var(--t3);cursor:default">✅ Pago este mês</button>'
-      )+
-      '<button class="alug-btn" style="background:var(--bg3);color:var(--t2)" data-fichalug="'+a.id+'">📋 Ver ficha</button>'+
-    '</div>'+
-  '</div>';
-}
-
-function abrirFichaAluguel(alugId){
-  var a = ALUGUEIS.find(function(x){ return String(x.id)===String(alugId); });
-  if(!a) return;
-  var parcMap = {};
-  (a.parcelas||[]).forEach(function(p){ parcMap[p.mesAno]=p; });
-
-  // Gerar todos os meses desde criação até hoje
-  var inicio = new Date(a.criadoEm||new Date());
-  var agora  = new Date();
-  var meses  = [];
-  var d = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
-  while(d <= agora){
-    meses.push(d.getFullYear()+'-'+pad(d.getMonth()+1));
-    d.setMonth(d.getMonth()+1);
-  }
-
-  var totalEsperado = meses.length * a.valorBase;
-  var totalPago     = (a.parcelas||[]).reduce(function(s,p){ return s+p.valor; },0);
-  var totalPendente = Math.max(0, totalEsperado - totalPago);
-
-  var linhas = meses.map(function(mo){
-    var p    = parcMap[mo];
-    var mes  = MESES_BR[parseInt(mo.split('-')[1])-1]+'/'+mo.split('-')[0];
-    var venc = mo+'-'+pad(a.dia);
-    var agr  = ymd(agora);
-    var status, cor, ico;
-    if(p){
-      status='Pago em '+p.dataPgto; cor='#2ecc9a'; ico='✅';
-    } else if(mo+'-'+pad(a.dia) < agr){
-      status='Vencido'; cor='#FF6B6B'; ico='⚠️';
-    } else {
-      status='Pendente'; cor='#888'; ico='⏳';
-    }
-    return '<tr>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #222">'+ico+' '+mes+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-weight:700">'+
-        'R$ '+(p?p.valor:a.valorBase).toFixed(2).replace('.',',')+
-      '</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #222;color:'+cor+';font-size:12px">'+status+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-family:monospace;font-size:10px;color:#555">'+
-        (p?p.codigo:'')+
-      '</td>'+
-    '</tr>';
-  }).join('');
-
-  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
-    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>Ficha — '+a.nome+'</title>'+
-    '<style>*{margin:0;padding:0;box-sizing:border-box}'+
-    'body{font-family:"Segoe UI",Arial,sans-serif;background:#0a0a14;color:#eee;padding:24px 16px}'+
-    '.ficha{max-width:600px;margin:0 auto;background:#111;border-radius:12px;overflow:hidden;border:1px solid #222}'+
-    '.fh{background:#1a1a2e;padding:24px;border-bottom:1px solid #222}'+
-    '.fh h2{font-size:18px;font-weight:900;margin-bottom:4px}'+
-    '.fh p{font-size:12px;color:#888}'+
-    '.ftotais{display:flex;gap:0;border-bottom:1px solid #222}'+
-    '.ftot{flex:1;padding:16px;text-align:center;border-right:1px solid #222}'+
-    '.ftot:last-child{border:none}'+
-    '.ftot-v{font-size:18px;font-weight:900;margin-bottom:2px}'+
-    '.ftot-l{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px}'+
-    'table{width:100%;border-collapse:collapse}'+
-    'td{font-size:13px}'+
-    '@media print{body{background:#fff;color:#000}.ficha{border:1px solid #ddd;background:#fff}.fh{background:#f5f5f5}.ftotais,.ftot{border-color:#ddd}}'+
-    '</style></head><body>'+
-    '<div class="ficha">'+
-      '<div class="fh">'+
-        '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">⚡ Fluxo App · Ficha de Aluguel</div>'+
-        '<h2>'+esc(a.nome)+'</h2>'+
-        '<p>'+(a.ref?esc(a.ref)+' · ':'')+
-          (a.tel?'📱 '+esc(a.tel)+' · ':'')+
-          'Vence dia '+a.dia+' · R$ '+a.valorBase.toFixed(2).replace('.',',')+'/mês'+
-        '</p>'+
-      '</div>'+
-      '<div class="ftotais">'+
-        '<div class="ftot"><div class="ftot-v" style="color:#2ecc9a">R$ '+totalPago.toFixed(2).replace('.',',')+'</div><div class="ftot-l">Recebido</div></div>'+
-        '<div class="ftot"><div class="ftot-v" style="color:#FF6B6B">R$ '+totalPendente.toFixed(2).replace('.',',')+'</div><div class="ftot-l">Pendente</div></div>'+
-        '<div class="ftot"><div class="ftot-v">'+meses.length+'</div><div class="ftot-l">Meses</div></div>'+
-      '</div>'+
-      '<table>'+linhas+'</table>'+
-    '</div>'+
-    '<div style="text-align:center;margin-top:16px">'+
-      '<button onclick="window.print()" style="padding:10px 24px;border:none;border-radius:8px;background:#2ecc9a;color:#0a1a0a;font-weight:700;cursor:pointer;font-size:14px">🖨️ Imprimir / Salvar PDF</button>'+
-    '</div>'+
-    '</body></html>';
-
-  var win = window.open('','_blank','width=640,height=860');
-  if(win){ win.document.write(html); win.document.close(); }
-  else toast('⚠️ Permita pop-ups para ver a ficha','err');
-}
-
-function renderAlugueisSection(){
-  // Atualizar select de pagadores no form de aluguel
-  var sel = document.getElementById('alug-pag');
-  if(sel){
-    sel.innerHTML = '<option value="">— selecione —</option>'+
-      PAGADORES.map(function(p){
-        return '<option value="'+p.id+'">'+esc(p.nome)+'</option>';
-      }).join('');
-  }
-  // Preencher select de pagadores no form de aluguel também
-  var selAlug = document.getElementById('alug-pag');
-  if(selAlug && !selAlug.innerHTML.includes(PAGADORES.length)){} // já feito acima
-  var el = document.getElementById('alug-list');
-  if(!el) return;
-  if(!ALUGUEIS.length){
-    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhum aluguel cadastrado</div>';
-    return;
-  }
-  el.innerHTML = ALUGUEIS.map(renderAluguelCard).join('');
-}
-
-function renderPagadores(){
-  var el = document.getElementById('pag-list');
-  if(!el) return;
-  if(!PAGADORES.length){ el.innerHTML=''; return; }
-  el.innerHTML = PAGADORES.map(function(p){
-    return '<div class="taski" style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
-      '<div style="font-size:22px">👤</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:14px;font-weight:700">'+esc(p.nome)+'</div>'+
-        '<div style="font-size:11px;color:var(--t3)">'+
-          (p.tel?'📱 '+esc(p.tel):'')+(p.tel&&p.doc?' · ':'')+(p.doc?esc(p.doc):'')+
-        '</div>'+
-      '</div>'+
-      '<button class="tdel2" data-delpag="'+p.id+'">🗑️</button>'+
-    '</div>';
-  }).join('');
-
-  // Atualizar select de pagadores no form de recibo
-  var sel = document.getElementById('rec-pag');
-  if(sel){
-    sel.innerHTML = '<option value="">— selecione ou preencha abaixo —</option>'+
-      PAGADORES.map(function(p){
-        return '<option value="'+p.id+'">'+esc(p.nome)+(p.tel?' ('+esc(p.tel)+')':'')+'</option>';
-      }).join('');
-    sel.onchange = function(){
-      var pid = sel.value;
-      var p   = PAGADORES.find(function(x){ return String(x.id)===pid; });
-      if(p) document.getElementById('rec-pag-nome').value = p.nome;
-      else  document.getElementById('rec-pag-nome').value = '';
-    };
-  }
-}
-
-// ════════════════════════════════════════════════════════
-//  RECIBOS
-// ════════════════════════════════════════════════════════
-function emitirRecibo(){
-  var pid   = document.getElementById('rec-pag').value;
-  var pag   = PAGADORES.find(function(p){ return String(p.id)===pid; });
-  var nome  = pag ? pag.nome : document.getElementById('rec-pag-nome').value.trim();
-  var tel   = pag ? pag.tel  : '';
-  var cpf   = pag ? (pag.doc||'') : (document.getElementById('rec-pag-cpf')||{}).value||'';
-  var desc  = document.getElementById('rec-desc').value.trim();
-  var val   = parseFloat(document.getElementById('rec-val').value)||0;
-  var data  = document.getElementById('rec-data').value || ymd(new Date());
-  var obs   = document.getElementById('rec-obs').value.trim();
-
-  if(!nome){ toast('⚠️ Informe o pagador','err'); return; }
-  if(!desc){ toast('⚠️ Informe a descrição','err'); return; }
-  if(!val||val<=0){ toast('⚠️ Informe o valor','err'); return; }
-
-  // Código único do recibo
-  var codigo = 'REC-'+Date.now().toString(36).toUpperCase();
-  var emitidoEm = new Date().toLocaleString('pt-BR');
-
-  var recibo = { id: Date.now(), codigo: codigo, pagador: nome, tel: tel, cpf: cpf,
-    desc: desc, valor: val, data: data, obs: obs, emitidoEm: emitidoEm };
-  RECIBOS.unshift(recibo);
-  saveRecibos();
-
-  // Limpar form
-  document.getElementById('rec-pag').value       = '';
-  document.getElementById('rec-pag-nome').value  = '';
-  document.getElementById('rec-desc').value      = '';
-  document.getElementById('rec-val').value       = '';
-  document.getElementById('rec-obs').value       = '';
-  document.getElementById('rec-data').value      = '';
-
-  renderRecibos();
-  abrirRecibo(recibo);
-  toast('🧾 Recibo emitido!');
-}
-
-function abrirRecibo(r){
-  var dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
-  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
-    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>Recibo '+r.codigo+'</title>'+
-    '<style>'+
-      '*{margin:0;padding:0;box-sizing:border-box}'+
-      'body{font-family:"Segoe UI",Arial,sans-serif;background:#f5f5f5;display:flex;justify-content:center;padding:30px 16px}'+
-      '.recibo{background:#fff;max-width:520px;width:100%;border-radius:4px;box-shadow:0 2px 20px rgba(0,0,0,.12);overflow:hidden}'+
-      '.rec-header{background:#0a0a1a;color:#fff;padding:28px 32px;text-align:center}'+
-      '.rec-logo{font-size:28px;font-weight:900;letter-spacing:2px;margin-bottom:4px}'+
-      '.rec-sub{font-size:11px;color:#888;letter-spacing:3px;text-transform:uppercase}'+
-      '.rec-titulo{background:#1a1a2e;color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}'+
-      '.rec-titulo h2{font-size:16px;font-weight:700;letter-spacing:1px}'+
-      '.rec-codigo{font-size:11px;color:#888;font-family:monospace}'+
-      '.rec-body{padding:28px 32px}'+
-      '.rec-row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #f0f0f0}'+
-      '.rec-row:last-child{border:none}'+
-      '.rec-label{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;font-weight:600}'+
-      '.rec-value{font-size:14px;color:#111;font-weight:600;text-align:right;max-width:60%}'+
-      '.rec-valor-total{background:#f8f8f8;border-radius:8px;padding:20px 32px;margin:0 32px 28px;text-align:center}'+
-      '.rec-valor-label{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}'+
-      '.rec-valor-num{font-size:32px;font-weight:900;color:#0a0a1a}'+
-      '.rec-carimbo{margin:0 32px 32px;border:2px dashed #ddd;border-radius:8px;padding:16px;text-align:center}'+
-      '.rec-carimbo-label{font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}'+
-      '.rec-carimbo-codigo{font-family:monospace;font-size:13px;font-weight:700;color:#444;letter-spacing:2px}'+
-      '.rec-carimbo-data{font-size:11px;color:#999;margin-top:4px}'+
-      '.rec-btns{display:flex;gap:10px;padding:0 32px 28px}'+
-      '.btn-print{flex:1;padding:12px;border:none;border-radius:8px;background:#0a0a1a;color:#fff;font-size:14px;font-weight:700;cursor:pointer}'+
-      '.btn-wpp{flex:1;padding:12px;border:none;border-radius:8px;background:#25D366;color:#fff;font-size:14px;font-weight:700;cursor:pointer}'+
-      '@media print{.rec-btns{display:none}body{background:#fff;padding:0}.recibo{box-shadow:none}}'+
-    '</style></head><body>'+
-    '<div class="recibo">'+
-      '<div class="rec-header">'+
-        '<div class="rec-logo">⚡ FLUXO</div>'+
-        '<div class="rec-sub">Recibo de Pagamento</div>'+
-      '</div>'+
-      '<div class="rec-titulo">'+
-        '<h2>RECIBO</h2>'+
-        '<span class="rec-codigo">'+r.codigo+'</span>'+
-      '</div>'+
-      '<div class="rec-body">'+
-        '<div class="rec-row"><div><div class="rec-label">Recebemos de</div><div class="rec-value">'+esc(r.pagador)+'</div></div></div>'+
-        '<div class="rec-row"><div><div class="rec-label">Referente a</div><div class="rec-value">'+esc(r.desc)+'</div></div></div>'+
-        '<div class="rec-row"><div><div class="rec-label">Data</div><div class="rec-value">'+dataFmt+'</div></div></div>'+
-        (r.obs?'<div class="rec-row"><div><div class="rec-label">Observação</div><div class="rec-value">'+esc(r.obs)+'</div></div></div>':'')+
-      '</div>'+
-      '<div class="rec-valor-total">'+
-        '<div class="rec-valor-label">Valor pago</div>'+
-        '<div class="rec-valor-num">'+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'</div>'+
-      '</div>'+
-      '<div class="rec-carimbo">'+
-        '<div class="rec-carimbo-label">Carimbo digital · Fluxo App</div>'+
-        '<div class="rec-carimbo-codigo">'+r.codigo+'</div>'+
-        '<div class="rec-carimbo-data">Emitido em: '+r.emitidoEm+'</div>'+
-      '</div>'+
-      '<div class="rec-btns">'+
-        '<button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>'+
-        (r.tel
-          ? '<button class="btn-wpp" onclick="enviarWpp()">💬 WhatsApp</button>'
-          : '<button class="btn-wpp" style="background:#ccc;cursor:default">💬 Sem telefone</button>'
-        )+
-      '</div>'+
-    '</div>'+
-    '<script>'+
-    'function enviarWpp(){'+
-      'var linhas = [];'+
-      'linhas.push("🧾 *RECIBO DE PAGAMENTO*");'+
-      'linhas.push("");'+
-      'linhas.push("Código: '+r.codigo+'");'+
-      'linhas.push("Pagador: '+r.pagador.replace(/['"]/g,' ')+'");'+
-      'linhas.push("Referente: '+r.desc.replace(/['"]/g,' ')+'");'+
-      'linhas.push("Valor: '+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'");'+
-      'linhas.push("Data: '+dataFmt+'");'+
-      (r.obs ? 'linhas.push("Obs: '+r.obs.replace(/['"]/g,' ')+'");' : '')+
-      'linhas.push("Emitido via Fluxo App em '+r.emitidoEm+'");'+
-      'var msg = encodeURIComponent(linhas.join("\\n"));'+
-      'var tel = "'+( r.tel ? r.tel.replace(/\D/g,'') : '' )+'";'+
-      'window.open("https://wa.me/"+(tel||"")+"?text="+msg,"_blank");'+
-    '}'+
-    '<\/script>'+
-    '</body></html>';
-
-  var win = window.open('','_blank','width=600,height=800');
-  if(win){ win.document.write(html); win.document.close(); }
-  else    toast('⚠️ Permita pop-ups para ver o recibo','err');
-}
-
-function delRecibo(id){
-  RECIBOS = RECIBOS.filter(function(r){ return String(r.id)!==String(id); });
-  saveRecibos();
-  renderRecibos();
-  toast('🗑️ Recibo removido');
-}
-
-
-// ════════════════════════════════════════════════════════
-//  CARTÃO DE CRÉDITO
-// ════════════════════════════════════════════════════════
-var curCCTab = 'gastos';
-
-function saveCartoes(){ localStorage.setItem('ff_cartoes', JSON.stringify(CARTOES)); }
-function saveCGastos(){ localStorage.setItem('ff_cgastos', JSON.stringify(CGASTOS)); }
-
-function setCCTab(t){
-  curCCTab = t;
-  ['gastos','fatura','cartoes'].forEach(function(tab){
-    var el = document.getElementById('ccp-'+tab);
-    if(el) el.style.display = tab===t ? 'block' : 'none';
-    var btn = document.getElementById('ccb-'+tab);
-    if(btn) btn.classList.toggle('on', tab===t);
-  });
-  if(t==='fatura') renderFatura();
-}
-
-// ── Cadastro de cartões ──────────────────────────────────
-function addCartao(){
-  var nome  = (document.getElementById('cc-nome').value||'').trim();
-  var fech  = parseInt(document.getElementById('cc-fech').value)||25;
-  var venc  = parseInt(document.getElementById('cc-venc').value)||5;
-  var limite= parseFloat(document.getElementById('cc-limite').value)||0;
-  if(!nome){ toast('⚠️ Informe o nome do cartão','err'); return; }
-  CARTOES.push({ id: Date.now(), nome:nome, fech:fech, venc:venc, limite:limite });
-  saveCartoes();
-  document.getElementById('cc-nome').value  = '';
-  document.getElementById('cc-fech').value  = '';
-  document.getElementById('cc-venc').value  = '';
-  document.getElementById('cc-limite').value= '';
-  renderCC();
-  toast('✅ Cartão salvo!');
-}
-
-function delCartao(id){
-  if(!confirm('Remover este cartão? Os gastos vinculados permanecem.')) return;
-  CARTOES = CARTOES.filter(function(c){ return String(c.id)!==String(id); });
-  saveCartoes();
-  renderCC();
-  toast('🗑️ Cartão removido');
-}
-
-// ── Lançar gasto ─────────────────────────────────────────
-function addGastoCartao(){
-  var cid   = document.getElementById('cg-cartao').value;
-  var data  = document.getElementById('cg-data').value || ymd(new Date());
-  var desc  = (document.getElementById('cg-desc').value||'').trim();
-  var val   = parseFloat(document.getElementById('cg-val').value)||0;
-  var cat   = document.getElementById('cg-cat').value;
-  var parc  = parseInt(document.getElementById('cg-parc').value)||1;
-  var cartao= CARTOES.find(function(c){ return String(c.id)===cid; });
-
-  if(!cartao){ toast('⚠️ Selecione o cartão','err'); return; }
-  if(!desc)  { toast('⚠️ Informe a descrição','err'); return; }
-  if(!val||val<=0){ toast('⚠️ Informe o valor','err'); return; }
-
-  var valParcela = val / parc;
-  var baseDate   = new Date(data+'T12:00:00');
-
-  // Criar um gasto por parcela
-  for(var p=0; p<parc; p++){
-    var d = new Date(baseDate.getFullYear(), baseDate.getMonth()+p, baseDate.getDate());
-    // Determinar a qual fatura pertence (baseado no dia de fechamento)
-    var fatMes = faturaDoGasto(d, cartao.fech);
-
-    CGASTOS.push({
-      id:       Date.now() + p,
-      cartaoId: String(cartao.id),
-      cartao:   cartao.nome,
-      desc:     desc + (parc>1 ? ' ('+( p+1)+'/'+parc+')' : ''),
-      val:      valParcela,
-      cat:      cat,
-      data:     ymd(d),
-      fatMes:   fatMes,  // YYYY-MM da fatura
-      pago:     false
-    });
-  }
-
-  saveCGastos();
-  // Salvar cada gasto no servidor
-  CGASTOS.filter(function(g){ return !g._synced; }).forEach(function(g){
-    apiPost('salvarCGasto', g, function(){ g._synced=true; });
-  });
-  document.getElementById('cg-desc').value = '';
-  document.getElementById('cg-val').value  = '';
-  document.getElementById('cg-parc').value = '1';
-  renderCC();
-  toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
-}
-
-// Determina a qual fatura um gasto pertence
-// Se a data do gasto é APÓS o fechamento, vai para o próximo mês
-function faturaDoGasto(dataGasto, diaFech){
-  var d = new Date(dataGasto);
-  if(d.getDate() > diaFech){
-    // Após fechamento → próxima fatura
-    return new Date(d.getFullYear(), d.getMonth()+1, 1)
-      .toISOString().substring(0,7);
-  }
-  return d.getFullYear()+'-'+pad(d.getMonth()+1);
-}
-
-function delGasto(id){
-  CGASTOS = CGASTOS.filter(function(g){ return String(g.id)!==String(id); });
-  saveCGastos();
-  renderCC();
-  toast('🗑️ Gasto removido');
-}
-
-// ── Fechar fatura ────────────────────────────────────────
-function fecharFatura(cartaoId, mesAno){
-  var cartao  = CARTOES.find(function(c){ return String(c.id)===cartaoId; });
-  if(!cartao) return;
-  var gastos  = CGASTOS.filter(function(g){
-    return String(g.cartaoId)===cartaoId && g.fatMes===mesAno && !g.pago;
-  });
-  if(!gastos.length){ toast('Nenhum gasto pendente nesta fatura'); return; }
-
-  var total   = gastos.reduce(function(s,g){ return s+g.val; }, 0);
-  var partes  = mesAno.split('-');
-  var mesLabel= ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(partes[1])-1]+'/'+partes[0];
-
-  if(!confirm('Fechar fatura de '+cartao.nome+' — '+mesLabel+'\nTotal: '+fmtBRL(total)+'\n\nIsso registrará UMA despesa no balanço financeiro. Confirmar?')) return;
-
-  // Marcar gastos como pagos
-  CGASTOS.forEach(function(g){
-    if(String(g.cartaoId)===cartaoId && g.fatMes===mesAno) g.pago = true;
-  });
-  saveCGastos();
-
-  // Registrar UMA transação no balanço
-  var tx = {
-    type:  'exp',
-    desc:  'Fatura '+cartao.nome+' '+mesLabel,
-    value: total,
-    cat:   '💳 Cartão de Crédito',
-    date:  ymd(new Date()),
-    fatCartaoId: cartaoId,
-    fatMes: mesAno
-  };
-  var tmp = Date.now();
-  TXS.unshift(Object.assign({id:tmp}, tx));
-  save();
-  apiCall('addTransaction', tx, function(err){
-    if(err){ TXS=TXS.filter(function(t){return t.id!==tmp;}); save(); toast('❌ Erro ao salvar','err'); }
-  });
-
-  // Lançar no resumo de categorias (gastos individuais)
-  // Os gastos do cartão já têm categoria — serão incluídos no relatório
-  renderCC();
-  renderBal();
-  toast('✅ Fatura fechada! R$ '+fmtBRL(total)+' registrado.');
-}
-
-// ── Render ───────────────────────────────────────────────
-function renderCC(){
-  // Atualizar selects de cartão
-  var opts = '<option value="">— selecione —</option>'+
-    CARTOES.map(function(c){
-      return '<option value="'+c.id+'">'+esc(c.nome)+'</option>';
-    }).join('');
-  ['cg-cartao','cf-cartao'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el){ var v=el.value; el.innerHTML=opts; if(v) el.value=v; }
-  });
-
-  // Data padrão = hoje
-  var dgEl = document.getElementById('cg-data');
-  if(dgEl && !dgEl.value) dgEl.value = ymd(new Date());
-
-  // Mês padrão = atual
-  var mfEl = document.getElementById('cf-mes');
-  if(mfEl && !mfEl.value){
-    var n=new Date(); mfEl.value=n.getFullYear()+'-'+pad(n.getMonth()+1);
-  }
-
-  renderListaCartoes();
-  renderListaGastos();
-  if(curCCTab==='fatura') renderFatura();
-}
-
-function renderListaCartoes(){
-  var el = document.getElementById('cc-list');
-  if(!el) return;
-  if(!CARTOES.length){
-    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhum cartão cadastrado</div>';
-    return;
-  }
-  el.innerHTML = CARTOES.map(function(cc){
-    var gastosPend = CGASTOS.filter(function(g){ return String(g.cartaoId)===String(cc.id)&&!g.pago; });
-    var total = gastosPend.reduce(function(s,g){return s+g.val;},0);
-    var pct   = cc.limite>0 ? Math.min(100, Math.round(total/cc.limite*100)) : 0;
-    return '<div class="cc-card-item">'+
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
-        '<div style="font-size:24px">💳</div>'+
-        '<div style="flex:1">'+
-          '<div style="font-size:15px;font-weight:800">'+esc(cc.nome)+'</div>'+
-          '<div style="font-size:11px;color:var(--t3)">Fecha dia '+cc.fech+' · Vence dia '+cc.venc+
-            (cc.limite?' · Limite '+fmtBRL(cc.limite):'')+
-          '</div>'+
-        '</div>'+
-        '<button class="tdel2" data-delcc="'+cc.id+'">🗑️</button>'+
-      '</div>'+
-      (cc.limite>0?
-        '<div style="height:6px;background:var(--bg3);border-radius:3px;margin-bottom:6px">'+
-          '<div style="height:6px;width:'+pct+'%;background:'+(pct>80?'var(--red)':'var(--green)')+';border-radius:3px"></div>'+
-        '</div>'+
-        '<div style="font-size:11px;color:var(--t3)">'+fmtBRL(total)+' de '+fmtBRL(cc.limite)+' ('+pct+'%)</div>'
-      :
-        '<div style="font-size:12px;color:var(--t3)">'+fmtBRL(total)+' em gastos pendentes</div>'
-      )+
-    '</div>';
-  }).join('');
-}
-
-function renderListaGastos(){
-  var el = document.getElementById('cg-list');
-  if(!el) return;
-  // Mostrar gastos dos últimos 30 dias não pagos + pagos da fatura atual
-  var now   = new Date();
-  var mes   = now.getFullYear()+'-'+pad(now.getMonth()+1);
-  var recentes = CGASTOS.filter(function(g){
-    return !g.pago || g.fatMes===mes;
-  }).slice(0,30);
-
-  if(!recentes.length){
-    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhum gasto registrado</div>';
-    return;
-  }
-  // Ordenar por data desc
-  recentes.sort(function(a,b){ return ymds(b.data)>ymds(a.data)?1:-1; });
-
-  el.innerHTML = recentes.map(function(g){
-    return '<div class="cc-fatura-item'+(g.pago?' pago':'')+'">'+
-      '<div style="font-size:20px">'+(g.pago?'✅':'🛍️')+'</div>'+
-      '<div class="fi-info">'+
-        '<div class="fi-desc">'+esc(g.desc)+'</div>'+
-        '<div class="fi-meta">'+esc(g.cartao)+' · '+esc(g.cat)+' · '+fmtDate(g.data)+'</div>'+
-      '</div>'+
-      '<div class="fi-val">'+fmtBRL(g.val)+'</div>'+
-      (!g.pago?'<button class="tdel2" data-delcg="'+g.id+'">🗑️</button>':'')+
-    '</div>';
-  }).join('');
-}
-
-function renderFatura(){
-  var cartaoId = (document.getElementById('cf-cartao')||{}).value||'';
-  var mesAno   = (document.getElementById('cf-mes')||{}).value||'';
-  var el = document.getElementById('cf-body');
-  if(!el) return;
-
-  if(!cartaoId||!mesAno){
-    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:24px">Selecione o cartão e o mês</div>';
-    return;
-  }
-  var cartao  = CARTOES.find(function(c){ return String(c.id)===cartaoId; });
-  if(!cartao){ el.innerHTML=''; return; }
-
-  var gastos  = CGASTOS.filter(function(g){
-    return String(g.cartaoId)===cartaoId && g.fatMes===mesAno;
-  });
-  var pendentes = gastos.filter(function(g){ return !g.pago; });
-  var pagos     = gastos.filter(function(g){ return g.pago; });
-  var total     = gastos.reduce(function(s,g){ return s+g.val; }, 0);
-  var totalPend = pendentes.reduce(function(s,g){ return s+g.val; }, 0);
-
-  // Agrupar por categoria
-  var porCat = {};
-  gastos.forEach(function(g){
-    porCat[g.cat] = (porCat[g.cat]||0) + g.val;
-  });
-
-  var partes   = mesAno.split('-');
-  var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  var mesLabel = meses_br[parseInt(partes[1])-1]+'/'+partes[0];
-
-  // Data de vencimento
-  var vencData = new Date(parseInt(partes[0]), parseInt(partes[1])-1+(cartao.venc<cartao.fech?1:0), cartao.venc);
-  var vencStr  = vencData.toLocaleDateString('pt-BR');
-
-  var html = '';
-
-  // Total
-  html += '<div class="fatura-total">'+
-    '<div class="ft-lbl">Fatura '+cartao.nome+' — '+mesLabel+'</div>'+
-    '<div class="ft-val">'+fmtBRL(total)+'</div>'+
-    '<div style="font-size:12px;color:var(--t3);margin-top:4px">Vencimento: '+vencStr+
-      (pagos.length?' · ✅ '+fmtBRL(pagos.reduce(function(s,g){return s+g.val;},0))+' pago':'')+
-    '</div>'+
-  '</div>';
-
-  // Gastos por categoria
-  if(Object.keys(porCat).length){
-    html += '<div class="slbl" style="margin-bottom:8px">Por categoria</div>';
-    html += '<div style="margin-bottom:12px">';
-    Object.keys(porCat).sort(function(a,b){ return porCat[b]-porCat[a]; }).forEach(function(cat){
-      var pct = total>0 ? Math.round(porCat[cat]/total*100) : 0;
-      html += '<div style="margin-bottom:8px">'+
-        '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">'+
-          '<span>'+esc(cat)+'</span><span style="font-weight:700">'+fmtBRL(porCat[cat])+' ('+pct+'%)</span>'+
-        '</div>'+
-        '<div style="height:5px;background:var(--bg3);border-radius:3px">'+
-          '<div style="height:5px;width:'+pct+'%;background:var(--blue);border-radius:3px"></div>'+
-        '</div>'+
-      '</div>';
-    });
-    html += '</div>';
-  }
-
-  // Lista de gastos
-  if(gastos.length){
-    html += '<div class="slbl" style="margin-bottom:8px">Lançamentos</div>';
-    gastos.sort(function(a,b){ return ymds(a.data)>ymds(b.data)?1:-1; });
-    html += gastos.map(function(g){
-      return '<div class="cc-fatura-item">'+
-        '<div style="font-size:18px">'+(g.pago?'✅':'🛍️')+'</div>'+
-        '<div class="fi-info">'+
-          '<div class="fi-desc">'+esc(g.desc)+'</div>'+
-          '<div class="fi-meta">'+esc(g.cat)+' · '+fmtDate(g.data)+'</div>'+
-        '</div>'+
-        '<div class="fi-val" style="color:'+(g.pago?'var(--t3)':'var(--red)')+'">'+fmtBRL(g.val)+'</div>'+
-      '</div>';
-    }).join('');
-  }
-
-  // Botão fechar fatura (só se tem pendentes)
-  if(pendentes.length){
-    html += '<button data-fechfat="1" id="btn-fechar-fat" style="width:100%;margin-top:14px;padding:14px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit">'+
-      '💳 Fechar fatura — '+fmtBRL(totalPend)+
-    '</button>';
-    // Guardar params no botão
-    var _fatBtn = document.getElementById('btn-fechar-fat');
-    if(_fatBtn){ _fatBtn.setAttribute('data-cid', cartaoId); _fatBtn.setAttribute('data-mes', mesAno); }
-    html += '<div style="font-size:11px;color:var(--t3);text-align:center;margin-top:8px;padding:0 16px">Isso registrará uma única despesa no balanço financeiro sem duplicar os gastos individuais</div>';
-  } else if(pagos.length){
-    html += '<div style="text-align:center;padding:16px;color:var(--green);font-weight:700">✅ Fatura paga</div>';
-  } else {
-    html += '<div style="text-align:center;padding:16px;color:var(--t3)">Nenhum lançamento nesta fatura</div>';
-  }
-
-  el.innerHTML = html;
-}
-
-
-// ════════════════════════════════════════════════════════
-//  CONTRATOS DE LOCAÇÃO
-// ════════════════════════════════════════════════════════
-function saveContratos(){ localStorage.setItem('ff_contratos', JSON.stringify(CONTRATOS)); }
-
-function toggleCampo(id, show){
-  var el = document.getElementById(id);
-  if(el) el.style.display = show ? 'block' : 'none';
-}
-
-function gV(id){ var el=document.getElementById(id); return el ? el.value.trim() : ''; }
-
-function salvarContrato(){
-  var inqNome = gV('ct-inq-nome');
-  var locNome = gV('ct-loc-nome');
-  var imovel  = gV('ct-imovel');
-  var valor   = parseFloat(gV('ct-valor'))||0;
-  var inicio  = gV('ct-inicio');
-  if(!inqNome){ toast('⚠️ Informe o nome do locatário','err'); return; }
-  if(!locNome){ toast('⚠️ Informe o nome do locador','err'); return; }
-  if(!imovel) { toast('⚠️ Informe o imóvel','err'); return; }
-  if(!valor)  { toast('⚠️ Informe o valor do aluguel','err'); return; }
-  if(!inicio) { toast('⚠️ Informe a data de início','err'); return; }
-
-  var dur = parseInt(gV('ct-duracao'))||12;
-  var fimDate = dur > 0
-    ? new Date(new Date(inicio+'T12:00:00').setMonth(new Date(inicio+'T12:00:00').getMonth()+dur))
-    : null;
-
-  var ct = {
-    id:        Date.now(),
-    tipo:      gV('ct-tipo'),
-    imovel:    imovel,
-    end:       gV('ct-end'),
-    mat:       gV('ct-mat'),
-    // Locador
-    locNome:   locNome,
-    locEciv:   gV('ct-loc-eciv'),
-    locCpf:    gV('ct-loc-cpf'),
-    locRg:     gV('ct-loc-rg'),
-    locNome2:  gV('ct-loc2-nome'),
-    locCpf2:   gV('ct-loc2-cpf'),
-    // Locatário
-    inqNome:   inqNome,
-    inqEciv:   gV('ct-inq-eciv'),
-    inqCpf:    gV('ct-inq-cpf'),
-    inqRg:     gV('ct-inq-rg'),
-    inqNome2:  gV('ct-inq2-nome'),
-    inqCpf2:   gV('ct-inq2-cpf'),
-    inqEnd:    gV('ct-inq-end'),
-    // Valores
-    valor:     valor,
-    diaPgto:   parseInt(gV('ct-diapgto'))||10,
-    inicio:    inicio,
-    duracao:   dur,
-    fim:       fimDate ? ymd(fimDate) : '',
-    // Vistoria
-    vistoria:  gV('ct-vistoria'),
-    itens:     gV('ct-itens'),
-    // Pagamentos registrados
-    pagamentos: [],
-    ativo:     true,
-    criadoEm: new Date().toISOString()
-  };
-
-  CONTRATOS.unshift(ct);
-  saveContratos();
-
-  // Salvar contrato no servidor (aba Contratos na planilha)
-  apiPost('salvarContrato', ct, function(err){
-    if(err) toast('⚠️ Erro ao salvar na planilha: '+(err.message||''),'err');
-    else toast('✅ Contrato salvo na planilha!');
-  });
-
-  // Criar planilha de controle de pagamentos
-  apiPost('criarPlanilhaContrato', ct, function(err){
-    if(!err) toast('✅ Contrato salvo! Planilha criada no Google Sheets.');
-    else toast('✅ Contrato salvo!');
-  });
-
-  // Criar pagador automaticamente se não existir
-  if(!PAGADORES.some(function(p){ return p.nome.toLowerCase()===inqNome.toLowerCase(); })){
-    var np = {id: Date.now()+1, nome: inqNome, tel: '', doc: ct.inqCpf};
-    PAGADORES.unshift(np);
-    savePagadores();
-  }
-
-  // Criar aluguel recorrente automaticamente
-  if(!ALUGUEIS.some(function(a){ return a.nome.toLowerCase()===inqNome.toLowerCase(); })){
-    var pag = PAGADORES.find(function(p){ return p.nome.toLowerCase()===inqNome.toLowerCase(); });
-    if(pag){
-      var alug = {
-        id: Date.now()+2, pagadorId: String(pag.id),
-        nome: inqNome, tel: pag.tel||'', dia: ct.diaPgto,
-        valorBase: valor, ref: imovel, parcelas: [], criadoEm: ct.criadoEm
-      };
-      ALUGUEIS.unshift(alug);
-      saveAlugueis();
-      sincronizarFichaGoogleSheets(alug);
-    }
-  }
-
-  renderContratos();
-  // Limpar form
-  ['ct-imovel','ct-end','ct-mat','ct-loc-nome','ct-loc-eciv','ct-loc-cpf','ct-loc-rg',
-   'ct-loc2-nome','ct-loc2-cpf','ct-inq-nome','ct-inq-eciv','ct-inq-cpf','ct-inq-rg',
-   'ct-inq2-nome','ct-inq2-cpf','ct-inq-end','ct-valor','ct-diapgto','ct-inicio',
-   'ct-vistoria','ct-itens'].forEach(function(id){
-    var el=document.getElementById(id); if(el) el.value='';
-  });
-  document.getElementById('ct-loc2-chk').checked=false;
-  document.getElementById('ct-inq2-chk').checked=false;
-  toggleCampo('ct-loc2-campos',false);
-  toggleCampo('ct-inq2-campos',false);
-}
-
-function delContrato(id){
-  if(!confirm('Remover este contrato? O histórico de pagamentos será perdido.')) return;
-  CONTRATOS = CONTRATOS.filter(function(c){ return String(c.id)!==String(id); });
-  saveContratos();
-  apiCall('deletarContrato', {id:id}, function(){});
-  renderContratos();
-  toast('🗑️ Contrato removido');
-}
-
-function abrirLinkInquilino(ctId){
-  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
-  if(!ct){ toast('⚠️ Contrato não encontrado','err'); return; }
-  if(!API){ toast('⚠️ Configure a URL do Apps Script','err'); return; }
-
-  // Remover /exec e parâmetros, usar URL base do Apps Script
-  var baseUrl = API.split('?')[0];
-  var url = baseUrl + '?action=paginaInquilino&ctId='+encodeURIComponent(String(ct.id));
-  
-  // Copiar link para clipboard e abrir
-  if(navigator.clipboard){
-    navigator.clipboard.writeText(url).then(function(){
-      toast('🔗 Link copiado! Abrindo preview...');
-    }).catch(function(){ toast('🔗 Abrindo link do inquilino...'); });
-  } else {
-    toast('🔗 Abrindo link do inquilino...');
-  }
-  window.open(url, '_blank');
-}
-
-function renderContratos(){
-  var el = document.getElementById('ct-list');
-  if(!el) return;
-  if(!CONTRATOS.length){
-    el.innerHTML='<div style="text-align:center;color:var(--t3);padding:20px;font-size:13px">Nenhum contrato cadastrado</div>';
-    return;
-  }
-  el.innerHTML = CONTRATOS.map(function(ct){
-    var fmtD = function(s){ return s ? s.split('-').reverse().join('/') : '—'; };
-    var pago  = ct.pagamentos.filter(function(p){ return p.pago; }).length;
-    var total = ct.duracao || '∞';
-    var venc  = ct.fim ? (new Date(ct.fim+'T12:00:00') < new Date() ? '🔴 Vencido' : '🟢 Ativo') : '🟢 Ativo';
-    return '<div class="taski" style="margin-bottom:10px">'+
-      '<div class="taski-hdr">'+
-        '<div style="font-size:22px">'+(ct.tipo==='comercial'?'🏢':'🏠')+'</div>'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:14px;font-weight:800">'+esc(ct.inqNome)+(ct.inqNome2?' + '+esc(ct.inqNome2):'')+'</div>'+
-          '<div style="font-size:11px;color:var(--t3)">'+esc(ct.imovel)+' · '+fmtBRL(ct.valor)+'/mês</div>'+
-        '</div>'+
-        '<button class="tdel2" data-delct="'+ct.id+'">🗑️</button>'+
-      '</div>'+
-      '<div class="tmeta">'+
-        '<span>'+venc+'</span>'+
-        '<span>📅 '+fmtD(ct.inicio)+(ct.fim?' → '+fmtD(ct.fim):'')+'</span>'+
-        '<span>💰 '+pago+'/'+total+' meses</span>'+
-      '</div>'+
-      '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">'+
-        '<button data-ctcontrato="'+ct.id+'" style="flex:1;min-width:80px;padding:9px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📄 Contrato</button>'+
-        '<button data-ctvistoria="'+ct.id+'" style="flex:1;min-width:80px;padding:9px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔍 Vistoria</button>'+
-        '<button data-ctpgto="'+ct.id+'" style="flex:1;min-width:80px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">💰 Pgto</button>'+
-        '<button data-ctlink="'+ct.id+'" style="flex:1;min-width:80px;padding:9px;border:none;border-radius:8px;background:rgba(100,160,255,.2);color:#64A0FF;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Link</button>'+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-
-// ── Gerar contrato HTML para imprimir ────────────────────
-function gerarContrato(ctId){
-  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
-  if(!ct) return;
-  var fmtD = function(s){ return s ? s.split('-').reverse().join('/') : '___/___/______'; };
-  var hoje = new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});
-  var tipoLabel = ct.tipo==='comercial' ? 'NÃO RESIDENCIAL' : 'RESIDENCIAL';
-
-  var locadorBloco = ct.locNome+', '+ct.locEciv+', inscrito no CPF sob o nº '+ct.locCpf+', portador da RG nº '+ct.locRg+
-    (ct.locNome2?'; e '+ct.locNome2+', inscrito no CPF sob o nº '+ct.locCpf2:'');
-
-  var locatarioBloco = ct.inqNome+', '+ct.inqEciv+', inscrito no CPF sob o nº '+ct.inqCpf+', portador da RG nº '+ct.inqRg+
-    (ct.inqNome2?'; e '+ct.inqNome2+', inscrito no CPF sob o nº '+ct.inqCpf2:'');
-
-  var valorExt = '(valor por extenso)';
-  var durMeses = ct.duracao > 0 ? ct.duracao+' ('+ct.duracao+') meses' : 'prazo indeterminado';
-
-  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
-  '<title>Contrato '+ct.inqNome+'</title>'+
-  '<style>'+
-    'body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;color:#000;margin:0;padding:0}'+
-    '.page{max-width:18cm;margin:0 auto;padding:2cm 2.5cm}'+
-    'h1{font-size:14pt;text-align:center;text-transform:uppercase;margin-bottom:20px}'+
-    'h2{font-size:12pt;text-transform:uppercase;margin:20px 0 8px}'+
-    'p{text-align:justify;margin:0 0 10px}'+
-    '.assin{margin-top:60px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:30px}'+
-    '.assin-bloco{min-width:200px;text-align:center}'+
-    '.linha{border-bottom:1px solid #000;width:100%;margin-bottom:4px}'+
-    '.testem{margin-top:40px;display:flex;justify-content:space-between;gap:30px}'+
-    '@media print{body{margin:0}.no-print{display:none}button{display:none}}'+
-    '.btn-print{position:fixed;top:20px;right:20px;padding:10px 20px;background:#0a1a2e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700}'+
-  '</style></head><body>'+
-  '<button class="btn-print" onclick="window.print()">🖨️ Imprimir / PDF</button>'+
-  '<div class="page">'+
-  '<h1>Contrato de Locação de Imóvel '+tipoLabel+'</h1>'+
-
-  '<p style="text-indent:2em">Contrato de LOCAÇÃO, que fazem entre si, de um lado como LOCADOR, '+locadorBloco+
-  ', residentes e domiciliados à '+esc(ct.end)+', Chapecó/SC; e de outro lado como LOCATÁRIO, '+locatarioBloco+
-  ', residentes e domiciliados à '+esc(ct.inqEnd)+', neste instrumento, doravante denominados simplesmente como LOCATÁRIO.</p>'+
-
-  '<h2>Cláusula Primeira – Do Imóvel</h2>'+
-  '<p style="text-indent:2em">Neste ato contratam as partes a locação do imóvel '+tipoLabel.toLowerCase()+
-  ': '+esc(ct.imovel)+', localizado à '+esc(ct.end)+', nesta cidade de Chapecó-SC'+
-  (ct.mat?', matriculado no Registro de Imóveis sob o nº '+esc(ct.mat):'')+'.</p>'+
-
-  '<h2>Cláusula Segunda – Do Prazo</h2>'+
-  '<p style="text-indent:2em">O prazo de locação é de '+durMeses+', tendo o seu início na data '+fmtD(ct.inicio)+
-  (ct.fim?' e término na data '+fmtD(ct.fim):'')+ '. Findo o prazo, compromete-se o LOCATÁRIO a restituir o imóvel nas mesmas condições em que o recebeu. '+
-  'A permanência do LOCATÁRIO após o término somente será possível por meio de novo contrato. '+
-  'Os valores serão reajustados a cada 12 (doze) meses pelo INPC-IBGE.</p>'+
-  '<p><em>Parágrafo Primeiro:</em> A partir de 12 (doze) meses, o locatário poderá desocupar o imóvel, notificando o LOCADOR por escrito com antecedência mínima de 30 (trinta) dias.</p>'+
-  '<p><em>Parágrafo Segundo:</em> Em caso de devolução durante o prazo contratual, o LOCATÁRIO pagará multa de 50% dos aluguéis devidos até o término, com redução proporcional ao período cumprido, nos termos do art. 4 da Lei nº 8.245/1991 e do art. 413 do Código Civil, com multa mínima de 01 (um) mês de aluguel.</p>'+
-
-  '<h2>Cláusula Terceira – Do Valor / Forma de Pagamento e Reajuste</h2>'+
-  '<p style="text-indent:2em">O valor do aluguel mensal é de '+fmtBRL(ct.valor)+' '+valorExt+
-  '. O pagamento deve ser efetuado todo o dia '+ct.diaPgto+' ('+ct.diaPgto+'º) de cada mês, '+
-  'diretamente ao LOCADOR ou mediante depósito bancário a ser indicado. Os aluguéis não quitados até o vencimento '+
-  'sofrerão acréscimo de multa de 10% (dez por cento) e juros de mora.</p>'+
-
-  '<h2>Cláusula Quarta</h2>'+
-  '<p style="text-indent:2em">Antes do vencimento do prazo, não poderá o LOCADOR retomar o imóvel, salvo infração contratual do LOCATÁRIO ou fundamentações legais estabelecidas na Lei nº 8.245/91.</p>'+
-
-  '<h2>Cláusula Quinta – Dos Impostos e Taxas</h2>'+
-  '<p style="text-indent:2em">Os impostos, taxas e despesas ordinárias de condomínio serão pagos pelo LOCATÁRIO junto com o aluguel. São de responsabilidade do LOCATÁRIO os encargos com energia elétrica, água, telefone e outros inerentes à sua atividade.</p>'+
-
-  '<h2>Cláusula Oitava – Do Uso e das Sublocações</h2>'+
-  '<p style="text-indent:2em">O LOCATÁRIO destinará o imóvel para fins exclusivamente '+
-  (ct.tipo==='comercial'?'comerciais/profissionais':'residenciais')+
-  ', não podendo sublocar, ceder ou emprestar o imóvel sem prévio consentimento por escrito do LOCADOR.</p>'+
-
-  '<h2>Cláusula Décima – Da Vistoria</h2>'+
-  '<p style="text-indent:2em">O LOCATÁRIO declara ter examinado o imóvel, encontrando-o em boas condições, '+
-  'conforme relatório de vistoria anexo, obrigando-se a restituí-lo ao final da locação no mesmo estado.</p>'+
-
-  '<h2>Cláusula Décima Quinta – Da Multa</h2>'+
-  '<p style="text-indent:2em">A falta de cumprimento de qualquer cláusula sujeitará o infrator a multa de 03 (três) meses de aluguel, além de honorários advocatícios de 20% sobre o total dos débitos.</p>'+
-
-  '<h2>Cláusula Décima Nona – Foro</h2>'+
-  '<p style="text-indent:2em">Fica eleito o Foro da Comarca de Chapecó/SC para solução de todas as questões decorrentes deste contrato.</p>'+
-
-  '<p style="text-align:center;margin-top:30px">Chapecó, '+hoje+'.</p>'+
-
-  '<div class="assin">'+
-    '<div class="assin-bloco"><div class="linha"></div><div>LOCADOR<br>'+esc(ct.locNome)+'<br>CPF: '+esc(ct.locCpf)+'</div></div>'+
-    (ct.locNome2?'<div class="assin-bloco"><div class="linha"></div><div>LOCADOR<br>'+esc(ct.locNome2)+'<br>CPF: '+esc(ct.locCpf2)+'</div></div>':'')+
-    '<div class="assin-bloco"><div class="linha"></div><div>LOCATÁRIO<br>'+esc(ct.inqNome)+'<br>CPF: '+esc(ct.inqCpf)+'</div></div>'+
-    (ct.inqNome2?'<div class="assin-bloco"><div class="linha"></div><div>LOCATÁRIO<br>'+esc(ct.inqNome2)+'<br>CPF: '+esc(ct.inqCpf2)+'</div></div>':'')+
-  '</div>'+
-  '<div class="testem">'+
-    '<div style="min-width:200px;text-align:center"><div class="linha"></div><div>TESTEMUNHA 1</div></div>'+
-    '<div style="min-width:200px;text-align:center"><div class="linha"></div><div>TESTEMUNHA 2</div></div>'+
-  '</div>'+
-  '</div></body></html>';
-
-  var win=window.open('','_blank','width=800,height=900');
-  if(win){ win.document.write(html); win.document.close(); }
-  else toast('⚠️ Permita pop-ups para visualizar o contrato','err');
-}
-
-// ── Gerar relatório de vistoria ──────────────────────────
-function gerarVistoria(ctId){
-  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
-  if(!ct) return;
-  var fmtD = function(s){ return s ? s.split('-').reverse().join('/') : '___/___/______'; };
-
-  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Vistoria</title>'+
-  '<style>body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;color:#000}'+
-  '.page{max-width:18cm;margin:0 auto;padding:2cm 2.5cm}'+
-  'h1{font-size:13pt;text-align:center;text-transform:uppercase;margin-bottom:20px}'+
-  'p{text-align:justify;margin:0 0 10px}'+
-  '.linha{border-bottom:1px solid #000;margin-bottom:4px}'+
-  '.assin{margin-top:60px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:30px}'+
-  '.assin-bloco{min-width:200px;text-align:center}'+
-  '@media print{button{display:none}}'+
-  '</style></head><body>'+
-  '<button onclick="window.print()" style="position:fixed;top:20px;right:20px;padding:10px 20px;background:#0a1a2e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700">🖨️ Imprimir / PDF</button>'+
-  '<div class="page">'+
-  '<h1>Relatório de Vistoria</h1>'+
-  '<p><strong>Parte integrante do Contrato de Locação firmado em '+fmtD(ct.inicio)+'.</strong></p>'+
-  '<p><strong>Imóvel:</strong> '+esc(ct.imovel)+', '+esc(ct.end)+', Chapecó/SC.</p>'+
-  '<p><strong>Locatário:</strong> '+esc(ct.inqNome)+(ct.inqNome2?' e '+esc(ct.inqNome2):'')+' — CPF: '+esc(ct.inqCpf)+'</p>'+
-  '<p><strong>Estado geral do imóvel:</strong></p>'+
-  '<p style="padding:12px;border:1px solid #ccc;border-radius:4px;background:#f9f9f9;white-space:pre-wrap">'+esc(ct.vistoria||'Não informado')+'</p>'+
-  '<p><strong>Itens entregues ao locatário:</strong></p>'+
-  '<p style="padding:12px;border:1px solid #ccc;border-radius:4px;background:#f9f9f9">'+esc(ct.itens||'Não informado')+'</p>'+
-  '<p style="margin-top:20px">Reconheço as anotações constantes deste relatório e me comprometo a restituir o imóvel nas mesmas condições em que o recebi, responsabilizando-me por todos os danos causados durante a locação.</p>'+
-  '<p style="margin-top:8px">O LOCATÁRIO tem prazo máximo de 3 (três) dias úteis para reclamar ou requerer retificação, findo o qual fica responsável pelos danos descritos.</p>'+
-  '<p style="text-align:center;margin-top:30px">Chapecó, '+new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'})+'.</p>'+
-  '<div class="assin">'+
-    '<div class="assin-bloco"><div class="linha"></div><div>LOCADOR<br>'+esc(ct.locNome)+'</div></div>'+
-    '<div class="assin-bloco"><div class="linha"></div><div>LOCATÁRIO<br>'+esc(ct.inqNome)+'</div></div>'+
-  '</div>'+
-  '</div></body></html>';
-
-  var win=window.open('','_blank','width=800,height=700');
-  if(win){ win.document.write(html); win.document.close(); }
-  else toast('⚠️ Permita pop-ups','err');
-}
-
-// ── Registrar pagamento do contrato ─────────────────────
-function registrarPgtoContrato(ctId){
-  var ct = CONTRATOS.find(function(x){ return String(x.id)===String(ctId); });
-  if(!ct) return;
-  var now    = new Date();
-  var mesAno = now.getFullYear()+'-'+pad(now.getMonth()+1);
-  var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  var mesLabel = meses_br[now.getMonth()]+'/'+now.getFullYear();
-
-  var jaPago = ct.pagamentos.some(function(p){ return p.mesAno===mesAno; });
-  if(jaPago){ toast('✅ '+mesLabel+' já registrado'); return; }
-
-  var val = prompt('Registrar pagamento de '+ct.inqNome+'\nMês: '+mesLabel+'\n\nValor (R$):', ct.valor.toFixed(2).replace('.',','));
-  if(val===null) return;
-  var valN = parseFloat(String(val).replace(',','.'));
-  if(isNaN(valN)||valN<=0) valN = ct.valor;
-
-  var codigo    = 'REC-'+Date.now().toString(36).toUpperCase();
-  var emitidoEm = now.toLocaleString('pt-BR');
-  var dataPgto  = ymd(now);
-
-  var pgto = { mesAno:mesAno, valor:valN, dataPgto:dataPgto, codigo:codigo, emitidoEm:emitidoEm, pago:true };
-  ct.pagamentos.push(pgto);
-  saveContratos();
-
-  // Gerar recibo automaticamente
-  var recibo = {
-    id: Date.now(), codigo: codigo, pagador: ct.inqNome,
-    tel: (PAGADORES.find(function(p){return p.nome===ct.inqNome;})||{}).tel||'',
-    desc: 'Aluguel '+esc(ct.imovel)+' — '+mesLabel,
-    valor: valN, data: dataPgto,
-    obs: 'Ref. mês de '+mesLabel+' · Contrato nº '+String(ct.id).substring(0,8),
-    emitidoEm: emitidoEm, contratoId: String(ct.id), mesAno: mesAno
-  };
-  RECIBOS.unshift(recibo);
-  saveRecibos();
-
-  // Registrar na planilha do Google Sheets
-  apiCall('registrarPagamentoContrato', {
-    inqNome: ct.inqNome, imovel: ct.imovel, mesAno: mesAno,
-    valor: valN, dataPgto: dataPgto, codigo: codigo
-  }, function(){});
-
-  renderContratos();
-  abrirRecibo(recibo);
-  toast('✅ Pagamento registrado — recibo gerado!');
-}
-
-var curRecTab = 'contratos';
-function setRecTab(t){
-  curRecTab = t;
-  ['pagadores','alugueis','contratos','recibos'].forEach(function(tab){
-    var el = document.getElementById('rp-'+tab);
-    if(el) el.style.display = tab===t ? 'block' : 'none';
-    var btn = document.getElementById('rb-'+tab);
-    if(btn) btn.classList.toggle('on', tab===t);
-  });
-  if(t==='contratos') renderContratos();
-  else renderRecibos();
-}
-
-function renderRecibos(){
-  try { renderAlugueisSection(); } catch(e){ console.error('renderAlugueisSection:', e); }
-  try { renderPagadores(); } catch(e){ console.error('renderPagadores:', e); }
-  try { if(curRecTab==='contratos') renderContratos(); } catch(e){}
-  // Preencher data padrão = hoje
-  var dataEl = document.getElementById('rec-data');
-  if(dataEl && !dataEl.value) dataEl.value = ymd(new Date());
-
-  var el = document.getElementById('rec-hist-list');
-  if(!el) return;
-  if(!RECIBOS.length){
-    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhum recibo emitido ainda</div>';
-    return;
-  }
-  el.innerHTML = RECIBOS.map(function(r){
-    var dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
-    return '<div class="taski" style="margin-bottom:8px">'+
-      '<div class="taski-hdr">'+
-        '<div style="font-size:20px">🧾</div>'+
-        '<div class="tname">'+esc(r.pagador)+'</div>'+
-        '<button class="tdel2" data-delrec="'+r.id+'">🗑️</button>'+
-      '</div>'+
-      '<div class="tmeta">'+
-        '<span style="font-weight:800;color:var(--green)">'+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'</span>'+
-        '<span>'+esc(r.desc)+'</span>'+
-        '<span>'+dataFmt+'</span>'+
-        '<span style="color:var(--t3);font-family:monospace">'+r.codigo+'</span>'+
-      '</div>'+
-      '<div style="margin-top:8px;display:flex;gap:8px">'+
-        '<button data-abrirec="'+r.id+'" style="flex:1;padding:8px;border:none;border-radius:8px;background:var(--bg3);color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🖨️ Abrir recibo</button>'+
-        (r.tel ? '<button data-wppec="'+r.id+'" style="flex:1;padding:8px;border:none;border-radius:8px;background:#25D366;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">💬 WhatsApp</button>' : '')+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-
-// ════════════════════════════════════════
-//  RENDER ALL
-// ════════════════════════════════════════
 function renderAll(){
-  renderBal();
-  if(curFinTab==='hist')   renderHist();
-  if(curFinTab==='cat')    renderCat();
-  if(curFinTab==='agenda') renderFinView();
-  if(curSection==='task')  renderTasks();
-  if(curSection==='hoje')  renderHoje();
-  if(curSection==='rec')   renderRecibos();
-  if(curSection==='fin' && curFinTab==='cc') renderFinCC();
-  renderDocs();
-  renderFixos();
+  try{renderBal();}catch(e){}
+  if(curFinTab==='hist') try{renderHist();}catch(e){}
+  if(curFinTab==='cat')  try{renderCat();}catch(e){}
+  if(curFinTab==='cc')   try{renderFinCC();}catch(e){}
+  if(curSection==='task') try{renderTasks();}catch(e){}
+  if(curSection==='hoje') try{renderHoje();}catch(e){}
+  if(curSection==='rec')  try{renderRecibos();}catch(e){}
+  try{renderDocs();}catch(e){}
+  try{renderFixos();}catch(e){}
 }
 
-// ════════════════════════════════════════
-//  TRANSACTIONS
-// ════════════════════════════════════════
 function setTxType(t){
   curTxType=t;
   document.getElementById('bt-exp').className='ttype'+(t==='exp'?' exp':'');
@@ -3744,33 +2359,39 @@ function realizedTxs(){
 }
 
 function renderBal(){
-  var b=balOf(filteredTxs());
-  var v=document.getElementById('bal-val');
-  // Mostra valor absoluto (sem sinal de menos), vermelho se negativo
-  v.textContent=fmtBRL(Math.abs(b.b));
-  v.className=b.b<0?'neg':'';
-  document.getElementById('bi').textContent=fmtBRL(b.i);
-  document.getElementById('be').textContent=fmtBRL(b.e);
+  try{
+    var b=balOf(filteredTxs());
+    var v=document.getElementById('bal-val');
+    if(v){ v.textContent=fmtBRL(Math.abs(b.b)); v.className=b.b<0?'neg':''; }
+    var bi=document.getElementById('bi'); if(bi) bi.textContent=fmtBRL(b.i);
+    var be=document.getElementById('be'); if(be) be.textContent=fmtBRL(b.e);
+  }catch(e){ console.error('renderBal',e); }
 }
 
 function renderHist(){
-  var months=[...new Set(validTxs().map(function(t){return ymds(t.date).substring(0,7);}))].sort().reverse();
-  var mf=document.getElementById('mf-row');
-  mf.innerHTML=months.map(function(m){
-    var p=m.split('-');
-    var lbl=new Date(p[0],parseInt(p[1])-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
-    return '<button class="mfc'+(m===selMonth?' on':'')+ '" onclick="selMon(\''+m+'\')">'+lbl+'</button>';
-  }).join('');
-  var txs=filteredTxs();
-  var el=document.getElementById('tx-list');
-  if(!txs.length){el.innerHTML=emptyHTML('📭','Nenhum lançamento','Nenhum registro neste período');return;}
-  el.innerHTML=txs.map(txCard).join('');
+  try{
+    var months=[...new Set(validTxs().map(function(t){
+      return ymds(t.date).substring(0,7);
+    }))].sort().reverse();
+    var mf=document.getElementById('mf-row');
+    if(mf) mf.innerHTML=months.map(function(m){
+      var p=m.split('-');
+      var lbl=new Date(p[0],parseInt(p[1])-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
+      return '<button class="mfc'+(m===selMonth?' on':'')+'" data-selmon="'+m+'">'+lbl+'</button>';
+    }).join('');
+    var txs=filteredTxs();
+    var el=document.getElementById('tx-list');
+    if(!el) return;
+    el.innerHTML=txs.length
+      ? txs.map(txCard).join('')
+      : emptyHTML('📭','Nenhum lançamento','Nenhum registro neste período');
+  }catch(e){ console.error('renderHist',e); }
 }
 
 function selMon(m){
   selMonth=m;
   var p=m.split('-');
-  document.getElementById('cat-month-lbl').textContent=
+  var cml=document.getElementById('cat-month-lbl'); if(cml) cml.textContent=
     new Date(p[0],parseInt(p[1])-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
   renderAll();
   if(curFinTab!=='hist') ftab('hist');
@@ -3778,6 +2399,7 @@ function selMon(m){
 
 function renderCat(){
   var el=document.getElementById('cat-list');
+  if(!el) return;
   var bc={};
 
   // 1. TXS reais do mês (diretas em Finanças)
@@ -4441,6 +3063,8 @@ function initTaskDelegation(){
     if(delcc){ delCartao(delcc.getAttribute('data-delcc')); return; }
     var delcg = e.target.closest('[data-delcg]');
     if(delcg){ delGasto(delcg.getAttribute('data-delcg')); return; }
+    var selmon = e.target.closest('[data-selmon]');
+    if(selmon){ selMon(selmon.getAttribute('data-selmon')); return; }
     var selcc = e.target.closest('[data-selcc]');
     if(selcc){ curFinCCId=selcc.getAttribute('data-selcc'); renderFinCC(); return; }
     var wpp = e.target.closest('[data-wppec]');
@@ -4528,7 +3152,13 @@ function renderTL(){
 function renderTD(){
   var d=tdDate; var dy=ymd(d);
   var mo=dy.substring(0,7);
-  document.getElementById('td-lbl').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  var tdLbl = document.getElementById('td-lbl');
+  var tdDate2 = document.getElementById('td-date');
+  var tdSub = document.getElementById('td-sub');
+  var dStr = d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  if(tdLbl) tdLbl.textContent = dStr;
+  if(tdDate2) tdDate2.textContent = dStr;
+  if(tdSub) tdSub.textContent = '';
   var tasks=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
   var alugDia=(typeof projecoesAluguel==='function') ? projecoesAluguel(mo).filter(function(t){return t.deadline===dy;}) : [];
   var all=tasks.map(function(t){return {t:t,isA:false};}).concat(
@@ -4876,10 +3506,10 @@ function _renderHoje(){
   document.getElementById('hc-rec').textContent  = recs.length;
 
   // Badges
-  document.getElementById('hb-pgto').textContent     = pgtos.length;
-  document.getElementById('hb-rec').textContent      = recs.length;
-  document.getElementById('hb-task').textContent     = todPend.length;
-  document.getElementById('hb-atrasado').textContent = atrasadoTasks.length;
+  (document.getElementById('hb-pgto')||{textContent:''}).textContent     = pgtos.length;
+  (document.getElementById('hb-rec')||{textContent:''}).textContent      = recs.length;
+  (document.getElementById('hb-task')||{textContent:''}).textContent     = todPend.length;
+  (document.getElementById('hb-atrasado')||{textContent:''}).textContent = atrasadoTasks.length;
 
   // Totais — soma dos valores pendentes
   var totalHoje = todPend.reduce(function(s,t){
@@ -4894,36 +3524,36 @@ function _renderHoje(){
   if(elTotAtr)  elTotAtr.textContent  = totalAtrasado > 0 ? fmtBRL(totalAtrasado) : '';
 
   // Mostrar/ocultar seções vazias
-  document.getElementById('hs-pgto').style.display    = pgtos.length    ? 'block':'none';
-  document.getElementById('hs-rec').style.display     = recs.length     ? 'block':'none';
-  document.getElementById('hs-task').style.display    = todTasks.length ? 'block':'none'; // inclui concluídas
-  document.getElementById('hs-atrasado').style.display = atrasadoTasks.length ? 'block':'none';
+  (document.getElementById('hs-pgto')||{style:{}}).style.display    = pgtos.length    ? 'block':'none';
+  (document.getElementById('hs-rec')||{style:{}}).style.display     = recs.length     ? 'block':'none';
+  (document.getElementById('hs-task')||{style:{}}).style.display    = todTasks.length ? 'block':'none'; // inclui concluídas
+  (document.getElementById('hs-atrasado')||{style:{}}).style.display = atrasadoTasks.length ? 'block':'none';
 
   // Render pagamentos
-  document.getElementById('hoje-pgto-list').innerHTML = pgtos.length
+  (document.getElementById('hoje-pgto-list')||{innerHTML:''}).innerHTML = pgtos.length
     ? pgtos.map(function(t){ return pgtoCard(t); }).join('')
     : '';
 
   // Render recebimentos
-  document.getElementById('hoje-rec-list').innerHTML = recs.length
+  (document.getElementById('hoje-rec-list')||{innerHTML:''}).innerHTML = recs.length
     ? recs.map(function(t){ return pgtoCard(t); }).join('')
     : '';
 
   // Render tarefas de hoje
-  document.getElementById('hoje-task-list').innerHTML = todTasks.length
+  (document.getElementById('hoje-task-list')||{innerHTML:''}).innerHTML = todTasks.length
     ? todTasks.map(function(t){ return taskCard(t); }).join('')
     : '';
 
   // Render atrasados
-  document.getElementById('hoje-atrasado-list').innerHTML = atrasadoTasks.length
+  (document.getElementById('hoje-atrasado-list')||{innerHTML:''}).innerHTML = atrasadoTasks.length
     ? atrasadoTasks.map(function(t){ return t._isAlug?taskCardComAlug(t):taskCard(t,'ov'); }).join('')
     : '';
 
   // Se tudo vazio, mostrar mensagem de parabéns
   var todPendTasks = todTasks.filter(function(t){ return t.status !== 'done'; });
   if(!pgtos.length && !recs.length && !todPendTasks.length && !atrasadoTasks.length && !todTasks.filter(function(t){return t.status==='done';}).length){
-    document.getElementById('hs-pgto').style.display = 'block';
-    document.getElementById('hoje-pgto-list').innerHTML =
+    (document.getElementById('hs-pgto')||{style:{}}).style.display = 'block';
+    (document.getElementById('hoje-pgto-list')||{innerHTML:''}).innerHTML =
       '<div class="hoje-empty"><div class="he-icon">🎉</div><div class="he-txt">Dia livre! Nenhum compromisso hoje.</div></div>';
   }
 }
