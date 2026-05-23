@@ -787,6 +787,25 @@ select option{background:#1A2A3A}
   </div>
 </div>
 
+<!-- ══ HEADER ══ -->
+<div id="hdr" style="display:none">
+  <div id="hdr-top">
+    <div class="logo">⚡ FLUXO</div>
+    <div class="right">
+      <button id="sync-btn" class="sync-btn" onclick="syncAll()">↻ Sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NAV ══ -->
+<div id="nav" style="display:none">
+  <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
+  <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💰</span>Finanças</button>
+  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Agenda</button>
+  <button class="nb"    id="nb-rec"  onclick="setSection('rec')"><span class="ni">🧾</span>Recibos</button>
+  <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
+</div>
+
 <!-- ══ CONTENT ══ -->
 <div id="content" style="display:none">
 
@@ -1772,7 +1791,7 @@ function boot(){
 
   }
   curSection = 'hoje';
-  document.getElementById('nb-hoje').classList.add('on');
+  var nbHoje=document.getElementById('nb-hoje'); if(nbHoje) nbHoje.classList.add('on');
 
   // Datas padrão
   try {
