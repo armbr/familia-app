@@ -790,8 +790,7 @@ select option{background:#1A2A3A}
 <!-- ══ CONTENT ══ -->
 <div id="content" style="display:none">
 
-  <!-- ── FINANCE ── -->
-  <div id="sec-fin" style="display:none">
+<div id="sec-fin" style="display:none">
 
     <!-- ADD -->
     <div class="pg on" id="fp-add">
@@ -939,9 +938,10 @@ select option{background:#1A2A3A}
       </div>
     </div>
 
-  </div><!-- /sec-fin -->
+  </div><!-- /sec-fin-inner1 -->
+</div><!-- /sec-fin-inner2 -->
 
-  <!-- ── TASKS ── -->
+    <!-- ── TASKS ── -->
   <div id="sec-task" style="display:none">
 
     <!-- form -->
@@ -1048,10 +1048,8 @@ select option{background:#1A2A3A}
 
   </div><!-- /sec-task -->
 
-</div><!-- /sec-fin -->
 
-  <!-- ══ HOJE ══ -->
-  <div id="sec-hoje" style="display:none;background:var(--bg);padding:16px;min-height:200px">
+<div id="sec-hoje" style="display:none">
 
     <!-- cabeçalho com data e contadores -->
     <div class="hoje-header">
@@ -1112,8 +1110,7 @@ select option{background:#1A2A3A}
 
   </div><!-- /sec-hoje -->
 
-  <!-- ══ DOCS ══ -->
-  <div id="sec-rec" style="display:none;padding:0 16px 100px">
+<div id="sec-rec" style="display:none;padding:0 16px 100px">
 
   <!-- ABAS internas -->
   <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
@@ -1460,84 +1457,18 @@ select option{background:#1A2A3A}
 
   </div><!-- /sec-docs -->
 
-</div><!-- /content -->
-
-<!-- ══ MODAL COMPROVANTE TAREFA ══ -->
 <div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;display:none;align-items:flex-end;justify-content:center">
   <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto">
     <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:4px">✅ Marcar como concluída</div>
-    <div style="font-size:12px;color:var(--t3);margin-bottom:16px">Deseja anexar o comprovante de pagamento?</div>
 
-    <input type="file" id="task-comprov-file" accept="image/*,application/pdf" capture="environment" style="display:none">
-    <div id="task-comprov-area" style="border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;cursor:pointer;margin-bottom:12px" onclick="document.getElementById('task-comprov-file').click()">
-      <div style="font-size:28px;margin-bottom:6px">📎</div>
-      <div style="font-size:13px;font-weight:600;color:var(--t2)">Foto ou PDF do comprovante</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:3px">opcional — pode pular</div>
-    </div>
-    <div id="task-comprov-preview" style="display:none;background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--t2)"></div>
-    <div id="task-comprov-progress" style="display:none;background:var(--bg3);border-radius:100px;height:4px;margin-bottom:12px;overflow:hidden">
-      <div id="task-comprov-bar" style="height:100%;background:var(--green);width:0%;transition:width .3s"></div>
-    </div>
-
-    <div style="display:flex;gap:10px">
-      <button onclick="closeComprovModal()" style="flex:1;padding:12px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Pular</button>
-      <button id="task-comprov-send" onclick="sendTaskComprov()" style="flex:2;padding:12px;border-radius:10px;border:none;background:var(--green);color:#0A1A12;font-size:13px;font-weight:800;cursor:pointer;font-family:inherit">Concluir ✓</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ MODAL RECORRÊNCIA ══ -->
 <div id="recur-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:flex-end;justify-content:center;padding:0">
   <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:22px 20px 32px;margin:0 auto">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <span style="font-size:20px">🔁</span>
       <div>
         <div style="font-size:15px;font-weight:800;color:var(--t1)" id="rm-title">Recorrência mensal</div>
-        <div style="font-size:11px;color:var(--t3)" id="rm-sub">Todo mês na mesma data</div>
-      </div>
-    </div>
-    <div style="margin-bottom:14px">
-      <div class="fl">Valor dos próximos meses</div>
-      <div class="r-wrap"><input id="rm-val" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" style="font-size:18px;font-weight:800"></div>
-    </div>
-    <div style="margin-bottom:18px">
-      <div class="fl">Categoria</div>
-      <select id="rm-cat">
-        <optgroup label="── Despesas ──">
-          <option>🍽️ Alimentação</option><option>🚗 Carro/Transporte</option>
-          <option>🏠 Casa/Moradia</option><option>💊 Saúde</option>
-          <option>📚 Educação</option><option>👗 Roupas</option>
-          <option>🎮 Lazer</option><option>💼 Empresa/Negócio</option>
-          <option>🏛️ Taxas/Impostos</option>
-          <option>💳 Cartão de Crédito</option>
-          <option>📈 Investimentos</option>
-          <option>🏦 Financiamentos</option>
-          <option>📦 Outros</option>
-        </optgroup>
-        <optgroup label="── Receitas ──">
-          <option>💰 Salário</option><option>⭐ Extra</option>
-        </optgroup>
-      </select>
-    </div>
-    <button onclick="saveRecurEdit()" style="width:100%;padding:13px;border-radius:10px;border:none;background:var(--green);color:#0A1A12;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;margin-bottom:10px">Salvar alterações ✓</button>
-    <button onclick="cancelRecurFromModal()" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--red);background:none;color:var(--red);font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">🗑️ Cancelar recorrência</button>
-    <button onclick="closeRecurModal()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:none;color:var(--t3);font-size:12px;cursor:pointer;font-family:inherit">Fechar</button>
-  </div>
-</div>
 
-<!-- ══ BOTTOM NAV ══ -->
-<div id="nav" style="display:none">
-  <button class="nb on" id="nb-hoje" onclick="setSection('hoje')"><span class="ni">☀️</span>Hoje</button>
-  <button class="nb"    id="nb-fin"  onclick="setSection('fin')"><span class="ni">💰</span>Finanças</button>
-  <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Agenda</button>
-  <button class="nb"    id="nb-rec"  onclick="setSection('rec')"><span class="ni">🧾</span>Recibos</button>
-  <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
-</div>
-
-<!-- ══ TOAST ══ -->
-<div id="toast"></div>
-
-</div><!-- /app -->
+</div></div></div></div></div></div><!-- /content -->
 
 <script>
 // Capturar erros globais e mostrar na tela
@@ -1551,7 +1482,6 @@ window.onerror = function(msg, src, line, col, err){
 // ════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════
-console.log('🟡 Script v20260522-205245 iniciando...');
 var API = ''; // will be loaded in init() after DOM ready
 var TXS   = (function(){
   var raw = JSON.parse(localStorage.getItem('ff_txs') || '[]');
@@ -1839,10 +1769,7 @@ function boot(){
   if(secHoje) {
     secHoje.style.display='block';
     // Debug: inserir div visível imediatamente
-    secHoje.insertAdjacentHTML('afterbegin',
-      '<div id="debug-banner" style="background:#2ECC9A;color:#000;padding:12px;border-radius:8px;margin-bottom:12px;font-weight:700">'+
-      '✅ sec-hoje está visível! JS funcionando.</div>'
-    );
+
   }
   curSection = 'hoje';
   document.getElementById('nb-hoje').classList.add('on');
@@ -1856,54 +1783,11 @@ function boot(){
     var cml=document.getElementById('cat-month-lbl');
     if(cml) cml.textContent=now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
   } catch(e){}
-
-  console.log('🟡 boot: chamando initTaskDelegation');
   try{ initTaskDelegation(); }catch(e){ console.error('initTaskDelegation:',e); }
-
-  console.log('🟡 boot: chamando renderHoje');
   try{ renderHoje();  }catch(e){ console.error('renderHoje no boot:',e); }
-  console.log('🟡 boot: chamando renderBal');
   try{ renderBal();   }catch(e){ console.error('renderBal no boot:',e); }
   try{ renderFixos(); }catch(e){}
-  console.log('🟡 boot: completo');
 
-  // Debug: verificar estado visual
-  setTimeout(function(){
-    var sc = document.getElementById('sec-hoje');
-    var ct = document.getElementById('content');
-    var hd = document.getElementById('hdr');
-    var nv = document.getElementById('nav');
-    console.log('🟣 sec-hoje display:', sc ? sc.style.display : 'NULL');
-    console.log('🟣 sec-hoje offsetHeight:', sc ? sc.offsetHeight : 'NULL');
-    console.log('🟣 content display:', ct ? ct.style.display : 'NULL');
-    console.log('🟣 hdr display:', hd ? hd.style.display : 'NULL');
-    console.log('🟣 nav display:', nv ? nv.style.display : 'NULL');
-    // Verificar computed style
-    if(sc) {
-      var cs = window.getComputedStyle(sc);
-      console.log('🟣 sec-hoje computed display:', cs.display);
-      console.log('🟣 sec-hoje computed visibility:', cs.visibility);
-      console.log('🟣 sec-hoje computed opacity:', cs.opacity);
-      console.log('🟣 sec-hoje computed height:', cs.height);
-    }
-    // Verificar debug banner
-    var banner = document.getElementById('debug-banner');
-    console.log('🟣 debug-banner existe:', banner ? 'SIM' : 'NÃO');
-    if(banner) {
-      var bs = window.getComputedStyle(banner);
-      console.log('🟣 debug-banner computed display:', bs.display);
-    // Verificar TODOS os pais de sec-hoje
-    var el = sc;
-    var depth = 0;
-    while(el && el !== document.body && depth < 10){
-      var cs2 = window.getComputedStyle(el);
-      console.log('🟣 pai['+depth+'] tag='+el.tagName+' id='+(el.id||'-')+
-        ' display='+cs2.display+' height='+el.offsetHeight+' overflow='+cs2.overflow);
-      el = el.parentElement;
-      depth++;
-    }
-    }
-  }, 1000);
 
   // Sync em background
   if(online) setTimeout(function(){
@@ -3599,40 +3483,30 @@ function taskWkFrom(from){
 //  HOJE — painel matinal
 // ════════════════════════════════════════
 function renderHoje(){
-  console.log('🔵 DENTRO de renderHoje');
   try {
-    console.log('🔵 try iniciado');
     var tod  = ymd(new Date());
-    console.log('🔵 tod=', tod);
-    console.log('🔵 A');
+
     var now2 = new Date();
     var h    = now2.getHours();
     var greeting = h<12?'Bom dia!':h<18?'Boa tarde!':'Boa noite!';
-    console.log('🔵 B greeting=',greeting);
     var gEl=document.getElementById('hoje-greeting'); if(gEl) gEl.textContent=greeting;
     var dlEl=document.getElementById('hoje-date-lbl');
     if(dlEl) dlEl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
-    console.log('🔵 C txValida=',typeof txValida);
     var todTxs=TXS.filter(function(t){ return ymds(t.date)===tod&&txValida(t)&&!t.fromAgenda; });
-    console.log('🔵 D todTxs=',todTxs.length);
     var pgtos =todTxs.filter(function(t){ return t.type==='exp'; });
     var recs  =todTxs.filter(function(t){ return t.type==='inc'; });
-    console.log('🔵 E TASKS=',TASKS.length);
     var todTasks=TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
     var todPend =todTasks.filter(function(t){ return t.status!=='done'; });
     var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
-    console.log('🔵 F atrasados=',atrasados.length);
 
     // Contadores
     var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
     var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
     var hcrEl=document.getElementById('hc-rec');  if(hcrEl) hcrEl.textContent=recs.length;
-    console.log('🔵 G contadores ok');
 
     // Mostrar seção compromissos
     var hsTask=document.getElementById('hs-task');
     if(hsTask) hsTask.style.display=todTasks.length?'block':'none';
-    console.log('🔵 H hs-task=',hsTask?'ok':'null', 'todTasks=',todTasks.length);
 
     // Renderizar tarefas com try individual
     var taskListEl=document.getElementById('hoje-task-list');
@@ -3643,7 +3517,6 @@ function renderHoje(){
       });
       taskListEl.innerHTML=taskHtml;
     }
-    console.log('🔵 I tarefas renderizadas');
 
     // Mostrar seção atrasados
     var hsAtr=document.getElementById('hs-atrasado');
@@ -3656,14 +3529,12 @@ function renderHoje(){
       });
       atrListEl.innerHTML=atrHtml;
     }
-    console.log('🔵 J atrasados renderizados');
 
     // Estado vazio
     var hsAll=[hsTask,hsAtr];
     var temAlgo=todTasks.length||atrasados.length||pgtos.length||recs.length;
     var emp=document.getElementById('hoje-empty');
     if(emp) emp.style.display=temAlgo?'none':'block';
-    console.log('🔵 K completo, temAlgo=',temAlgo);
 
   } catch(err) {
     console.error('🔴 renderHoje CATCH:', err.message, err.stack);
@@ -4692,9 +4563,7 @@ function emptyHTML(icon,title,desc){
 //  INIT
 // ════════════════════════════════════════
 function init(){
-  console.log('🟡 init() chamado');
   try{ API = localStorage.getItem('ff_api') || ''; }catch(e){ API=''; }
-  console.log('🟡 API:', API ? 'configurada' : 'VAZIA - vai mostrar setup');
   if(API){
     document.getElementById('setup').style.display='none';
     boot();
