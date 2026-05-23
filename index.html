@@ -1633,12 +1633,13 @@ function fmtDate(s){
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function toast(msg,type){
   var t=document.getElementById('toast');
+  if(!t){console.log('TOAST:',msg);return;}
   t.textContent=msg; t.className='toast '+(type||'ok')+' show';
   setTimeout(function(){ t.classList.remove('show'); },2600);
 }
 function load(show,msg){
-  document.getElementById('loader').classList.toggle('show',show);
-  if(msg) document.getElementById('loader-msg').textContent=msg;
+  var l=document.getElementById('loader');if(l)l.classList.toggle('show',show);
+  var lm=document.getElementById('loader-msg');if(lm&&msg)lm.textContent=msg;
 }
 function save(){
   localStorage.setItem('ff_txs',   JSON.stringify(TXS));
@@ -4274,7 +4275,7 @@ function salvarContrato(){
     locNome:g('ct-loc-nome'),  locCpf:g('ct-loc-cpf'),   locRg:g('ct-loc-rg'),
     locEciv:g('ct-loc-eciv'),  locEnd:g('ct-loc-end'),
     locNome2:g('ct-loc2-nome'),locCpf2:g('ct-loc2-cpf'),  locRg2:g('ct-loc2-rg'),
-    inqNome:g('ct-inq-nome'),  inqCpf:g('ct-inq-cpf'),   inqRg:g('ct-inq-rg'),
+    inqNome:g('ct-inq-nome'),  inqCpf:g('ct-inq-cpf'),   inqRg:g('ct-inq-rg'),   inqEmail:g('ct-inq-email'),
     inqEciv:g('ct-inq-eciv'),  inqEnd:g('ct-inq-end'),
     inqNome2:g('ct-inq2-nome'),inqCpf2:g('ct-inq2-cpf'), inqRg2:g('ct-inq2-rg'),
     tipo:g('ct-tipo'),         imovel:g('ct-imovel'),      end:g('ct-end'),
@@ -4364,58 +4365,114 @@ function renderContratos(){
 function gerarContrato(ctId){
   var ct=CONTRATOS.find(function(x){return String(x.id)===String(ctId);});
   if(!ct){toast('Contrato não encontrado','err');return;}
-  var dataFmt=function(s){if(!s)return '___/___/______';var p=s.split('-');return p[2]+'/'+p[1]+'/'+p[0];};
-  var fmtV=function(v){return 'R$ '+Number(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');};
-  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
-    '<title>Contrato — '+esc(ct.inqNome)+'</title>'+
-    '<style>*{margin:0;padding:0;box-sizing:border-box}'+
-    'body{font-family:"Times New Roman",serif;font-size:12pt;line-height:1.6;color:#000;padding:40px;max-width:800px;margin:0 auto}'+
-    'h1{text-align:center;font-size:14pt;margin-bottom:4px}'+
-    '.sub{text-align:center;font-size:11pt;margin-bottom:24px}'+
-    'h2{font-size:12pt;margin:20px 0 8px;border-bottom:1px solid #000}'+
-    'p{margin-bottom:8px;text-align:justify}'+
-    '.ass{display:flex;gap:40px;margin-top:40px;flex-wrap:wrap}'+
-    '.ass-item{flex:1;min-width:200px;text-align:center}'+
-    '.ass-linha{border-top:1px solid #000;margin-bottom:6px;margin-top:50px}'+
-    'button{display:block;margin:20px auto;padding:10px 24px;background:#0F2438;color:#fff;border:none;border-radius:8px;font-size:12pt;cursor:pointer}'+
-    '@media print{button{display:none}}</style></head><body>'+
-    '<h1>CONTRATO DE LOCAÇÃO</h1>'+
-    '<div class="sub">'+(ct.tipo||'Imóvel')+'</div>'+
-    '<h2>I — DAS PARTES</h2>'+
-    '<p><strong>LOCADOR:</strong> '+esc(ct.locNome)+(ct.locCpf?', CPF: '+esc(ct.locCpf):'')+
-      (ct.locRg?', RG: '+esc(ct.locRg):'')+', residente em '+esc(ct.locEnd||'____')+'.</p>'+
-    (ct.locNome2?'<p><strong>LOCADOR 2:</strong> '+esc(ct.locNome2)+(ct.locCpf2?', CPF: '+esc(ct.locCpf2):'')+'.</p>':'')+
-    '<p><strong>LOCATÁRIO:</strong> '+esc(ct.inqNome)+(ct.inqCpf?', CPF: '+esc(ct.inqCpf):'')+
-      (ct.inqRg?', RG: '+esc(ct.inqRg):'')+', residente em '+esc(ct.inqEnd||'____')+'.</p>'+
-    (ct.inqNome2?'<p><strong>LOCATÁRIO 2:</strong> '+esc(ct.inqNome2)+(ct.inqCpf2?', CPF: '+esc(ct.inqCpf2):'')+'.</p>':'')+
-    '<h2>II — DO IMÓVEL</h2>'+
-    '<p>Imóvel: <strong>'+esc(ct.imovel||'____')+'</strong>, situado em '+esc(ct.end||'____')+(ct.mat?', matrícula nº '+esc(ct.mat):'')+'.</p>'+
-    '<h2>III — DA VIGÊNCIA E DO VALOR</h2>'+
-    '<p>Início: <strong>'+dataFmt(ct.inicio)+'</strong> · Término: <strong>'+
-      (ct.fim?dataFmt(ct.fim):'Indeterminado')+'</strong>'+(ct.duracao?' · Duração: '+ct.duracao+' meses.':'.')+'</p>'+
-    '<p>Valor: <strong>'+fmtV(ct.valor)+' mensais</strong>, pagos até o dia <strong>'+
-      (ct.diaPgto||'___')+'</strong> de cada mês.</p>'+
-    '<h2>IV — DA VISTORIA</h2>'+
-    '<p>'+(ct.vistoria||'O imóvel é entregue nas condições acordadas entre as partes.')+'</p>'+
-    (ct.itens?'<p><strong>Itens:</strong> '+esc(ct.itens)+'</p>':'')+
-    '<h2>V — DAS CLÁUSULAS</h2>'+
-    '<p>1. O atraso no pagamento sujeitará multa de 10% e juros de 1% ao mês.</p>'+
-    '<p>2. Proibida sublocação sem autorização escrita do locador.</p>'+
-    '<p>3. Obras e reformas dependem de autorização prévia por escrito.</p>'+
-    '<p>4. Rescisão mediante aviso prévio de 30 dias por qualquer parte.</p>'+
-    '<p>5. O locatário devolverá o imóvel nas condições da vistoria inicial.</p>'+
-    '<p>6. Foro: Chapecó/SC.</p>'+
-    '<p style="margin-top:16px">Chapecó, '+new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})+'.</p>'+
-    '<div class="ass">'+
-      '<div class="ass-item"><div class="ass-linha"></div><div>'+esc(ct.locNome)+'</div><div style="font-size:10pt;color:#666">Locador</div></div>'+
-      '<div class="ass-item"><div class="ass-linha"></div><div>'+esc(ct.inqNome)+'</div><div style="font-size:10pt;color:#666">Locatário</div></div>'+
-      (ct.inqNome2?'<div class="ass-item"><div class="ass-linha"></div><div>'+esc(ct.inqNome2)+'</div><div style="font-size:10pt;color:#666">Locatário</div></div>':'')+
-    '</div>'+
-    '<button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>'+
-    '</body></html>';
-  var w=window.open('','_blank','width=840,height=900');
+  function fD(s){if(!s)return '___/___/______';var p=String(s).split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
+  function fV(v){var n=Number(v||0).toFixed(2).replace('.',','); var parts=n.split(','); parts[0]=parts[0].replace(/\d(?=(\d{3})+$)/g,'$&.'); return 'R$ '+parts.join(',');}
+  function e(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  var hoje=new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});
+  
+  var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Contrato — '+e(ct.inqNome)+'</title>'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.8;color:#000}'
+    +'.page{max-width:780px;margin:0 auto;padding:2cm}h1{font-size:14pt;text-align:center;text-transform:uppercase;font-weight:bold;margin-bottom:20px}'
+    +'h2{font-size:12pt;font-weight:bold;margin:20px 0 10px;text-transform:uppercase}p{text-align:justify;margin-bottom:10px;text-indent:2cm}'
+    +'.ni{text-indent:0}.center{text-align:center;text-indent:0}.bold{font-weight:bold}'
+    +'.ass-row{display:flex;gap:40px;margin-bottom:30px;flex-wrap:wrap}.ass-item{flex:1;min-width:220px}'
+    +'.ass-line{border-top:1px solid #000;margin-bottom:6px;margin-top:50px}.ass-lbl{font-size:11pt}'
+    +'hr{border:none;border-top:1px solid #000;margin:30px 0}'
+    +'@media print{.no-print{display:none}}</style></head><body><div class="page">'
+    +'<div class="no-print" style="background:#0F2438;color:#fff;padding:12px 20px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">'
+    +'<span style="font-weight:700">⚡ Fluxo — Contrato de Locação</span>'
+    +'<button onclick="window.print()" style="padding:8px 20px;background:#2ECC9A;color:#0a1a0a;border:none;border-radius:6px;font-weight:700;cursor:pointer">🖨️ Imprimir / Salvar PDF</button>'
+    +'</div>'
+    +'<h1>Contrato de Locação de Imóvel</h1>'
+    +'<p>Contrato de LOCAÇÃO que fazem entre si, de um lado como <span class="bold">LOCADOR</span>, <span class="bold">'+e(ct.locNome)+'</span>'
+    +(ct.locEciv?', '+e(ct.locEciv):'')+', CPF nº '+e(ct.locCpf||'____________')+', RG nº '+e(ct.locRg||'____________')
+    +', residente à '+e(ct.locEnd||'_________________________________')
+    +(ct.locNome2?'; e <span class="bold">'+e(ct.locNome2)+'</span>, CPF nº '+e(ct.locCpf2||'____________'):'')+
+    +'; e de outro lado como <span class="bold">LOCATÁRIO</span>, <span class="bold">'+e(ct.inqNome)+'</span>'
+    +(ct.inqEciv?', '+e(ct.inqEciv):'')+', CPF nº '+e(ct.inqCpf||'____________')+', RG nº '+e(ct.inqRg||'____________')
+    +', residente à '+e(ct.inqEnd||'_________________________________')
+    +(ct.inqNome2?'; e <span class="bold">'+e(ct.inqNome2)+'</span>, CPF nº '+e(ct.inqCpf2||'____________'):'')+'.</p>'
+
+    +'<h2>Cláusula Primeira – Do Imóvel</h2>'
+    +'<p>O objeto deste contrato é a locação do imóvel '+e(ct.tipo||'residencial')+', constituído por <span class="bold">'+e(ct.imovel||'_______')+'</span>'
+    +', situado na '+e(ct.end||'___________________________')
+    +(ct.mat?', matriculado sob o nº '+e(ct.mat):'')+', nesta cidade de Chapecó-SC.</p>'
+
+    +'<h2>Cláusula Segunda – Do Prazo</h2>'
+    +'<p>O prazo de locação é de <span class="bold">'+e(ct.duracao||'12')+'</span> meses, com início em <span class="bold">'+fD(ct.inicio)+'</span> e término em <span class="bold">'+fD(ct.fim)+'</span>. Findo o prazo, o LOCATÁRIO obriga-se a restituir o imóvel. A permanência após o término somente será possível mediante novo contrato, devendo o LOCATÁRIO manifestar interesse por escrito com 30 dias de antecedência.</p>'
+    +'<p>Em caso de devolução antecipada, o LOCATÁRIO pagará multa correspondente a 50% dos aluguéis devidos, com redução proporcional ao período cumprido, nos termos do art. 4º da Lei nº 8.245/1991, com multa mínima de 01 (um) mês de aluguel.</p>'
+
+    +'<h2>Cláusula Terceira – Do Valor, Pagamento e Reajuste</h2>'
+    +'<p>O aluguel mensal é de <span class="bold">'+fV(ct.valor)+'</span>, a ser pago até o dia <span class="bold">'+e(ct.diaPgto||'10')+'</span> de cada mês, diretamente ao LOCADOR ou por depósito bancário indicado por este.</p>'
+    +'<p>O atraso acarretará multa de 10% e juros de 1% ao mês. O não pagamento poderá resultar em ação de despejo. O valor será reajustado anualmente pelo INPC-IBGE ou índice legal vigente.</p>'
+
+    +'<h2>Cláusula Quarta – Das Vedações ao Locador</h2>'
+    +'<p>Antes do vencimento, o LOCADOR não poderá retomar o imóvel, salvo infração contratual ou fundamentação legal (Lei nº 8.245/91).</p>'
+
+    +'<h2>Cláusula Quinta – Dos Impostos e Taxas</h2>'
+    +'<p>Os impostos, taxas e despesas de condomínio serão pagos pelo LOCATÁRIO. São de sua exclusiva responsabilidade as despesas com energia elétrica, água, telefone e demais serviços.</p>'
+
+    +'<h2>Cláusula Sexta – Do Uso e Das Sublocações</h2>'
+    +'<p>O LOCATÁRIO destinará o imóvel exclusivamente para fins '+e(ct.tipo||'residenciais')+'. É vedada a sublocação, cessão ou empréstimo, no todo ou em parte, sem prévio consentimento escrito do LOCADOR.</p>'
+
+    +'<h2>Cláusula Sétima – Das Modificações e Benfeitorias</h2>'
+    +'<p>O LOCATÁRIO não poderá realizar modificações ou benfeitorias sem autorização escrita do LOCADOR. As benfeitorias realizadas ficarão incorporadas ao imóvel sem direito a indenização ou retenção.</p>'
+
+    +'<h2>Cláusula Oitava – Da Vistoria</h2>'
+    +'<p>O LOCATÁRIO declara ter examinado o imóvel e que se encontra em boas condições, conforme Relatório de Vistoria anexo. Obriga-se a zelar pela conservação e a realizar, às suas expensas, os reparos dos danos causados durante a locação.</p>'
+
+    +'<h2>Cláusula Nona – Da Devolução do Imóvel</h2>'
+    +'<p>Ao encerrar a locação, o LOCATÁRIO deverá apresentar as chaves e certidões negativas da CELESC e CASAN, além de comprovante de quitação do condomínio. O imóvel deverá ser devolvido com pintura, reparos e limpeza necessários para repô-lo nas condições originais.</p>'
+
+    +'<h2>Cláusula Décima – Da Multa Contratual</h2>'
+    +'<p>O descumprimento de qualquer cláusula sujeitará o infrator a multa de 03 (três) meses de aluguel, além de honorários advocatícios de 20% sobre o total do débito.</p>'
+
+    +'<h2>Cláusula Décima Primeira – Das Rescisões</h2>'
+    +'<p>Constituem casos de rescisão: abandono do imóvel; impedimento de vistoria pelo LOCADOR; insolvência ou morte do fiador sem substituição no prazo de 30 dias; e demais hipóteses previstas na Lei nº 8.245/91.</p>'
+
+    +'<h2>Cláusula Décima Segunda – Do Foro</h2>'
+    +'<p>Fica eleito o Foro da Comarca de Chapecó (SC) para dirimir quaisquer questões oriundas deste contrato, renunciando as partes a qualquer outro foro, por mais privilegiado que seja.</p>'
+
+    +'<p>Por estarem assim justas e acertadas, as partes assinam o presente instrumento em 02 (duas) vias de igual teor, em '+hoje+'.</p>'
+
+    +'<p class="bold center">LOCADOR</p>'
+    +'<div class="ass-row">'
+    +'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">'+e(ct.locNome)+'</p><p class="ass-lbl">CPF: '+e(ct.locCpf||'_____________')+'</p></div>'
+    +(ct.locNome2?'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">'+e(ct.locNome2)+'</p><p class="ass-lbl">CPF: '+e(ct.locCpf2||'_____________')+'</p></div>':'')
+    +'</div>'
+    +'<p class="bold center">LOCATÁRIO</p>'
+    +'<div class="ass-row">'
+    +'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">'+e(ct.inqNome)+'</p><p class="ass-lbl">CPF: '+e(ct.inqCpf||'_____________')+'</p></div>'
+    +(ct.inqNome2?'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">'+e(ct.inqNome2)+'</p><p class="ass-lbl">CPF: '+e(ct.inqCpf2||'_____________')+'</p></div>':'')
+    +'</div>'
+    +'<p class="bold center">TESTEMUNHAS</p>'
+    +'<div class="ass-row">'
+    +'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">___________________________</p></div>'
+    +'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">___________________________</p></div>'
+    +'</div>'
+
+    +'<hr>'
+    +'<h1>Relatório de Vistoria</h1>'
+    +'<p class="ni bold">Parte integrante do Contrato de Locação firmado em '+hoje+'.</p>'
+    +'<p class="ni"><span class="bold">Tipo:</span> '+e(ct.tipo||'_______')+'</p>'
+    +'<p class="ni"><span class="bold">Imóvel:</span> '+e(ct.imovel||'_______')+'</p>'
+    +'<p class="ni"><span class="bold">Endereço:</span> '+e(ct.end||'_______')+'</p>'
+    +'<h2>Estado Geral do Imóvel</h2>'
+    +(ct.vistoria?'<p class="ni">'+e(ct.vistoria)+'</p>':'<p class="ni">_____________________________________________</p><p class="ni">_____________________________________________</p>')
+    +'<h2>Itens Entregues</h2>'
+    +(ct.itens?'<p class="ni">'+e(ct.itens)+'</p>':'<p class="ni">_____________________________________________</p><p class="ni">_____________________________________________</p>')
+    +'<p>O LOCATÁRIO declara ter examinado o imóvel e reconhece as condições acima. Eventuais divergências devem ser comunicadas por escrito em até 3 (três) dias úteis.</p>'
+    +'<p>Compromete-se a devolver o imóvel nas mesmas condições em que o recebeu.</p>'
+    +'<div class="ass-row" style="margin-top:40px">'
+    +'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">'+e(ct.locNome)+'</p><p class="ass-lbl">LOCADOR — CPF: '+e(ct.locCpf||'_____________')+'</p></div>'
+    +'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">'+e(ct.inqNome)+'</p><p class="ass-lbl">LOCATÁRIO — CPF: '+e(ct.inqCpf||'_____________')+'</p></div>'
+    +'</div>'
+    +'<p style="text-align:right;color:#888;font-size:10pt;margin-top:30px">Gerado por Fluxo App · '+new Date().toLocaleString('pt-BR')+'</p>'
+    +'</div></body></html>';
+
+  var w=window.open('','_blank','width=900,height=900');
   if(w){w.document.write(html);w.document.close();}
-  else toast('⚠️ Permita pop-ups','err');
+  else toast('⚠️ Permita pop-ups para gerar o contrato','err');
 }
 
 function gerarVistoria(ctId){
