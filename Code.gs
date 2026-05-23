@@ -822,6 +822,8 @@ function criarPlanilhaContrato(body) {
       var mesLabel = meses_br[d.getMonth()] + '/' + d.getFullYear();
       var row = [mesLabel, parseFloat(body.valor||0), '', 'PENDENTE', '', ''];
       sheet.getRange(7 + m, 1, 1, 6).setValues([row]);
+      // Formatar coluna Mês como texto puro para evitar conversão de data
+      sheet.getRange(7 + m, 1).setNumberFormat('@STRING@');
       sheet.getRange(7 + m, 4).setBackground('#FFF3CD').setFontColor('#856404');
     }
   }
@@ -996,7 +998,15 @@ function paginaInquilino(e) {
     var pg = pgSheet.getDataRange().getValues();
     for (var j = 6; j < pg.length; j++) {
       if (!pg[j][0]) continue;
-      linhas.push({ mes: pg[j][0], valor: pg[j][1], data: pg[j][2], status: pg[j][3], codigo: pg[j][4] });
+      var mesVal = pg[j][0];
+      // Se Sheets converteu para Date, formatar de volta para "Mmm/AAAA"
+      if (mesVal instanceof Date) {
+        var meses_fix = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        mesVal = meses_fix[mesVal.getMonth()] + '/' + mesVal.getFullYear();
+      } else {
+        mesVal = String(mesVal || '').trim();
+      }
+      linhas.push({ mes: mesVal, valor: pg[j][1], data: pg[j][2], status: pg[j][3], codigo: pg[j][4] });
     }
   }
 
@@ -1211,4 +1221,140 @@ function testarSalvarContrato() {
   // Verificar se foi criado
   var sheet = ss().getSheetByName('Contratos');
   Logger.log('Linhas na aba Contratos: ' + (sheet ? sheet.getLastRow() : 'aba não existe'));
+}
+
+// ════════════════════════════════════════════════════════════
+//  LEMBRETE DE VENCIMENTO DE ALUGUEL
+//  Execute criarTriggerLembreteAluguel() UMA VEZ para ativar
+//  Envia email 3 dias antes do vencimento de cada aluguel
+// ════════════════════════════════════════════════════════════
+function enviarLembreteAluguel() {
+  var tz   = Session.getScriptTimeZone();
+  var hoje = new Date();
+  var diaHoje = hoje.getDate();
+
+  // Buscar contratos da aba Contratos
+  var sheet = ss().getSheetByName('Contratos');
+  if (!sheet) { Logger.log('Aba Contratos não encontrada'); return; }
+
+  var dados = sheet.getDataRange().getValues();
+  var enviados = 0;
+
+  for (var i = 1; i < dados.length; i++) {
+    if (!dados[i][1]) continue;
+    var ct;
+    try { ct = JSON.parse(String(dados[i][1])); } catch(e) { continue; }
+    if (!ct || !ct.inqNome || !ct.diaPgto || !ct.valor) continue;
+
+    var diaPgto = parseInt(ct.diaPgto);
+    var diasAte = diaPgto - diaHoje;
+
+    // Enviar lembrete 3 dias antes e no dia do vencimento
+    if (diasAte !== 3 && diasAte !== 0) continue;
+
+    // Verificar se já foi pago este mês
+    var mesAno = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
+    var nomeAba = 'Contrato - ' + String(ct.inqNome).substring(0, 18);
+    var pgSheet = ss().getSheetByName(nomeAba);
+    var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    var mesLabel = meses_br[hoje.getMonth()] + '/' + hoje.getFullYear();
+
+    if (pgSheet) {
+      var pg = pgSheet.getDataRange().getValues();
+      for (var j = 6; j < pg.length; j++) {
+        if (String(pg[j][0]) === mesLabel && String(pg[j][3]).toUpperCase() === 'PAGO') {
+          Logger.log(ct.inqNome + ' — ' + mesLabel + ' já pago, pulando');
+          continue;
+        }
+      }
+    }
+
+    // Montar e-mail
+    var fmtV = function(v) {
+      return 'R$ ' + parseFloat(v).toFixed(2).replace('.', ',');
+    };
+    var diaVenc = Utilities.formatDate(
+      new Date(hoje.getFullYear(), hoje.getMonth(), diaPgto),
+      tz, 'dd/MM/yyyy'
+    );
+
+    var assunto = diasAte === 0
+      ? '⚠️ Vencimento do aluguel HOJE — ' + ct.imovel
+      : '📅 Lembrete: aluguel vence em 3 dias — ' + ct.imovel;
+
+    var corpo = '<div style="font-family:Arial,sans-serif;max-width:500px;background:#f5f5f5;padding:20px;border-radius:12px">'
+      + '<div style="background:#0F2438;color:#fff;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">'
+      + '<div style="font-size:22px;font-weight:900">⚡ Fluxo App</div>'
+      + '<div style="color:#aaa;font-size:12px">' + (diasAte === 0 ? 'Vencimento hoje' : 'Lembrete de vencimento') + '</div>'
+      + '</div>'
+      + '<div style="background:#fff;border-radius:8px;padding:16px">'
+      + '<p style="font-size:15px">Olá, <strong>' + ct.inqNome + '</strong>!</p>'
+      + '<p style="margin:12px 0">Este é um lembrete sobre o vencimento do aluguel:</p>'
+      + '<table style="width:100%;border-collapse:collapse">'
+      + '<tr><td style="padding:8px;color:#666">Imóvel</td><td style="padding:8px;font-weight:700">' + ct.imovel + '</td></tr>'
+      + '<tr style="background:#f9f9f9"><td style="padding:8px;color:#666">Valor</td><td style="padding:8px;font-weight:700;font-size:18px">' + fmtV(ct.valor) + '</td></tr>'
+      + '<tr><td style="padding:8px;color:#666">Vencimento</td><td style="padding:8px;font-weight:700;color:' + (diasAte === 0 ? '#e74c3c' : '#e67e22') + '">' + diaVenc + '</td></tr>'
+      + '</table>'
+      + '<p style="margin-top:12px;font-size:12px;color:#888">Em caso de dúvidas, entre em contato com o locador.</p>'
+      + '</div>'
+      + '<p style="text-align:center;color:#bbb;font-size:10px;margin-top:12px">Enviado por Fluxo App</p>'
+      + '</div>';
+
+    // Enviar para o LOCADOR (aviso interno)
+    if (EMAIL_DESTINO) {
+      GmailApp.sendEmail(
+        EMAIL_DESTINO,
+        '[Fluxo] Vencimento: ' + ct.inqNome + ' — ' + diaVenc,
+        '',
+        { htmlBody: corpo, name: 'Fluxo App' }
+      );
+    }
+
+    // Enviar para o INQUILINO se tiver email cadastrado
+    var inqEmail = ct.inqEmail || '';
+    if (inqEmail && inqEmail.indexOf('@') > -1) {
+      var corpoInq = '<div style="font-family:Arial,sans-serif;max-width:500px;background:#f5f5f5;padding:20px;border-radius:12px">'
+        + '<div style="background:#0F2438;color:#fff;border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">'
+        + '<div style="font-size:22px;font-weight:900">⚡ Fluxo App</div>'
+        + '<div style="color:#aaa;font-size:12px">Lembrete de vencimento de aluguel</div>'
+        + '</div>'
+        + '<div style="background:#fff;border-radius:8px;padding:16px">'
+        + '<p style="font-size:15px">Olá, <strong>' + ct.inqNome + '</strong>!</p>'
+        + '<p style="margin:12px 0">Lembramos que o aluguel do imóvel abaixo vence ' + (diasAte === 0 ? '<strong>hoje</strong>' : 'em <strong>3 dias</strong>') + ':</p>'
+        + '<table style="width:100%;border-collapse:collapse">'
+        + '<tr><td style="padding:8px;color:#666">Imóvel</td><td style="padding:8px;font-weight:700">' + ct.imovel + '</td></tr>'
+        + '<tr style="background:#f9f9f9"><td style="padding:8px;color:#666">Valor</td><td style="padding:8px;font-weight:700;font-size:18px">' + fmtV(ct.valor) + '</td></tr>'
+        + '<tr><td style="padding:8px;color:#666">Vencimento</td><td style="padding:8px;font-weight:700;color:' + (diasAte === 0 ? '#e74c3c' : '#e67e22') + '">' + diaVenc + '</td></tr>'
+        + '</table>'
+        + '<p style="margin-top:16px;font-size:13px">Por favor, realize o pagamento conforme combinado. Em caso de dúvidas, entre em contato com o locador.</p>'
+        + '<p style="font-size:12px;color:#888;margin-top:8px">Locador: <strong>' + ct.locNome + '</strong></p>'
+        + '</div>'
+        + '<p style="text-align:center;color:#bbb;font-size:10px;margin-top:12px">Mensagem automática gerada por Fluxo App</p>'
+        + '</div>';
+
+      GmailApp.sendEmail(
+        inqEmail,
+        (diasAte === 0 ? '⚠️ Vencimento do aluguel HOJE' : '📅 Lembrete: aluguel vence em 3 dias') + ' — ' + ct.imovel,
+        '',
+        { htmlBody: corpoInq, name: ct.locNome + ' via Fluxo App' }
+      );
+      Logger.log('Email enviado ao inquilino: ' + inqEmail);
+    } else {
+      Logger.log('Inquilino ' + ct.inqNome + ' sem email cadastrado');
+    }
+
+    enviados++;
+    Logger.log('Lembrete processado para ' + ct.inqNome + ' — vence em ' + diasAte + ' dias');
+  }
+  Logger.log('Total de lembretes enviados: ' + enviados);
+}
+
+function criarTriggerLembreteAluguel() {
+  // Remove triggers antigos
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'enviarLembreteAluguel') ScriptApp.deleteTrigger(t);
+  });
+  // Criar trigger diário às 8h (junto com o resumo diário)
+  ScriptApp.newTrigger('enviarLembreteAluguel').timeBased().everyDays(1).atHour(8).create();
+  Logger.log('✅ Trigger de lembrete de aluguel criado — roda todo dia às 8h.');
 }
