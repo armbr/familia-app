@@ -1888,10 +1888,25 @@ function apiPost(action, body, cb){
 function ativarNotificacoes(){
   if(typeof window.solicitarPushPermissao === 'function'){
     window.solicitarPushPermissao();
-    toast('🔔 Solicitando permissão de notificação...');
+    toast('🔔 Solicitando permissão...');
   } else {
-    toast('⚠️ Firebase não inicializado ainda','err');
+    toast('⚠️ Firebase não inicializado','err');
   }
+}
+
+// Verifica e re-envia token FCM para o servidor
+function verificarTokenPush(){
+  var token = localStorage.getItem('ff_fcm_token');
+  if(!token){
+    toast('⚠️ Nenhum token. Toque em 🔕 para ativar notificações','err');
+    if(typeof window.solicitarPushPermissao==='function') window.solicitarPushPermissao();
+    return;
+  }
+  toast('🔔 Enviando token ao servidor...');
+  apiCall('salvarFcmToken', {token:token}, function(err, d){
+    if(err) toast('❌ Erro: '+err.message,'err');
+    else toast('✅ Token registrado! Agora teste o push.');
+  });
 }
 
 // Mostrar botão de notificação se suportado
@@ -1901,9 +1916,18 @@ window.addEventListener('load', function(){
       var btn = document.getElementById('push-btn');
       if(btn){
         btn.style.display = 'inline-block';
-        if(Notification.permission === 'granted') btn.textContent = '🔔';
-        else if(Notification.permission === 'denied') btn.style.display = 'none';
-        else btn.textContent = '🔕';
+        if(Notification.permission === 'granted'){
+          btn.textContent = '🔔';
+          // Token já existe? Re-enviar para garantir
+          var t = localStorage.getItem('ff_fcm_token');
+          if(t && API){
+            apiCall('salvarFcmToken',{token:t},function(){});
+          }
+        } else if(Notification.permission === 'denied'){
+          btn.style.display = 'none';
+        } else {
+          btn.textContent = '🔕';
+        }
       }
     }
   }, 3000);
