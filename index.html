@@ -28,40 +28,46 @@
 
     // Registrar Service Worker e pedir permissão
     function iniciarPush() {
-      window._pushDbg&&window._pushDbg('🔄 Iniciando push...');
+      console.log('[Push] 🔄 Iniciando push...');
       if (!('serviceWorker' in navigator) || !('Notification' in window)) {
-        window._pushDbg&&window._pushDbg('⚠️ Push não suportado neste browser','#FFA500');
+        console.log('[Push] ⚠️ Push não suportado neste browser');
         return;
       }
-      window._pushDbg&&window._pushDbg('Permissão atual: '+Notification.permission);
+      // push log removido
+
       var swReg = null;
       navigator.serviceWorker.register('./firebase-messaging-sw.js')
         .then(function(reg) {
           swReg = reg;
-          window._pushDbg&&window._pushDbg('✅ SW registrado: '+reg.scope);
+          // push log removido
+
           return Notification.requestPermission();
         })
         .then(function(perm) {
-          window._pushDbg&&window._pushDbg('Permissão: '+perm);
-          if (perm !== 'granted') { window._pushDbg&&window._pushDbg('❌ Permissão negada','#FF6B6B'); return; }
-          window._pushDbg&&window._pushDbg('🔄 Obtendo token FCM...');
+          // push log removido
+
+          if (perm !== 'granted') { console.log('[Push] ❌ Permissão negada'); return; }
+          console.log('[Push] 🔄 Obtendo token FCM...');
           return messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
         })
         .then(function(token) {
-          if (!token) { window._pushDbg&&window._pushDbg('❌ Token não gerado — verifique VAPID Key','#FF6B6B'); return; }
-          window._pushDbg&&window._pushDbg('✅ Token: ' + token.substring(0,20)+'...');
+          if (!token) { console.log('[Push] ❌ Token não gerado — verifique VAPID Key'); return; }
+          // push log removido
+
           localStorage.setItem('ff_fcm_token', token);
           var api = localStorage.getItem('ff_api') || '';
           if (api) {
             fetch(api + '?action=salvarFcmToken&payload=' +
               encodeURIComponent(JSON.stringify({token: token})))
-              .then(function(){ window._pushDbg&&window._pushDbg('✅ Token salvo no servidor! Execute testarPush()'); })
-              .catch(function(e){ window._pushDbg&&window._pushDbg('❌ Erro salvar: '+e.message,'#FF6B6B'); });
+              .then(function(){ console.log('[Push] ✅ Token salvo no servidor! Execute testarPush()'); })
+              .catch(function(e){ // push log removido
+ });
           } else {
-            window._pushDbg&&window._pushDbg('⚠️ API URL não configurada — faça Sync primeiro','#FFA500');
+            console.log('[Push] ⚠️ API URL não configurada — faça Sync primeiro');
           }
         })
-        .catch(function(err) { window._pushDbg&&window._pushDbg('❌ '+err.message,'#FF6B6B'); });
+        .catch(function(err) { // push log removido
+ });
 
       // Mensagem com app aberto
       messaging.onMessage(function(payload) {
@@ -880,7 +886,6 @@ select option{background:#1A2A3A}
     <div class="right">
       <button id="sync-btn" class="sync-btn" onclick="syncAll()">↻ Sync</button>
       <button id="push-btn" onclick="ativarNotificacoes()" title="Ativar notificações" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:4px 8px;display:none">🔔</button>
-      <button onclick="if(window._pushDbg)window._pushDbg('Teste manual de debug')" title="Debug push" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:4px">🔍</button>
     </div>
   </div>
 </div>
@@ -1591,33 +1596,6 @@ select option{background:#1A2A3A}
 
 <div id="toast" class="toast"></div>
 <script>
-// ── Debug visual para testar push no mobile ──────────────
-function _dbgPush(msg, cor) {
-  cor = cor || '#2ecc9a';
-  var p = document.getElementById('push-dbg');
-  if (!p) {
-    p = document.createElement('div');
-    p.id = 'push-dbg';
-    p.style.cssText = 'position:fixed;bottom:90px;left:10px;right:10px;background:#0a1421;'
-      + 'border:2px solid #2ecc9a;border-radius:12px;padding:12px;font-size:12px;'
-      + 'font-family:monospace;z-index:9998;max-height:200px;overflow-y:auto';
-    p.innerHTML = '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'
-      + '<b style="color:#2ecc9a">🔔 Push Status</b>'
-      + '<button data-closepushdbg="1" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:18px">✕</button>'
-      + '</div><div id="push-dbg-log"></div>';
-    document.body.appendChild(p);
-  }
-  p.style.display='block';
-  var l=document.getElementById('push-dbg-log');
-  if(!l) return;
-  var d=document.createElement('div');
-  d.style.cssText='color:'+cor+';margin-bottom:4px;line-height:1.5;word-break:break-all';
-  d.textContent=new Date().toLocaleTimeString('pt-BR')+' — '+msg;
-  l.appendChild(d); l.scrollTop=l.scrollHeight;
-  console.log('[Push]',msg);
-}
-window._pushDbg = _dbgPush;
-
 // ── Capturar erros globais e mostrar na tela
 window.onerror = function(msg, src, line, col, err){
   var div = document.createElement('div');
@@ -3297,9 +3275,6 @@ function initTaskDelegation(){
     if(delcc){ delCartao(delcc.getAttribute('data-delcc')); return; }
     var delcg = e.target.closest('[data-delcg]');
     if(delcg){ delGasto(delcg.getAttribute('data-delcg')); return; }
-    if(e.target.closest('[data-closepushdbg]')){
-      var pd=document.getElementById('push-dbg'); if(pd) pd.style.display='none'; return;
-    }
     var selmon = e.target.closest('[data-selmon]');
     if(selmon){ selMon(selmon.getAttribute('data-selmon')); return; }
     var selcc = e.target.closest('[data-selcc]');
