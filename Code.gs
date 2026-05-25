@@ -480,7 +480,7 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-var EMAIL_DESTINO = 'SEU_EMAIL@gmail.com';
+var EMAIL_DESTINO = 'armbr258@gmail.com';
 
 // Normaliza qualquer valor de data para string 'YYYY-MM-DD'
 function toDateStr(val) {
@@ -1351,28 +1351,16 @@ function enviarLembreteAluguel() {
       if (fone.length < 12) fone = '55' + fone; // adicionar DDI Brasil
       var meses_br2 = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
       var msgWpp = encodeURIComponent(
-        '📅 *Lembrete de aluguel*
-
-'
-        + 'Olá, *' + ct.inqNome + '*!
-
-'
+        '📅 *Lembrete de aluguel*\n\n'
+        + 'Olá, *' + ct.inqNome + '*!\n\n'
         + (diasAte === 0
             ? '⚠️ Seu aluguel vence *hoje*!'
             : '📅 Seu aluguel vence em *3 dias* (' + diaVenc + ').')
-        + '
-
-'
-        + '🏠 Imóvel: ' + ct.imovel + '
-'
-        + '💰 Valor: ' + fmtV(ct.valor) + '
-'
-        + '📅 Vencimento: dia ' + ct.diaPgto + ' de cada mês
-
-'
-        + 'Por favor, realize o pagamento conforme combinado.
-
-'
+        + '\n\n'
+        + '🏠 Imóvel: ' + ct.imovel + '\n'
+        + '💰 Valor: ' + fmtV(ct.valor) + '\n'
+        + '📅 Vencimento: dia ' + ct.diaPgto + ' de cada mês\n\n'
+        + 'Por favor, realize o pagamento conforme combinado.\n\n'
         + '_Mensagem automática — Fluxo App_'
       );
       var linkWpp = 'https://wa.me/' + fone + '?text=' + msgWpp;
@@ -1509,10 +1497,17 @@ function testarTudoEmail() {
 //  Autenticação via Service Account (não usa Server Key)
 // ════════════════════════════════════════════════════════════
 
-var FCM_PROJECT_ID  = 'fluxo-app-46562';
-var FCM_CLIENT_EMAIL = 'firebase-adminsdk-fbsvc@fluxo-app-46562.iam.gserviceaccount.com';
-// Chave privada do Service Account (mantenha em segredo)
-var FCM_PRIVATE_KEY  = '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3ln0wvg1uJKPa\n2bZ2P9eINdqZHlqF7gjjldmjxbtE2wZ2UDne3djHPnB5YUf3iU9ne7gYprfH8h9G\nX3CxLq+47bawwBbmdspDS9AUySqc/Zhkj339btZMryHM1jRcQod2XPHt3RCEYbfa\nPmFwguX8QcgXYPCoa9uDau2KdmmD2SfCYMeU0i0A9k9iefRb2OJxwwIBHdrlgx2r\n8X1kND/J/AdUIWCBMggQsCTTmAAemAljZ03ksg6025R4eJjPE+qs3Nzts0IQi7Jk\nUCRsJRmPwAj2wsQizjCB92bR5CFbvWZNnDHP+mdEDG/qH4PUTNVzA9z61joqzz0P\nIfvbfXABAgMBAAECggEAD1nHG0Si8xkfddDTPck6DIbDQd8cvtrf1abNoVDq5xeg\nz1MHObxHUGanSTDyD2/E6tBYnQAQuShkxtG7ZqdSlGYVCuuu5oObhzu/OQO2m1Sl\nkdABPwgN5XDV5M6q52V9Ne+Q35ym0Ujp8nbZlyqs0BZQhKrriIunOdJ+rP+YdEiX\nOmhvuDnuBmE1WhCTyzKtUt+oqQjB0GeL0vU9VwutqxcNNYdestmoV1aL7xmM52Cw\n2SJM+vzWlpbmk6+3QKX23FFwCo4Rd/slAQoEcFQHH/Wr2wNLJjfW7UguFUCLz6eP\nfFtb0sdhnLUevX5zBWEbVb4Lwc9aALLXGJT3SkpfCQKBgQDy1ZVpPZttbcScCtqZ\nVT44upDR8aNOQ3huj4WlqX1y0q0cihu2rYMLYyB0T1JQDYlG+41VrTAMnCg80uRJ\nVdFLYXifzbKAz0DNA2mG9TrWkuNR/4AqnSnNBBW734NPox4ifjWNGqU8ZXWFbgbi\nPusBmhsk2aN+oBZL9rHVYQxn6QKBgQDBipg+PqhMXpwalZzT67nf1A5QVR0EvrVx\n9AawEkJ9fSnwVrvqsanH5/rDMMjv8uXWQzIKy+Y2GF/CS9dK/UnE+cCdhk6GYN+W\n0nkl3zYDtgI+ESDT7b0MUbBLeqrQpiVdE27hYvHRhq0J4m/ojEK4z7ejS4khslVm\nE7MGY8DQWQKBgQDNoCx3xFJD1GpjFBHNO1CH6vtMu8fkMt/dBy1NfXsb6ufpvcz/\n4GeSEetecfiqjvvKnqIshY2lb+nmr1HeA4xJv4zMDPt1dYpSz+vg+vFK13Ekcy1N\naG4IC8h3oSnpGqAe5y5jgMegn+1nAidUF6EaZytLBfwa8mZPBuPJYveFWQKBgEhR\nKSHY97nRgDLOxJLK+eEQs2iA5R7ow5OYwwb3S7DoG8uaHQ1M5Uu0+pYEnJBMCmVN\nJl2yYorEAMPw4rk6e14GlFpH3P+JIwKQEoR8Kwqn756Rd9q4cnMv8tfBNiJQcpWc\ntUmyVvkbgXy4B2i1QBkeRFfX2Z2lrRM/OR2iGGHBAoGBAM2M7debpXk23yirssUe\n4lEfuT3Dmw5krblbCAhjws7KYN9NZYf8ydgaeFCAf47+RmDbowPHvrD6MSa/Evfk\npGpAJVvkhuam4spqCueijcxDhgxVmGARTNRuwEcl+8c9j15Jev9P016WDG14wWQp\nyUHsyVjPK9bsYup97n3DBVwR\n-----END PRIVATE KEY-----\n';
+// Chaves FCM lidas do Properties Service (nunca expostas no código)
+// Para configurar, execute no console do Apps Script:
+// PropertiesService.getScriptProperties().setProperties({
+//   'FCM_PROJECT_ID': 'fluxo-app-46562',
+//   'FCM_CLIENT_EMAIL': 'firebase-adminsdk-fbsvc@fluxo-app-46562.iam.gserviceaccount.com',
+//   'FCM_PRIVATE_KEY': '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n'
+// });
+var _FCM_PROPS_      = PropertiesService.getScriptProperties();
+var FCM_PROJECT_ID   = _FCM_PROPS_.getProperty('FCM_PROJECT_ID')   || '';
+var FCM_CLIENT_EMAIL = _FCM_PROPS_.getProperty('FCM_CLIENT_EMAIL') || '';
+var FCM_PRIVATE_KEY  = _FCM_PROPS_.getProperty('FCM_PRIVATE_KEY')  || '';
 
 // Salva o token FCM do dispositivo (chamado automaticamente pelo app)
 function salvarFcmToken(body) {
