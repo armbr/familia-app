@@ -6,6 +6,71 @@
 <title>Fluxo v20260523-022811</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
+
+<!-- ══ FIREBASE PUSH ══ -->
+<!-- Cole seu firebaseConfig aqui após criar o projeto Firebase -->
+<script type="module">
+  // ▼▼▼ SUBSTITUIR COM SEU CONFIG ▼▼▼
+  const FIREBASE_CONFIG = {
+    apiKey:            "AIzaSyDWwLFR5Rd1R8YUx7hLk4ZwXR7Fkcct0sY",
+    authDomain:        "fluxo-app-46562.firebaseapp.com",
+    projectId:         "fluxo-app-46562",
+    storageBucket:     "fluxo-app-46562.firebasestorage.app",
+    messagingSenderId: "720780183452",
+    appId:             "1:720780183452:web:3a471aae91f5b270472a59"
+  };
+  const VAPID_KEY = "BH0H4zJOHOVwAwkZEtoGMy6hS3HI_9F-G55YDP2UXoIek06z5ZvBp1o__YjmULII6E781SjLiRYkVhI7cJPsO28"; // Web Push certificate key pair
+  // ▲▲▲ SUBSTITUIR COM SEU CONFIG ▲▲▲
+
+  // Só inicializar se as chaves foram configuradas
+  if (FIREBASE_CONFIG.apiKey !== "COLE_AQUI") {
+    import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js').then(({initializeApp}) => {
+    import('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js').then(({getMessaging, getToken, onMessage}) => {
+      const app       = initializeApp(FIREBASE_CONFIG);
+      const messaging = getMessaging(app);
+
+      // Registrar Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+          .then(reg => {
+            console.log('SW registrado:', reg.scope);
+            // Pedir permissão de notificação
+            return Notification.requestPermission();
+          })
+          .then(perm => {
+            if (perm === 'granted') {
+              return getToken(messaging, { vapidKey: VAPID_KEY });
+            }
+            throw new Error('Permissão negada');
+          })
+          .then(token => {
+            console.log('FCM Token:', token);
+            localStorage.setItem('ff_fcm_token', token);
+            // Enviar token ao servidor para salvar
+            if (window.API) {
+              fetch(window.API + '?action=salvarFcmToken&payload=' +
+                encodeURIComponent(JSON.stringify({token: token})));
+            }
+          })
+          .catch(err => console.log('Push não disponível:', err.message));
+      }
+
+      // Receber mensagens com app aberto
+      onMessage(messaging, payload => {
+        console.log('Push recebido:', payload);
+        var title = payload.notification?.title || '⚡ Fluxo';
+        var body  = payload.notification?.body  || '';
+        if (window.toast) window.toast(title + (body ? ' — ' + body : ''));
+        // Mostrar notificação nativa mesmo com app aberto
+        if (Notification.permission === 'granted') {
+          new Notification(title, { body: body, icon: '/icon.svg' });
+        }
+      });
+    });});
+  } else {
+    console.log('Firebase não configurado — push desativado');
+  }
+</script>
 <meta name="theme-color" content="#0F1923">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1255,6 +1320,18 @@ select option{background:#1A2A3A}
       <!-- Endereço locatário -->
       <div style="margin-bottom:10px"><div class="fl">Endereço do locatário</div>
         <input id="ct-inq-end" type="text" placeholder="Rua, número, cidade" maxlength="120">
+      </div>
+
+      <!-- Contato para lembretes -->
+      <div class="row2" style="margin-bottom:10px">
+        <div>
+          <div class="fl">📧 Email do inquilino <span style="color:var(--t3);font-weight:400">(para lembretes)</span></div>
+          <input id="ct-inq-email" type="email" placeholder="email@inquilino.com" maxlength="80">
+        </div>
+        <div>
+          <div class="fl">📱 WhatsApp <span style="color:var(--t3);font-weight:400">(com DDD)</span></div>
+          <input id="ct-inq-whats" type="tel" placeholder="47999990000" maxlength="20">
+        </div>
       </div>
 
       <!-- Valores e datas -->
@@ -4276,7 +4353,7 @@ function salvarContrato(){
     locNome:g('ct-loc-nome'),  locCpf:g('ct-loc-cpf'),   locRg:g('ct-loc-rg'),
     locEciv:g('ct-loc-eciv'),  locEnd:g('ct-loc-end'),
     locNome2:g('ct-loc2-nome'),locCpf2:g('ct-loc2-cpf'),  locRg2:g('ct-loc2-rg'),
-    inqNome:g('ct-inq-nome'),  inqCpf:g('ct-inq-cpf'),   inqRg:g('ct-inq-rg'),   inqEmail:g('ct-inq-email'),
+    inqNome:g('ct-inq-nome'),  inqCpf:g('ct-inq-cpf'),   inqRg:g('ct-inq-rg'),   inqEmail:g('ct-inq-email'),   inqWhats:g('ct-inq-whats'),
     inqEciv:g('ct-inq-eciv'),  inqEnd:g('ct-inq-end'),
     inqNome2:g('ct-inq2-nome'),inqCpf2:g('ct-inq2-cpf'), inqRg2:g('ct-inq2-rg'),
     tipo:g('ct-tipo'),         imovel:g('ct-imovel'),      end:g('ct-end'),
@@ -4452,7 +4529,7 @@ function gerarContrato(ctId){
     +'<div class="ass-item"><div class="ass-line"></div><p class="ass-lbl">___________________________</p></div>'
     +'</div>'
 
-    +'<hr>'
+    +'<div style="page-break-before:always"></div>'
     +'<h1>Relatório de Vistoria</h1>'
     +'<p class="ni bold">Parte integrante do Contrato de Locação firmado em '+hoje+'.</p>'
     +'<p class="ni"><span class="bold">Tipo:</span> '+e(ct.tipo||'_______')+'</p>'
