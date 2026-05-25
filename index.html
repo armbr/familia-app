@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260525-170639</title>
+<title>Fluxo v20260525-195506</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1067,6 +1067,7 @@ select option{background:#1A2A3A}
         <div class="row2">
           <div><div class="fl">Tipo</div><select id="t-type" onchange="onTaskTypeChange()"><option value="exp">🔴 Despesa</option><option value="inc">🟢 Receita</option><option value="task">📌 Compromisso</option></select></div>
           <div><div class="fl">Data / Prazo</div><input id="t-dead" type="date"></div>
+          <div><div class="fl">Horário <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="t-time" type="time"></div>
         </div>
         <div class="row2" id="t-val-row">
           <div><div class="fl">Valor</div><div class="r-wrap"><input id="t-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
@@ -1099,6 +1100,13 @@ select option{background:#1A2A3A}
           <div class="recur-toggle-dot" id="recur-dot"></div>
           <div class="recur-toggle-lbl">Repetir todo mês</div>
           <span class="recur-badge" id="recur-badge">inativo</span>
+        </div>
+        <!-- Vincular cartão à recorrência -->
+        <div id="recur-cartao-row" style="display:none;margin-bottom:10px">
+          <div class="fl">💳 Vincular ao cartão <span style="color:var(--t3);font-weight:400">(valor atualiza automaticamente)</span></div>
+          <select id="recur-cartao-sel">
+            <option value="">— nenhum —</option>
+          </select>
         </div>
         <button class="btn" id="btn-add-task" onclick="addTask()">Adicionar ✓</button>
       </div>
@@ -1581,9 +1589,21 @@ select option{background:#1A2A3A}
 
   </div><!-- /sec-docs -->
 
-<div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;display:none;align-items:flex-end;justify-content:center">
+<div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;align-items:flex-end;justify-content:center">
   <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto">
     <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:4px">✅ Marcar como concluída</div>
+    <p style="font-size:13px;color:var(--t3);margin-bottom:14px">Adicione um comprovante (opcional)</p>
+    <input id="task-comprov-file" type="file" accept="image/*,.pdf" style="display:none">
+    <div id="task-comprov-preview" style="display:none;background:var(--bg3);border-radius:8px;padding:10px;font-size:13px;margin-bottom:10px;color:var(--t2)"></div>
+    <div id="task-comprov-progress" style="display:none;background:var(--bg3);border-radius:4px;height:6px;margin-bottom:12px">
+      <div id="task-comprov-bar" style="height:6px;width:0%;background:var(--green);border-radius:4px;transition:width .3s"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('task-comprov-file').click()" style="flex:1;padding:11px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--t2);font-size:13px;cursor:pointer;font-family:inherit">📷 Comprovante</button>
+      <button onclick="confirmarComprov()" style="flex:1;padding:11px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✓ Concluir</button>
+      <button onclick="closeComprovModal()" style="padding:11px 14px;border:none;border-radius:8px;background:var(--bg3);color:var(--t2);cursor:pointer;font-family:inherit">✕</button>
+    </div>
+  </div>
 
 <div id="recur-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:flex-end;justify-content:center;padding:0">
   <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:22px 20px 32px;margin:0 auto">
@@ -2322,6 +2342,18 @@ function toggleRecur(){
   tog.classList.toggle('on', curRecur);
   dot.textContent = curRecur ? '✓' : '';
   badge.textContent = curRecur ? 'mensal' : 'inativo';
+  // Mostrar seletor de cartão ao ativar
+  var row = document.getElementById('recur-cartao-row');
+  var sel = document.getElementById('recur-cartao-sel');
+  if(row && sel){
+    row.style.display = curRecur ? 'block' : 'none';
+    if(curRecur && CARTOES.length){
+      sel.innerHTML = '<option value="">— nenhum —</option>'+
+        CARTOES.map(function(cc){
+          return '<option value="'+cc.id+'">'+esc(cc.nome)+'</option>';
+        }).join('');
+    }
+  }
 }
 
 function saveRecur(){
@@ -2349,6 +2381,24 @@ function limparRecurDuplicados(){
     localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
     if(removidos) toast('🧹 '+removidos+' recorrência'+(removidos>1?'s duplicadas removidas':' duplicada removida')+'!');
   }
+}
+
+// Retorna o total de gastos de um cartão no mês atual (fatura aberta)
+function totalFaturaCartao(cartaoId){
+  var now    = new Date();
+  var mesAno = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  return CGASTOS.filter(function(g){
+    return String(g.cartaoId)===String(cartaoId) && g.fatMes===mesAno && !g.pago;
+  }).reduce(function(s,g){ return s+parseFloat(g.val||0); }, 0);
+}
+
+// Atualiza o valor de uma recorrência do tipo cartão com o total real da fatura
+function syncValorRecurCartao(){
+  RECUR.forEach(function(r){
+    if(!r.cartaoId) return;
+    var total = totalFaturaCartao(r.cartaoId);
+    if(total > 0) r._valorReal = total; // valor real sem alterar o valor base
+  });
 }
 
 function renderFixos(){
@@ -2383,13 +2433,33 @@ function saveRecurEdit(){
   if(!r){ closeRecurModal(); return; }
   var newVal = parseFloat(document.getElementById('rm-val').value)||0;
   var newCat = document.getElementById('rm-cat').value;
+  var oldVal = r.value;
   r.value = newVal;
   r.cat   = newCat;
   saveRecur();
-  apiCall('addRecur', r, function(){}); // upsert no servidor
+  apiCall('addRecur', r, function(){});
+
+  // Atualizar tasks do mês atual vinculadas a esta recorrência
+  var now    = new Date();
+  var mesMes = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var updated = 0;
+  TASKS.forEach(function(t){
+    if(String(t.recurId)===String(r.id) && t.deadline && t.deadline.startsWith(mesMes)){
+      t.value = newVal;
+      t.cat   = newCat;
+      updated++;
+      // Atualizar no servidor também
+      apiCall('updateTask', {id:t.id, value:newVal, cat:newCat}, function(){});
+    }
+  });
+  localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+
   closeRecurModal();
-  renderTasks();
-  toast('✅ Recorrência atualizada!');
+  renderAll();
+  if(updated > 0)
+    toast('✅ Valor atualizado! Task do mês corrigida de '+fmtBRL(oldVal)+' para '+fmtBRL(newVal));
+  else
+    toast('✅ Recorrência atualizada para '+fmtBRL(newVal)+'/mês');
 }
 
 function cancelRecurFromModal(){
@@ -2459,11 +2529,17 @@ function processRecur(){
       var dl  = moStr+'-'+pad(day);
       if(dl < today) return; // não criar no passado
 
+      // Para cartões: usar total real da fatura como valor
+      var taskVal = r.value;
+      if(r.cartaoId){
+        var fatTotal = totalFaturaCartao(r.cartaoId);
+        if(fatTotal > 0) taskVal = fatTotal;
+      }
       var task = {
         desc:     r.desc,
         type:     r.type||'exp',
         deadline: dl,
-        value:    r.value,
+        value:    taskVal,
         cat:      r.cat||'',
         status:   'pend',
         recurId:  rid
@@ -2999,7 +3075,9 @@ function addTask(){
   var tmp=Date.now(); TASKS.unshift(Object.assign({id:tmp},task)); renderTasks();
   if(curRecur){
     var newRecurId = Date.now();
-    addRecur({id:newRecurId,type:type,desc:desc,value:val||0,cat:cat||'',date:dead||ymd(new Date())});
+    var rcSel = document.getElementById('recur-cartao-sel');
+    var rcId  = rcSel ? rcSel.value : '';
+    addRecur({id:newRecurId,type:type,desc:desc,value:val||0,cat:cat||'',date:dead||ymd(new Date()),cartaoId:rcId});
     task.recurId = newRecurId; // salvar referência na tarefa
     curRecur=false;
     var togR=document.getElementById('recur-toggle');
@@ -3050,11 +3128,11 @@ var taskComprovFile = null;
 function openComprovModal(id){
   comprovModalTaskId = id;
   taskComprovFile = null;
-  document.getElementById('task-comprov-preview').style.display='none';
-  document.getElementById('task-comprov-bar').style.width='0%';
-  document.getElementById('task-comprov-progress').style.display='none';
-  var modal = document.getElementById('comprov-modal');
-  modal.style.display = 'flex';
+  var _cp=document.getElementById('task-comprov-preview'); if(_cp) _cp.style.display='none';
+  var _cb=document.getElementById('task-comprov-bar');      if(_cb) _cb.style.width='0%';
+  var _cg=document.getElementById('task-comprov-progress'); if(_cg) _cg.style.display='none';
+  var modal=document.getElementById('comprov-modal');
+  if(modal) modal.style.display='flex';
 
   // bind file input
   var inp = document.getElementById('task-comprov-file');
@@ -4257,6 +4335,19 @@ function addGastoCartao(){
     apiCall('salvarCGasto',g,function(){});
   }
   saveCGastos();
+  // Atualizar tasks recorrentes vinculadas ao cartão com novo total
+  if(cartao){
+    var fatMesAtual = faturaDoGasto(new Date(data+'T12:00:00'), cartao.fech);
+    var novoTotal = totalFaturaCartao(cartaoId);
+    TASKS.forEach(function(t){
+      // Encontrar a task recorrente do cartão para o mês da fatura
+      var r = RECUR.find(function(x){ return String(x.cartaoId)===cartaoId; });
+      if(r && String(t.recurId)===String(r.id) && t.deadline && t.deadline.startsWith(fatMesAtual)){
+        t.value = novoTotal;
+      }
+    });
+    localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+  }
   ['cg-desc','cg-val'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var pgEl=document.getElementById('cg-parc'); if(pgEl) pgEl.value='1';
   renderCC(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
