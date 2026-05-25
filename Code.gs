@@ -638,6 +638,20 @@ function enviarResumoDiario() {
   );
 
   Logger.log('✅ E-mail enviado para ' + EMAIL_DESTINO);
+
+  // Enviar push notification junto com o email
+  try {
+    var pushMsg = totalTarefas > 0
+      ? totalTarefas + ' tarefa' + (totalTarefas > 1 ? 's' : '') + ' para hoje'
+        + (totalAtrasadas > 0 ? ' · ' + totalAtrasadas + ' atrasada' + (totalAtrasadas > 1 ? 's' : '') : '')
+      : totalAtrasadas > 0
+        ? totalAtrasadas + ' tarefa' + (totalAtrasadas > 1 ? 's atrasadas' : ' atrasada')
+        : 'Nenhum compromisso hoje 🎉';
+    enviarPush('☀️ Fluxo — Resumo do dia', pushMsg);
+    Logger.log('✅ Push enviado: ' + pushMsg);
+  } catch(ep) {
+    Logger.log('Push falhou: ' + ep.message);
+  }
 }
 
 // ── Trigger diário às 8h ─────────────────────────────────
@@ -1386,6 +1400,13 @@ function enviarLembreteAluguel() {
         Logger.log('Email com link WhatsApp enviado ao locador');
       }
     }
+
+    // Push para o locador junto com o email
+    try {
+      var pushAlug = 'Aluguel de ' + ct.inqNome + ' vence '
+        + (diasAte === 0 ? 'hoje' : 'em 3 dias') + ' — ' + fmtV(ct.valor);
+      enviarPush('🏠 Fluxo — Vencimento de aluguel', pushAlug);
+    } catch(ep2) { Logger.log('Push aluguel falhou: ' + ep2.message); }
 
     enviados++;
     Logger.log('Lembrete processado para ' + ct.inqNome + ' — vence em ' + diasAte + ' dias');
