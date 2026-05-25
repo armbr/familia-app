@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260523-022811</title>
+<title>Fluxo v20260525-170639</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -28,33 +28,40 @@
 
     // Registrar Service Worker e pedir permissão
     function iniciarPush() {
+      window._pushDbg&&window._pushDbg('🔄 Iniciando push...');
       if (!('serviceWorker' in navigator) || !('Notification' in window)) {
-        window._pushDbg && _dbgPush('⚠️ Push não suportado','#FFA500');
+        window._pushDbg&&window._pushDbg('⚠️ Push não suportado neste browser','#FFA500');
         return;
       }
+      window._pushDbg&&window._pushDbg('Permissão atual: '+Notification.permission);
+      var swReg = null;
       navigator.serviceWorker.register('./firebase-messaging-sw.js')
         .then(function(reg) {
-          dbg('✅ SW Firebase registrado');
+          swReg = reg;
+          window._pushDbg&&window._pushDbg('✅ SW registrado: '+reg.scope);
           return Notification.requestPermission();
         })
         .then(function(perm) {
-          if (perm !== 'granted') { window._pushDbg && _dbgPush('❌ Permissão negada','#FF6B6B'); return; }
-          return messaging.getToken({ vapidKey: VAPID_KEY });
+          window._pushDbg&&window._pushDbg('Permissão: '+perm);
+          if (perm !== 'granted') { window._pushDbg&&window._pushDbg('❌ Permissão negada','#FF6B6B'); return; }
+          window._pushDbg&&window._pushDbg('🔄 Obtendo token FCM...');
+          return messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
         })
         .then(function(token) {
-          if (!token) { dbg('❌ Token não obtido','#FF6B6B'); return; }
-          dbg('✅ Token: ' + token.substring(0,20)+'...');
+          if (!token) { window._pushDbg&&window._pushDbg('❌ Token não gerado — verifique VAPID Key','#FF6B6B'); return; }
+          window._pushDbg&&window._pushDbg('✅ Token: ' + token.substring(0,20)+'...');
           localStorage.setItem('ff_fcm_token', token);
-          // Salvar token no servidor
           var api = localStorage.getItem('ff_api') || '';
           if (api) {
             fetch(api + '?action=salvarFcmToken&payload=' +
               encodeURIComponent(JSON.stringify({token: token})))
-              .then(function(){ dbg('✅ Token salvo no servidor!'); })
-              .catch(function(e){ dbg('❌ Erro salvar token: '+e.message,'#FF6B6B'); });
+              .then(function(){ window._pushDbg&&window._pushDbg('✅ Token salvo no servidor! Execute testarPush()'); })
+              .catch(function(e){ window._pushDbg&&window._pushDbg('❌ Erro salvar: '+e.message,'#FF6B6B'); });
+          } else {
+            window._pushDbg&&window._pushDbg('⚠️ API URL não configurada — faça Sync primeiro','#FFA500');
           }
         })
-        .catch(function(err) { dbg('❌ Erro: '+err.message,'#FF6B6B'); });
+        .catch(function(err) { window._pushDbg&&window._pushDbg('❌ '+err.message,'#FF6B6B'); });
 
       // Mensagem com app aberto
       messaging.onMessage(function(payload) {
