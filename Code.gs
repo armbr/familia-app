@@ -72,6 +72,7 @@ function doGetInternal(action, body) {
     case 'salvarCGasto':      return salvarItemSheet('GastosCartao', body);
     case 'getCGastos':        return getItemsSheet('GastosCartao');
     case 'paginaInquilino':   return { ok: false, error: 'Use GET direto para paginaInquilino' };
+    case 'salvarFcmToken':    return salvarFcmToken(body);
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
@@ -480,7 +481,7 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-var EMAIL_DESTINO = 'armbr258@gmail.com';
+var EMAIL_DESTINO = 'SEU_EMAIL@gmail.com';
 
 // Normaliza qualquer valor de data para string 'YYYY-MM-DD'
 function toDateStr(val) {
@@ -1511,14 +1512,16 @@ var FCM_PRIVATE_KEY  = _FCM_PROPS_.getProperty('FCM_PRIVATE_KEY')  || '';
 
 // Salva o token FCM do dispositivo (chamado automaticamente pelo app)
 function salvarFcmToken(body) {
+  Logger.log('salvarFcmToken chamado, token: ' + String(body.token || '').substring(0,20));
   var sheet = ss().getSheetByName('FCMTokens');
   if (!sheet) {
     sheet = ss().insertSheet('FCMTokens');
     sheet.appendRow(['token', 'updatedAt']);
     sheet.setFrozenRows(1);
+    Logger.log('Aba FCMTokens criada');
   }
   var token = String(body.token || '').trim();
-  if (!token) return { ok: false };
+  if (!token) { Logger.log('Token vazio!'); return { ok: false, error: 'token vazio' }; }
 
   // Verificar se já existe
   var dados = sheet.getDataRange().getValues();
