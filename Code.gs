@@ -73,6 +73,7 @@ function doGetInternal(action, body) {
     case 'getCGastos':        return getItemsSheet('GastosCartao');
     case 'paginaInquilino':   return { ok: false, error: 'Use GET direto para paginaInquilino' };
     case 'salvarFcmToken':    return salvarFcmToken(body);
+    case 'getValorFaturaCartao': return getValorFaturaCartao(body);
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
@@ -481,7 +482,19 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-var EMAIL_DESTINO = 'SEU_EMAIL@gmail.com';
+// Para múltiplos destinatários, separe com vírgula:
+// var EMAILS_DESTINO = ['armbr@gmail.com', 'email2@gmail.com'];
+var EMAIL_DESTINO  = 'SEU_EMAIL@gmail.com';
+// Helper para enviar para múltiplos emails
+function enviarEmail(assunto, htmlBody, nomeRemetente) {
+  EMAILS_DESTINO.forEach(function(em) {
+    if (!em || em.indexOf('@') < 0) return;
+    GmailApp.sendEmail(em, assunto, '', { htmlBody: htmlBody, name: nomeRemetente || 'Fluxo App' });
+  });
+} // email principal
+var EMAILS_DESTINO = [EMAIL_DESTINO];       // lista — adicione mais aqui // email principal
+// Para múltiplos emails, adicione separados por vírgula:
+// var EMAIL_DESTINO = 'email1@gmail.com,email2@gmail.com';
 
 // Normaliza qualquer valor de data para string 'YYYY-MM-DD'
 function toDateStr(val) {
@@ -499,6 +512,15 @@ function toDateStr(val) {
     var p = s.split('/'); return p[2]+'-'+p[1]+'-'+p[0];
   }
   return s;
+}
+
+// Envia email para todos os destinatários configurados
+function enviarParaTodos(assunto, corpo) {
+  var emails = String(EMAIL_DESTINO).split(',').map(function(e){ return e.trim(); }).filter(function(e){ return e.indexOf('@')>0; });
+  emails.forEach(function(email) {
+    GmailApp.sendEmail(email, assunto, '', { htmlBody: corpo, name: 'Fluxo App' });
+    Logger.log('Email enviado para: ' + email);
+  });
 }
 
 function enviarResumoDiario() {
@@ -1647,30 +1669,10 @@ function enviarPush(titulo, mensagem) {
 
 // Adicionar push ao resumo diário de tarefas
 function enviarPushResumoDiario() {
-  var hoje = new Date();
-  var diaHoje = hoje.getDate();
-  var mesHoje = hoje.getMonth();
-  var anoHoje = hoje.getFullYear();
-
-  // Contar tarefas do dia
-  var sheetTasks = ss().getSheetByName('Tarefas');
-  var total = 0;
-  if (sheetTasks && sheetTasks.getLastRow() > 1) {
-    var tasks = sheetTasks.getRange(2,1,sheetTasks.getLastRow()-1,sheetTasks.getLastColumn()).getValues();
-    var headers = sheetTasks.getRange(1,1,1,sheetTasks.getLastColumn()).getValues()[0];
-    var dlIdx = headers.indexOf('deadline');
-    var stIdx = headers.indexOf('status');
-    var hoje_str = anoHoje + '-' + String(mesHoje+1).padStart(2,'0') + '-' + String(diaHoje).padStart(2,'0');
-    tasks.forEach(function(r) {
-      if (String(r[dlIdx]).substring(0,10) === hoje_str && r[stIdx] !== 'done') total++;
-    });
-  }
-
-  var msg = total > 0
-    ? total + ' compromisso' + (total>1?'s':'') + ' para hoje'
-    : 'Sem compromissos hoje 🎉';
-
-  enviarPush('⚡ Fluxo — Resumo de hoje', msg);
+  // Esta função é chamada por enviarResumoDiario() com os dados já coletados
+  // Não deve ser chamada diretamente — use enviarResumoDiario()
+  Logger.log('Use enviarResumoDiario() para enviar push + email juntos');
+  enviarResumoDiario();
 }
 
 // Testar push manualmente
@@ -1678,4 +1680,35 @@ function testarPush() {
   Logger.log('Enviando push de teste...');
   var result = enviarPush('⚡ Fluxo — Teste', 'Push notifications funcionando! 🎉');
   Logger.log('Resultado: ' + JSON.stringify(result));
+}
+
+// ════════════════════════════════════════════════════════════
+//  VALOR VARIÁVEL — Fatura do cartão = soma dos gastos do mês
+//  Chamado pelo app para obter o valor real da fatura
+// ════════════════════════════════════════════════════════════
+function getValorFaturaCartao(body) {
+  var cartaoId = String(body.cartaoId || '');
+  var mesAno   = String(body.mesAno   || '');
+  if (!cartaoId || !mesAno) return { ok: false, error: 'Parâmetros inválidos' };
+
+  var sheet = ss().getSheetByName('GastosCartao');
+  if (!sheet || sheet.getLastRow() < 2) return { ok: true, total: 0, gastos: [] };
+
+  var dados   = sheet.getDataRange().getValues();
+  var total   = 0;
+  var gastos  = [];
+  var porCat  = {};
+
+  for (var i = 1; i < dados.length; i++) {
+    if (!dados[i][1]) continue;
+    try {
+      var g = JSON.parse(String(dados[i][1]));
+      if (String(g.cartaoId) === cartaoId && g.fatMes === mesAno && !g.pago) {
+        total += parseFloat(g.val || 0);
+        porCat[g.cat] = (porCat[g.cat] || 0) + parseFloat(g.val || 0);
+        gastos.push({ desc: g.desc, val: g.val, cat: g.cat, data: g.data });
+      }
+    } catch(e) {}
+  }
+  return { ok: true, total: total, gastos: gastos, porCat: porCat };
 }
