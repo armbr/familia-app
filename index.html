@@ -32,7 +32,7 @@
         console.log('Push não suportado neste browser');
         return;
       }
-      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+      navigator.serviceWorker.register('./firebase-messaging-sw.js')
         .then(function(reg) {
           console.log('✅ SW Firebase registrado');
           return Notification.requestPermission();
@@ -68,11 +68,15 @@
       });
     }
 
+    // Expor função globalmente para botão manual
+    window.solicitarPushPermissao = iniciarPush;
+
     // Iniciar após o DOM estar pronto
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', iniciarPush);
     } else {
-      iniciarPush();
+      // Pequeno delay para garantir que o app carregou
+      setTimeout(iniciarPush, 2000);
     }
 
   } catch(e) {
@@ -867,6 +871,7 @@ select option{background:#1A2A3A}
     <div class="logo">⚡ FLUXO</div>
     <div class="right">
       <button id="sync-btn" class="sync-btn" onclick="syncAll()">↻ Sync</button>
+      <button id="push-btn" onclick="ativarNotificacoes()" title="Ativar notificações" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:4px 8px;display:none">🔔</button>
     </div>
   </div>
 </div>
@@ -1850,6 +1855,30 @@ function apiPost(action, body, cb){
     });
   });
 }
+
+function ativarNotificacoes(){
+  if(typeof window.solicitarPushPermissao === 'function'){
+    window.solicitarPushPermissao();
+    toast('🔔 Solicitando permissão de notificação...');
+  } else {
+    toast('⚠️ Firebase não inicializado ainda','err');
+  }
+}
+
+// Mostrar botão de notificação se suportado
+window.addEventListener('load', function(){
+  setTimeout(function(){
+    if('Notification' in window && 'serviceWorker' in navigator){
+      var btn = document.getElementById('push-btn');
+      if(btn){
+        btn.style.display = 'inline-block';
+        if(Notification.permission === 'granted') btn.textContent = '🔔';
+        else if(Notification.permission === 'denied') btn.style.display = 'none';
+        else btn.textContent = '🔕';
+      }
+    }
+  }, 3000);
+});
 
 function boot(){
   var now = new Date();
