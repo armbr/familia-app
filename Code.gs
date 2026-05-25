@@ -1343,6 +1343,61 @@ function enviarLembreteAluguel() {
       Logger.log('Inquilino ' + ct.inqNome + ' sem email cadastrado');
     }
 
+    // WhatsApp — gerar link wa.me para envio manual (Apps Script não envia WA diretamente)
+    // Mas podemos enviar o link por email ao LOCADOR para ele encaminhar
+    var inqWhats = ct.inqWhats || '';
+    if (inqWhats) {
+      var fone = inqWhats.replace(/\D/g, '');
+      if (fone.length < 12) fone = '55' + fone; // adicionar DDI Brasil
+      var meses_br2 = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+      var msgWpp = encodeURIComponent(
+        '📅 *Lembrete de aluguel*
+
+'
+        + 'Olá, *' + ct.inqNome + '*!
+
+'
+        + (diasAte === 0
+            ? '⚠️ Seu aluguel vence *hoje*!'
+            : '📅 Seu aluguel vence em *3 dias* (' + diaVenc + ').')
+        + '
+
+'
+        + '🏠 Imóvel: ' + ct.imovel + '
+'
+        + '💰 Valor: ' + fmtV(ct.valor) + '
+'
+        + '📅 Vencimento: dia ' + ct.diaPgto + ' de cada mês
+
+'
+        + 'Por favor, realize o pagamento conforme combinado.
+
+'
+        + '_Mensagem automática — Fluxo App_'
+      );
+      var linkWpp = 'https://wa.me/' + fone + '?text=' + msgWpp;
+      Logger.log('Link WhatsApp para ' + ct.inqNome + ': ' + linkWpp);
+
+      // Enviar link ao locador por email para ele encaminhar
+      if (EMAIL_DESTINO) {
+        GmailApp.sendEmail(
+          EMAIL_DESTINO,
+          '[Fluxo] Envie WhatsApp para ' + ct.inqNome + ' — vencimento ' + diaVenc,
+          '',
+          {
+            htmlBody: '<div style="font-family:Arial;padding:20px">'
+              + '<h3>⚡ Fluxo — Lembrete para enviar ao inquilino</h3>'
+              + '<p>Clique no botão para enviar o lembrete via WhatsApp para <strong>' + ct.inqNome + '</strong>:</p>'
+              + '<a href="' + linkWpp + '" style="display:inline-block;margin:12px 0;padding:12px 24px;background:#25D366;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px">💬 Enviar WhatsApp</a>'
+              + '<p style="color:#888;font-size:12px">Ou copie o número: ' + ct.inqWhats + '</p>'
+              + '</div>',
+            name: 'Fluxo App'
+          }
+        );
+        Logger.log('Email com link WhatsApp enviado ao locador');
+      }
+    }
+
     enviados++;
     Logger.log('Lembrete processado para ' + ct.inqNome + ' — vence em ' + diasAte + ' dias');
   }
@@ -1357,4 +1412,251 @@ function criarTriggerLembreteAluguel() {
   // Criar trigger diário às 8h (junto com o resumo diário)
   ScriptApp.newTrigger('enviarLembreteAluguel').timeBased().everyDays(1).atHour(8).create();
   Logger.log('✅ Trigger de lembrete de aluguel criado — roda todo dia às 8h.');
+}
+
+// ════════════════════════════════════════════════════════════
+//  FUNÇÕES DE TESTE — Execute manualmente no editor
+// ════════════════════════════════════════════════════════════
+
+// PASSO 1: Configure seu email real aqui e no topo do arquivo
+// var EMAIL_DESTINO = 'seu.email@gmail.com';
+
+function testarEmailTarefas() {
+  // Simula o enviarResumoDiario independente do horário
+  Logger.log('=== TESTE: Email de Tarefas ===');
+  Logger.log('EMAIL_DESTINO atual: ' + EMAIL_DESTINO);
+  
+  if (EMAIL_DESTINO === 'SEU_EMAIL@gmail.com') {
+    Logger.log('❌ ERRO: Configure EMAIL_DESTINO no topo do arquivo Code.gs!');
+    return;
+  }
+  
+  // Enviar email de teste simples
+  GmailApp.sendEmail(
+    EMAIL_DESTINO,
+    '✅ [Fluxo] Teste — Notificação de Tarefas funcionando!',
+    '',
+    {
+      htmlBody: '<div style="font-family:Arial;padding:20px;background:#f5f5f5;border-radius:12px">'
+        + '<h2 style="color:#0F2438">⚡ Fluxo App — Teste de Notificação</h2>'
+        + '<p>✅ O sistema de email de <strong>tarefas agendadas</strong> está funcionando!</p>'
+        + '<p>Enviado em: ' + new Date().toLocaleString() + '</p>'
+        + '<hr>'
+        + '<p style="color:#888;font-size:12px">Este é um email de teste. O email real é enviado todo dia às 8h com suas tarefas do dia.</p>'
+        + '</div>',
+      name: 'Fluxo App'
+    }
+  );
+  Logger.log('✅ Email de teste enviado para: ' + EMAIL_DESTINO);
+}
+
+function testarEmailInquilino() {
+  // Simula o enviarLembreteAluguel para um contrato específico
+  Logger.log('=== TESTE: Email ao Inquilino ===');
+  
+  var sheet = ss().getSheetByName('Contratos');
+  if (!sheet) { Logger.log('❌ Aba Contratos não encontrada'); return; }
+  
+  var dados = sheet.getDataRange().getValues();
+  var ct = null;
+  for (var i = 1; i < dados.length; i++) {
+    if (!dados[i][1]) continue;
+    try { ct = JSON.parse(String(dados[i][1])); break; } catch(e) {}
+  }
+  
+  if (!ct) { Logger.log('❌ Nenhum contrato encontrado na planilha'); return; }
+  
+  Logger.log('Contrato encontrado: ' + ct.inqNome);
+  Logger.log('Email inquilino: ' + (ct.inqEmail || 'NÃO CADASTRADO'));
+  Logger.log('Email locador (EMAIL_DESTINO): ' + EMAIL_DESTINO);
+  
+  if (EMAIL_DESTINO === 'SEU_EMAIL@gmail.com') {
+    Logger.log('❌ Configure EMAIL_DESTINO no topo do arquivo!');
+    return;
+  }
+  
+  var corpo = '<div style="font-family:Arial;padding:20px;background:#f5f5f5;border-radius:12px">'
+    + '<h2 style="color:#0F2438">⚡ Fluxo App — Teste de Lembrete</h2>'
+    + '<p>✅ O sistema de <strong>lembrete de aluguel</strong> está funcionando!</p>'
+    + '<p><strong>Inquilino:</strong> ' + ct.inqNome + '</p>'
+    + '<p><strong>Imóvel:</strong> ' + (ct.imovel || '—') + '</p>'
+    + '<p><strong>Valor:</strong> R$ ' + parseFloat(ct.valor||0).toFixed(2).replace('.', ',') + '</p>'
+    + '<p><strong>Vencimento:</strong> todo dia ' + (ct.diaPgto || '—') + '</p>'
+    + '<hr>'
+    + '<p style="color:#888;font-size:12px">Teste enviado em: ' + new Date().toLocaleString() + '</p>'
+    + '</div>';
+  
+  // Enviar para você (locador)
+  GmailApp.sendEmail(EMAIL_DESTINO, '✅ [Fluxo] Teste — Lembrete de aluguel de ' + ct.inqNome, '', { htmlBody: corpo, name: 'Fluxo App' });
+  Logger.log('✅ Email enviado ao locador: ' + EMAIL_DESTINO);
+  
+  // Enviar para o inquilino se tiver email
+  if (ct.inqEmail && ct.inqEmail.indexOf('@') > -1) {
+    GmailApp.sendEmail(ct.inqEmail, '✅ [Fluxo] Teste — Lembrete de vencimento', '', { htmlBody: corpo, name: ct.locNome + ' via Fluxo App' });
+    Logger.log('✅ Email enviado ao inquilino: ' + ct.inqEmail);
+  } else {
+    Logger.log('⚠️ Inquilino sem email — cadastre o campo "Email do inquilino" no contrato');
+  }
+}
+
+function testarTudoEmail() {
+  testarEmailTarefas();
+  testarEmailInquilino();
+}
+
+// ════════════════════════════════════════════════════════════
+//  PUSH NOTIFICATIONS — Firebase Cloud Messaging API v1
+//  Autenticação via Service Account (não usa Server Key)
+// ════════════════════════════════════════════════════════════
+
+var FCM_PROJECT_ID  = 'fluxo-app-46562';
+var FCM_CLIENT_EMAIL = 'firebase-adminsdk-fbsvc@fluxo-app-46562.iam.gserviceaccount.com';
+// Chave privada do Service Account (mantenha em segredo)
+var FCM_PRIVATE_KEY  = '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3ln0wvg1uJKPa\n2bZ2P9eINdqZHlqF7gjjldmjxbtE2wZ2UDne3djHPnB5YUf3iU9ne7gYprfH8h9G\nX3CxLq+47bawwBbmdspDS9AUySqc/Zhkj339btZMryHM1jRcQod2XPHt3RCEYbfa\nPmFwguX8QcgXYPCoa9uDau2KdmmD2SfCYMeU0i0A9k9iefRb2OJxwwIBHdrlgx2r\n8X1kND/J/AdUIWCBMggQsCTTmAAemAljZ03ksg6025R4eJjPE+qs3Nzts0IQi7Jk\nUCRsJRmPwAj2wsQizjCB92bR5CFbvWZNnDHP+mdEDG/qH4PUTNVzA9z61joqzz0P\nIfvbfXABAgMBAAECggEAD1nHG0Si8xkfddDTPck6DIbDQd8cvtrf1abNoVDq5xeg\nz1MHObxHUGanSTDyD2/E6tBYnQAQuShkxtG7ZqdSlGYVCuuu5oObhzu/OQO2m1Sl\nkdABPwgN5XDV5M6q52V9Ne+Q35ym0Ujp8nbZlyqs0BZQhKrriIunOdJ+rP+YdEiX\nOmhvuDnuBmE1WhCTyzKtUt+oqQjB0GeL0vU9VwutqxcNNYdestmoV1aL7xmM52Cw\n2SJM+vzWlpbmk6+3QKX23FFwCo4Rd/slAQoEcFQHH/Wr2wNLJjfW7UguFUCLz6eP\nfFtb0sdhnLUevX5zBWEbVb4Lwc9aALLXGJT3SkpfCQKBgQDy1ZVpPZttbcScCtqZ\nVT44upDR8aNOQ3huj4WlqX1y0q0cihu2rYMLYyB0T1JQDYlG+41VrTAMnCg80uRJ\nVdFLYXifzbKAz0DNA2mG9TrWkuNR/4AqnSnNBBW734NPox4ifjWNGqU8ZXWFbgbi\nPusBmhsk2aN+oBZL9rHVYQxn6QKBgQDBipg+PqhMXpwalZzT67nf1A5QVR0EvrVx\n9AawEkJ9fSnwVrvqsanH5/rDMMjv8uXWQzIKy+Y2GF/CS9dK/UnE+cCdhk6GYN+W\n0nkl3zYDtgI+ESDT7b0MUbBLeqrQpiVdE27hYvHRhq0J4m/ojEK4z7ejS4khslVm\nE7MGY8DQWQKBgQDNoCx3xFJD1GpjFBHNO1CH6vtMu8fkMt/dBy1NfXsb6ufpvcz/\n4GeSEetecfiqjvvKnqIshY2lb+nmr1HeA4xJv4zMDPt1dYpSz+vg+vFK13Ekcy1N\naG4IC8h3oSnpGqAe5y5jgMegn+1nAidUF6EaZytLBfwa8mZPBuPJYveFWQKBgEhR\nKSHY97nRgDLOxJLK+eEQs2iA5R7ow5OYwwb3S7DoG8uaHQ1M5Uu0+pYEnJBMCmVN\nJl2yYorEAMPw4rk6e14GlFpH3P+JIwKQEoR8Kwqn756Rd9q4cnMv8tfBNiJQcpWc\ntUmyVvkbgXy4B2i1QBkeRFfX2Z2lrRM/OR2iGGHBAoGBAM2M7debpXk23yirssUe\n4lEfuT3Dmw5krblbCAhjws7KYN9NZYf8ydgaeFCAf47+RmDbowPHvrD6MSa/Evfk\npGpAJVvkhuam4spqCueijcxDhgxVmGARTNRuwEcl+8c9j15Jev9P016WDG14wWQp\nyUHsyVjPK9bsYup97n3DBVwR\n-----END PRIVATE KEY-----\n';
+
+// Salva o token FCM do dispositivo (chamado automaticamente pelo app)
+function salvarFcmToken(body) {
+  var sheet = ss().getSheetByName('FCMTokens');
+  if (!sheet) {
+    sheet = ss().insertSheet('FCMTokens');
+    sheet.appendRow(['token', 'updatedAt']);
+    sheet.setFrozenRows(1);
+  }
+  var token = String(body.token || '').trim();
+  if (!token) return { ok: false };
+
+  // Verificar se já existe
+  var dados = sheet.getDataRange().getValues();
+  for (var i = 1; i < dados.length; i++) {
+    if (dados[i][0] === token) {
+      sheet.getRange(i + 1, 2).setValue(new Date().toISOString());
+      return { ok: true, updated: true };
+    }
+  }
+  sheet.appendRow([token, new Date().toISOString()]);
+  return { ok: true, created: true };
+}
+
+// Gera JWT para autenticação OAuth2 com Service Account
+function getFcmAccessToken_() {
+  var now   = Math.floor(Date.now() / 1000);
+  var claim = {
+    iss:   FCM_CLIENT_EMAIL,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud:   'https://oauth2.googleapis.com/token',
+    iat:   now,
+    exp:   now + 3600
+  };
+
+  // Criar JWT manualmente (Apps Script não tem crypto nativo para RSA)
+  // Usamos o serviço OAuth2 do Apps Script via ScriptApp
+  var header  = Utilities.base64EncodeWebSafe(JSON.stringify({alg:'RS256',typ:'JWT'}));
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify(claim));
+  var toSign  = header + '.' + payload;
+
+  // Assinar com chave privada usando Utilities.computeRsaSha256Signature
+  var key  = FCM_PRIVATE_KEY;
+  var sign = Utilities.computeRsaSha256Signature(toSign, key);
+  var jwt  = toSign + '.' + Utilities.base64EncodeWebSafe(sign);
+
+  // Trocar JWT por access token
+  var resp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method:  'post',
+    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt },
+    muteHttpExceptions: true
+  });
+  var data = JSON.parse(resp.getContentText());
+  if (!data.access_token) {
+    Logger.log('Erro ao obter access token: ' + resp.getContentText());
+    return null;
+  }
+  return data.access_token;
+}
+
+// Envia push para todos os dispositivos registrados (FCM API v1)
+function enviarPush(titulo, mensagem) {
+  var sheet = ss().getSheetByName('FCMTokens');
+  if (!sheet || sheet.getLastRow() < 2) {
+    Logger.log('Nenhum token FCM cadastrado — abra o app primeiro');
+    return;
+  }
+  var tokens = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues()
+    .map(function(r) { return String(r[0]).trim(); })
+    .filter(function(t) { return t.length > 0; });
+
+  if (!tokens.length) { Logger.log('Nenhum token válido'); return; }
+
+  var accessToken = getFcmAccessToken_();
+  if (!accessToken) { Logger.log('Falha na autenticação FCM'); return; }
+
+  var url = 'https://fcm.googleapis.com/v1/projects/' + FCM_PROJECT_ID + '/messages:send';
+  var resultados = [];
+
+  // FCM v1 envia um token por vez
+  tokens.forEach(function(token) {
+    var body = JSON.stringify({
+      message: {
+        token: token,
+        notification: { title: titulo, body: mensagem },
+        webpush: {
+          notification: {
+            title: titulo,
+            body:  mensagem,
+            icon:  '/icon.svg',
+            badge: '/icon.svg',
+            requireInteraction: false
+          },
+          fcm_options: { link: 'https://seu-usuario.github.io/fluxo-app/' }
+        }
+      }
+    });
+
+    var resp = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + accessToken },
+      payload: body,
+      muteHttpExceptions: true
+    });
+    var result = JSON.parse(resp.getContentText());
+    Logger.log('Push para ' + token.substring(0,20) + '...: ' + JSON.stringify(result));
+    resultados.push(result);
+  });
+
+  return resultados;
+}
+
+// Adicionar push ao resumo diário de tarefas
+function enviarPushResumoDiario() {
+  var hoje = new Date();
+  var diaHoje = hoje.getDate();
+  var mesHoje = hoje.getMonth();
+  var anoHoje = hoje.getFullYear();
+
+  // Contar tarefas do dia
+  var sheetTasks = ss().getSheetByName('Tarefas');
+  var total = 0;
+  if (sheetTasks && sheetTasks.getLastRow() > 1) {
+    var tasks = sheetTasks.getRange(2,1,sheetTasks.getLastRow()-1,sheetTasks.getLastColumn()).getValues();
+    var headers = sheetTasks.getRange(1,1,1,sheetTasks.getLastColumn()).getValues()[0];
+    var dlIdx = headers.indexOf('deadline');
+    var stIdx = headers.indexOf('status');
+    var hoje_str = anoHoje + '-' + String(mesHoje+1).padStart(2,'0') + '-' + String(diaHoje).padStart(2,'0');
+    tasks.forEach(function(r) {
+      if (String(r[dlIdx]).substring(0,10) === hoje_str && r[stIdx] !== 'done') total++;
+    });
+  }
+
+  var msg = total > 0
+    ? total + ' compromisso' + (total>1?'s':'') + ' para hoje'
+    : 'Sem compromissos hoje 🎉';
+
+  enviarPush('⚡ Fluxo — Resumo de hoje', msg);
+}
+
+// Testar push manualmente
+function testarPush() {
+  Logger.log('Enviando push de teste...');
+  var result = enviarPush('⚡ Fluxo — Teste', 'Push notifications funcionando! 🎉');
+  Logger.log('Resultado: ' + JSON.stringify(result));
 }
