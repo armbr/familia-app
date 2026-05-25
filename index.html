@@ -7,11 +7,12 @@
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
-<!-- ══ FIREBASE PUSH ══ -->
-<!-- Cole seu firebaseConfig aqui após criar o projeto Firebase -->
-<script type="module">
-  // ▼▼▼ SUBSTITUIR COM SEU CONFIG ▼▼▼
-  const FIREBASE_CONFIG = {
+<!-- ══ FIREBASE PUSH — usando bibliotecas compat ══ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script>
+(function(){
+  var FIREBASE_CONFIG = {
     apiKey:            "AIzaSyDWwLFR5Rd1R8YUx7hLk4ZwXR7Fkcct0sY",
     authDomain:        "fluxo-app-46562.firebaseapp.com",
     projectId:         "fluxo-app-46562",
@@ -19,57 +20,65 @@
     messagingSenderId: "720780183452",
     appId:             "1:720780183452:web:3a471aae91f5b270472a59"
   };
-  const VAPID_KEY = "BH0H4zJOHOVwAwkZEtoGMy6hS3HI_9F-G55YDP2UXoIek06z5ZvBp1o__YjmULII6E781SjLiRYkVhI7cJPsO28"; // Web Push certificate key pair
-  // ▲▲▲ SUBSTITUIR COM SEU CONFIG ▲▲▲
+  var VAPID_KEY = "BH0H4zJOHOVwAwkZEtoGMy6hS3HI_9F-G55YDP2UXoIek06z5ZvBp1o__YjmULII6E781SjLiRYkVhI7cJPsO28";
 
-  // Só inicializar se as chaves foram configuradas
-  if (FIREBASE_CONFIG.apiKey !== "COLE_AQUI") {
-    import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js').then(({initializeApp}) => {
-    import('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js').then(({getMessaging, getToken, onMessage}) => {
-      const app       = initializeApp(FIREBASE_CONFIG);
-      const messaging = getMessaging(app);
+  try {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    var messaging = firebase.messaging();
 
-      // Registrar Service Worker
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js')
-          .then(reg => {
-            console.log('SW registrado:', reg.scope);
-            // Pedir permissão de notificação
-            return Notification.requestPermission();
-          })
-          .then(perm => {
-            if (perm === 'granted') {
-              return getToken(messaging, { vapidKey: VAPID_KEY });
-            }
-            throw new Error('Permissão negada');
-          })
-          .then(token => {
-            console.log('FCM Token:', token);
-            localStorage.setItem('ff_fcm_token', token);
-            // Enviar token ao servidor para salvar
-            if (window.API) {
-              fetch(window.API + '?action=salvarFcmToken&payload=' +
-                encodeURIComponent(JSON.stringify({token: token})));
-            }
-          })
-          .catch(err => console.log('Push não disponível:', err.message));
+    // Registrar Service Worker e pedir permissão
+    function iniciarPush() {
+      if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+        console.log('Push não suportado neste browser');
+        return;
       }
+      navigator.serviceWorker.register('/firebase-messaging-sw.js')
+        .then(function(reg) {
+          console.log('✅ SW Firebase registrado');
+          return Notification.requestPermission();
+        })
+        .then(function(perm) {
+          if (perm !== 'granted') { console.log('Permissão de notificação negada'); return; }
+          return messaging.getToken({ vapidKey: VAPID_KEY });
+        })
+        .then(function(token) {
+          if (!token) { console.log('Token FCM não obtido'); return; }
+          console.log('✅ FCM Token obtido:', token.substring(0,20)+'...');
+          localStorage.setItem('ff_fcm_token', token);
+          // Salvar token no servidor
+          var api = localStorage.getItem('ff_api') || '';
+          if (api) {
+            fetch(api + '?action=salvarFcmToken&payload=' +
+              encodeURIComponent(JSON.stringify({token: token})))
+              .then(function(){ console.log('✅ Token FCM salvo no servidor'); })
+              .catch(function(e){ console.log('Erro ao salvar token:', e); });
+          }
+        })
+        .catch(function(err) { console.log('Erro push:', err.message); });
 
-      // Receber mensagens com app aberto
-      onMessage(messaging, payload => {
-        console.log('Push recebido:', payload);
-        var title = payload.notification?.title || '⚡ Fluxo';
-        var body  = payload.notification?.body  || '';
-        if (window.toast) window.toast(title + (body ? ' — ' + body : ''));
-        // Mostrar notificação nativa mesmo com app aberto
+      // Mensagem com app aberto
+      messaging.onMessage(function(payload) {
+        var title = (payload.notification && payload.notification.title) || '⚡ Fluxo';
+        var body  = (payload.notification && payload.notification.body)  || '';
+        console.log('Push recebido:', title, body);
+        if (typeof toast === 'function') toast(title + (body ? ' — ' + body : ''));
         if (Notification.permission === 'granted') {
           new Notification(title, { body: body, icon: '/icon.svg' });
         }
       });
-    });});
-  } else {
-    console.log('Firebase não configurado — push desativado');
+    }
+
+    // Iniciar após o DOM estar pronto
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', iniciarPush);
+    } else {
+      iniciarPush();
+    }
+
+  } catch(e) {
+    console.log('Firebase init erro:', e.message);
   }
+})();
 </script>
 <meta name="theme-color" content="#0F1923">
 <meta name="mobile-web-app-capable" content="yes">
