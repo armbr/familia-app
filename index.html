@@ -3448,7 +3448,7 @@ function taskCard(t,wrap){
   }
   // Mostrar botão se tem recurId mesmo sem achar no RECUR (pode estar carregando)
   var recurTag = recurRid
-    ? '<button class="tag trecur recur-manage-btn" data-rid="'+recurRid+'" title="Clique para editar valor/categoria da recorrência">🔁 Mensal</button>'
+    ? '<button class="tag trecur" onclick="event.stopPropagation();openRecurModal(\''+recurRid+'\')" title="Clique para editar valor/categoria da recorrência">🔁 Mensal</button>'
     : '';
   var sid=String(t.id);
   var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
