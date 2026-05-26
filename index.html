@@ -2855,7 +2855,7 @@ function renderCat(){
 function txCard(t){
   var tp=(t.type==='inc')?'inc':'exp';
   var ico=tp==='exp'?'🔴':'🟢';
-  var sig=tp==='exp'?'-':'+';
+  var sig='';
   var sid=String(t.id);
   return '<div class="txi">'+
     '<div class="txi-ico '+tp+'">'+ico+'</div>'+
@@ -3361,9 +3361,34 @@ function sendTaskComprov(){
 
 function chgTaskStatus(id,s){
   var t=TASKS.find(function(x){return String(x.id)===String(id);});
-  if(!t)return; var old=t.status; t.status=s; renderTasks();
+  if(!t)return;
+  var old=t.status;
+  t.status=s;
+  localStorage.setItem('ff_tasks',JSON.stringify(TASKS));
+  // Ao concluir task com valor financeiro, lançar em TXS
+  if(s==='done' && old!=='done' && t.value && parseFloat(t.value)>0 && t.type!=='task'){
+    var tx={
+      type:       t.type==='inc'?'inc':'exp',
+      desc:       t.desc,
+      value:      parseFloat(t.value),
+      cat:        t.cat||(t.type==='inc'?'⭐ Extra':'📦 Outros'),
+      date:       ymd(new Date()),
+      fromAgenda: true,
+      recurId:    t.recurId||''
+    };
+    var tmpId=Date.now();
+    TXS.unshift(Object.assign({id:tmpId},tx));
+    save();
+    apiCall('addTransaction',tx,function(err){
+      if(err){ TXS=TXS.filter(function(x){return x.id!==tmpId;}); save(); }
+    });
+    renderAll();
+  } else {
+    renderTasks();
+    if(curSection==='hoje') renderHoje();
+  }
   apiCall('updateTask',{id:id,status:s},function(err){
-    if(err){t.status=old;renderTasks();toast('❌ Erro','err');}
+    if(err){t.status=old;localStorage.setItem('ff_tasks',JSON.stringify(TASKS));renderAll();}
   });
 }
 
@@ -3892,7 +3917,7 @@ function renderHoje(){
     var gEl=document.getElementById('hoje-greeting'); if(gEl) gEl.textContent=greeting;
     var dlEl=document.getElementById('hoje-date-lbl');
     if(dlEl) dlEl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
-    var todTxs=TXS.filter(function(t){ return ymds(t.date)===tod&&txValida(t)&&!t.fromAgenda; });
+    var todTxs=TXS.filter(function(t){ return ymds(t.date)===tod&&txValida(t); });
     var pgtos =todTxs.filter(function(t){ return t.type==='exp'; });
     var recs  =todTxs.filter(function(t){ return t.type==='inc'; });
     var todTasks=TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
@@ -3930,8 +3955,23 @@ function renderHoje(){
       atrListEl.innerHTML=atrHtml;
     }
 
+    // Seção: pagos/recebidos hoje (TXS + tasks concluídas hoje)
+    var tasksDoneHoje = TASKS.filter(function(t){
+      return t.status==='done' && t.value && parseFloat(t.value)>0 && t.type!=='task';
+      // Inclui tasks vencidas qualquer dia mas pagas hoje (via fromAgenda em TXS)
+    });
+    // pgtos e recs já vêm de TXS (inclui fromAgenda=true gerados ao concluir task)
+    var hsPgto=document.getElementById('hs-pgto');
+    if(hsPgto) hsPgto.style.display=pgtos.length?'block':'none';
+    var pgtoList=document.getElementById('hoje-pgto-list');
+    if(pgtoList) pgtoList.innerHTML=pgtos.map(pgtoCard).join('');
+
+    var hsRec=document.getElementById('hs-rec');
+    if(hsRec) hsRec.style.display=recs.length?'block':'none';
+    var recList=document.getElementById('hoje-rec-list');
+    if(recList) recList.innerHTML=recs.map(pgtoCard).join('');
+
     // Estado vazio
-    var hsAll=[hsTask,hsAtr];
     var temAlgo=todTasks.length||atrasados.length||pgtos.length||recs.length;
     var emp=document.getElementById('hoje-empty');
     if(emp) emp.style.display=temAlgo?'none':'block';
@@ -3952,7 +3992,7 @@ function pgtoCard(t){
       '<div class="pgto-desc">'+ esc(t.desc) +'</div>'+
       '<div class="pgto-meta"><span class="pgto-cat">'+ esc(t.cat) +'</span></div>'+
     '</div>'+
-    '<div class="pgto-val '+ t.type +'">'+ (t.type==='exp'?'-':'+') + fmtBRL(parseFloat(t.value)) +'</div>'+
+    '<div class="pgto-val '+ t.type +'">'+ fmtBRL(parseFloat(t.value)) +'</div>'+
   '</div>';
 }
 
@@ -4412,7 +4452,7 @@ function abrirFichaAluguel(alugId){
     '</div>'+
     '<div class="ft">'+
       '<div class="ftot"><div class="ftv" style="color:#2ecc9a">R$ '+totalPago.toFixed(2).replace('.',',')+'</div><div class="ftl">Recebido</div></div>'+
-      '<div class="ftot"><div class="ftv" style="color:#FF6B6B">R$ '+totalPend.toFixed(2).replace('.',',')+'</div><div class="ftl">Pendente</div></div>'+
+      /* Total pendente ocultado conforme solicitado */
       '<div class="ftot"><div class="ftv">'+meses.length+'</div><div class="ftl">Meses</div></div>'+
     '</div>'+
     '<table>'+linhas+'</table></div>'+
