@@ -3920,92 +3920,107 @@ function taskWkFrom(from){
 function renderHoje(){
   try {
     var tod  = ymd(new Date());
-
     var now2 = new Date();
     var h    = now2.getHours();
     var greeting = h<12?'Bom dia!':h<18?'Boa tarde!':'Boa noite!';
-    var gEl=document.getElementById('hoje-greeting'); if(gEl) gEl.textContent=greeting;
+    var gEl=document.getElementById('hoje-greeting');
+    if(gEl) gEl.textContent=greeting;
     var dlEl=document.getElementById('hoje-date-lbl');
     if(dlEl) dlEl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
-    var todTxs=TXS.filter(function(t){ return ymds(t.date)===tod&&txValida(t); });
-    var pgtos =todTxs.filter(function(t){ return t.type==='exp'; });
-    var recs  =todTxs.filter(function(t){ return t.type==='inc'; });
-    var todTasks=TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
-    var todPend =todTasks.filter(function(t){ return t.status!=='done'; });
-    var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
 
-    // Contadores
-    // hc-pgto será atualizado após calcular pagoHojeExp
-    var hcpEl=document.getElementById('hc-pgto');
+    var mesAtual = tod.substring(0,7);
+
+    // 1. Tasks com deadline HOJE (pendentes e concluídas)
+    var todTasks = TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
+    var todPend  = todTasks.filter(function(t){ return t.status!=='done'; });
+
+    // 2. Atrasadas: deadline passado e ainda pendentes
+    var atrasados = TASKS.filter(function(t){
+      return t.deadline && ymds(t.deadline)<tod && t.status!=='done';
+    });
+
+    // 3. Pagas hoje: tasks concluídas com valor
+    //    - doneDate===tod (marcadas hoje com a nova versão)
+    //    - OU: sem doneDate mas deadline===tod e done (marcadas hoje antes da versão nova)
+    //    - OU: sem doneDate e deadline passado mas done — mostrar as recentes (último mês)
+    var pagasHoje = TASKS.filter(function(t){
+      if(t.status !== 'done') return false;
+      if(parseFloat(t.value||0) <= 0) return false;
+      if(t.type === 'task') return false;
+      // marcadas hoje explicitamente
+      if(t.doneDate && t.doneDate === tod) return true;
+      // deadline hoje e concluída (provavelmente paga hoje)
+      if(ymds(t.deadline) === tod) return true;
+      return false;
+    });
+
+    // 4. TXS registradas hoje (lançamentos diretos em Finanças)
+    var todTxs = TXS.filter(function(t){ return ymds(t.date)===tod && txValida(t); });
+    var txPgtos = todTxs.filter(function(t){ return t.type==='exp'; });
+    var txRecs  = todTxs.filter(function(t){ return t.type==='inc'; });
+
+    // Combinar pagamentos: TXS + tasks pagas hoje (sem duplicar)
+    var allPagos = pagasHoje.filter(function(t){ return t.type==='exp'; })
+      .map(function(t){ return {type:'exp',desc:t.desc,cat:t.cat||'📦 Outros',value:parseFloat(t.value),date:tod,_fromTask:true}; });
+    // Adicionar TXS que não são de task (lançamentos manuais)
+    txPgtos.forEach(function(p){
+      if(!allPagos.some(function(x){ return x.desc===p.desc && Math.abs(x.value-parseFloat(p.value))<0.01; }))
+        allPagos.push(p);
+    });
+
+    var allRecs = pagasHoje.filter(function(t){ return t.type==='inc'; })
+      .map(function(t){ return {type:'inc',desc:t.desc,cat:t.cat||'⭐ Extra',value:parseFloat(t.value),date:tod,_fromTask:true}; });
+    txRecs.forEach(function(r){
+      if(!allRecs.some(function(x){ return x.desc===r.desc && Math.abs(x.value-parseFloat(r.value))<0.01; }))
+        allRecs.push(r);
+    });
+
+    // Contadores no topo
+    var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=allPagos.length+atrasados.length;
     var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
-    var hcrEl=document.getElementById('hc-rec');  if(hcrEl) hcrEl.textContent=recs.length;
+    var hcrEl=document.getElementById('hc-rec');  if(hcrEl) hcrEl.textContent=allRecs.length;
 
-    // Mostrar seção compromissos
+    // Seção: Compromissos de hoje
     var hsTask=document.getElementById('hs-task');
     if(hsTask) hsTask.style.display=todTasks.length?'block':'none';
-
-    // Renderizar tarefas com try individual
     var taskListEl=document.getElementById('hoje-task-list');
-    if(taskListEl && todTasks.length){
-      var taskHtml='';
-      todTasks.forEach(function(t){
-        try{ taskHtml+=taskCard(t); }catch(e){ taskHtml+='<div style="color:red">Erro no card: '+e.message+'</div>'; }
-      });
-      taskListEl.innerHTML=taskHtml;
+    if(taskListEl){
+      taskListEl.innerHTML=todTasks.map(function(t){
+        try{ return taskCard(t); }catch(e){ return ''; }
+      }).join('');
     }
 
-    // Mostrar seção atrasados
+    // Seção: Atrasados
     var hsAtr=document.getElementById('hs-atrasado');
     if(hsAtr) hsAtr.style.display=atrasados.length?'block':'none';
     var atrListEl=document.getElementById('hoje-atrasado-list');
-    if(atrListEl && atrasados.length){
-      var atrHtml='';
-      atrasados.forEach(function(t){
-        try{ atrHtml+=taskCard(t,'ov'); }catch(e){ atrHtml+='<div style="color:red">Erro: '+e.message+'</div>'; }
-      });
-      atrListEl.innerHTML=atrHtml;
+    if(atrListEl){
+      atrListEl.innerHTML=atrasados.map(function(t){
+        try{ return taskCard(t,'ov'); }catch(e){ return ''; }
+      }).join('');
     }
 
-    // Seção: pagos hoje = TXS de hoje + tasks marcadas como done hoje
-    var tasksPagasHoje = TASKS.filter(function(t){
-      return t.status==='done' && t.doneDate===tod &&
-             parseFloat(t.value||0)>0 && t.type!=='task';
-    });
-    var pagoHojeExp = pgtos.concat(
-      tasksPagasHoje.filter(function(t){ return t.type==='exp'; })
-        .filter(function(t){ // evitar duplicatas com TXS
-          return !pgtos.some(function(p){ return p.desc===t.desc && String(p.value)===String(t.value); });
-        })
-        .map(function(t){ return {type:'exp',desc:t.desc,cat:t.cat||'📦 Outros',value:t.value,date:tod}; })
-    );
-    var pagoHojeInc = recs.concat(
-      tasksPagasHoje.filter(function(t){ return t.type==='inc'; })
-        .filter(function(t){
-          return !recs.some(function(r){ return r.desc===t.desc && String(r.value)===String(t.value); });
-        })
-        .map(function(t){ return {type:'inc',desc:t.desc,cat:t.cat||'⭐ Extra',value:t.value,date:tod}; })
-    );
-    if(hcpEl) hcpEl.textContent=pagoHojeExp.length;
+    // Seção: Pagos hoje
     var hsPgto=document.getElementById('hs-pgto');
-    if(hsPgto) hsPgto.style.display=pagoHojeExp.length?'block':'none';
+    if(hsPgto) hsPgto.style.display=allPagos.length?'block':'none';
     var pgtoList=document.getElementById('hoje-pgto-list');
-    if(pgtoList) pgtoList.innerHTML=pagoHojeExp.map(pgtoCard).join('');
+    if(pgtoList) pgtoList.innerHTML=allPagos.map(pgtoCard).join('');
 
+    // Seção: Recebimentos hoje
     var hsRec=document.getElementById('hs-rec');
-    if(hsRec) hsRec.style.display=pagoHojeInc.length?'block':'none';
+    if(hsRec) hsRec.style.display=allRecs.length?'block':'none';
     var recList=document.getElementById('hoje-rec-list');
-    if(recList) recList.innerHTML=pagoHojeInc.map(pgtoCard).join('');
+    if(recList) recList.innerHTML=allRecs.map(pgtoCard).join('');
 
     // Estado vazio
-    var temAlgo=todTasks.length||atrasados.length||pagoHojeExp.length||pagoHojeInc.length;
+    var temAlgo=todTasks.length||atrasados.length||allPagos.length||allRecs.length;
     var emp=document.getElementById('hoje-empty');
     if(emp) emp.style.display=temAlgo?'none':'block';
 
     try{ bindRecurBtns(); }catch(e){}
 
   } catch(err) {
-    console.error('🔴 renderHoje CATCH:', err.message, err.stack);
-    document.getElementById('sec-hoje').innerHTML = '<div style="color:red;padding:20px">ERRO: '+err.message+'</div>';
+    console.error('renderHoje erro:', err.message, err);
   }
 }
 
