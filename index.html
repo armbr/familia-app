@@ -2099,7 +2099,7 @@ function syncAll(){
 
   apiCall('getTransactions',null,function(err,d){
     if(!err && d.ok){
-      TXS = d.data
+      var serverTxs = d.data
         .map(function(t){
           return Object.assign({}, t, {
             date:  ymds(t.date),
@@ -2110,11 +2110,19 @@ function syncAll(){
             id:    String(t.id    || t.ID  || Date.now())
           });
         })
-        .filter(function(t){
-          // Descartar qualquer linha com type inválido
-          // (lixo gerado pela versão antiga do processRecur)
-          return t.type === 'inc' || t.type === 'exp';
-        });
+        .filter(function(t){ return t.type === 'inc' || t.type === 'exp'; });
+
+      // Preservar entradas locais que não estão no servidor ainda
+      // (ex: pagamentos feitos agora que o servidor ainda não confirmou)
+      var serverIds = {};
+      serverTxs.forEach(function(t){ serverIds[String(t.id)] = true; });
+      var localOnly = TXS.filter(function(t){
+        return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp');
+      });
+
+      TXS = serverTxs.concat(localOnly);
+      // Ordenar por data desc
+      TXS.sort(function(a,b){ return ymds(b.date) > ymds(a.date) ? 1 : -1; });
       save();
     }
     tick();
@@ -3923,13 +3931,6 @@ function renderHoje(){
     var todTasks=TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
     var todPend =todTasks.filter(function(t){ return t.status!=='done'; });
     var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
-
-    // LOG diagnóstico
-    console.log('renderHoje: tod='+tod+' pgtos='+pgtos.length+' recs='+recs.length+' atrasados='+atrasados.length+' todTasks='+todTasks.length+' TXS.length='+TXS.length);
-    if(pgtos.length===0 && TXS.length>0){
-      var sample=TXS.slice(0,3).map(function(t){return '{date:'+t.date+',type:'+t.type+',fromAgenda:'+t.fromAgenda+',recurId:'+t.recurId+',valid:'+txValida(t)+'}';});
-      console.log('TXS amostra:', sample.join(' | '));
-    }
 
     // Contadores
     var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
