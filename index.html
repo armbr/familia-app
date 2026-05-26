@@ -3372,6 +3372,8 @@ function chgTaskStatus(id,s){
   if(!t)return;
   var old=t.status;
   t.status=s;
+  if(s==='done') t.doneDate = ymd(new Date()); // guardar data do pagamento
+  else           delete t.doneDate;
   localStorage.setItem('ff_tasks',JSON.stringify(TASKS));
   // Ao concluir task com valor financeiro, lançar em TXS
   if(s==='done' && old!=='done' && t.value && parseFloat(t.value)>0 && t.type!=='task'){
@@ -3933,7 +3935,8 @@ function renderHoje(){
     var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
 
     // Contadores
-    var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
+    // hc-pgto será atualizado após calcular pagoHojeExp
+    var hcpEl=document.getElementById('hc-pgto');
     var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
     var hcrEl=document.getElementById('hc-rec');  if(hcrEl) hcrEl.textContent=recs.length;
 
@@ -3963,24 +3966,38 @@ function renderHoje(){
       atrListEl.innerHTML=atrHtml;
     }
 
-    // Seção: pagos/recebidos hoje (TXS + tasks concluídas hoje)
-    var tasksDoneHoje = TASKS.filter(function(t){
-      return t.status==='done' && t.value && parseFloat(t.value)>0 && t.type!=='task';
-      // Inclui tasks vencidas qualquer dia mas pagas hoje (via fromAgenda em TXS)
+    // Seção: pagos hoje = TXS de hoje + tasks marcadas como done hoje
+    var tasksPagasHoje = TASKS.filter(function(t){
+      return t.status==='done' && t.doneDate===tod &&
+             parseFloat(t.value||0)>0 && t.type!=='task';
     });
-    // pgtos e recs já vêm de TXS (inclui fromAgenda=true gerados ao concluir task)
+    var pagoHojeExp = pgtos.concat(
+      tasksPagasHoje.filter(function(t){ return t.type==='exp'; })
+        .filter(function(t){ // evitar duplicatas com TXS
+          return !pgtos.some(function(p){ return p.desc===t.desc && String(p.value)===String(t.value); });
+        })
+        .map(function(t){ return {type:'exp',desc:t.desc,cat:t.cat||'📦 Outros',value:t.value,date:tod}; })
+    );
+    var pagoHojeInc = recs.concat(
+      tasksPagasHoje.filter(function(t){ return t.type==='inc'; })
+        .filter(function(t){
+          return !recs.some(function(r){ return r.desc===t.desc && String(r.value)===String(t.value); });
+        })
+        .map(function(t){ return {type:'inc',desc:t.desc,cat:t.cat||'⭐ Extra',value:t.value,date:tod}; })
+    );
+    if(hcpEl) hcpEl.textContent=pagoHojeExp.length;
     var hsPgto=document.getElementById('hs-pgto');
-    if(hsPgto) hsPgto.style.display=pgtos.length?'block':'none';
+    if(hsPgto) hsPgto.style.display=pagoHojeExp.length?'block':'none';
     var pgtoList=document.getElementById('hoje-pgto-list');
-    if(pgtoList) pgtoList.innerHTML=pgtos.map(pgtoCard).join('');
+    if(pgtoList) pgtoList.innerHTML=pagoHojeExp.map(pgtoCard).join('');
 
     var hsRec=document.getElementById('hs-rec');
-    if(hsRec) hsRec.style.display=recs.length?'block':'none';
+    if(hsRec) hsRec.style.display=pagoHojeInc.length?'block':'none';
     var recList=document.getElementById('hoje-rec-list');
-    if(recList) recList.innerHTML=recs.map(pgtoCard).join('');
+    if(recList) recList.innerHTML=pagoHojeInc.map(pgtoCard).join('');
 
     // Estado vazio
-    var temAlgo=todTasks.length||atrasados.length||pgtos.length||recs.length;
+    var temAlgo=todTasks.length||atrasados.length||pagoHojeExp.length||pagoHojeInc.length;
     var emp=document.getElementById('hoje-empty');
     if(emp) emp.style.display=temAlgo?'none':'block';
 
