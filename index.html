@@ -3924,6 +3924,13 @@ function renderHoje(){
     var todPend =todTasks.filter(function(t){ return t.status!=='done'; });
     var atrasados=TASKS.filter(function(t){ return t.deadline&&ymds(t.deadline)<tod&&t.status!=='done'; });
 
+    // LOG diagnóstico
+    console.log('renderHoje: tod='+tod+' pgtos='+pgtos.length+' recs='+recs.length+' atrasados='+atrasados.length+' todTasks='+todTasks.length+' TXS.length='+TXS.length);
+    if(pgtos.length===0 && TXS.length>0){
+      var sample=TXS.slice(0,3).map(function(t){return '{date:'+t.date+',type:'+t.type+',fromAgenda:'+t.fromAgenda+',recurId:'+t.recurId+',valid:'+txValida(t)+'}';});
+      console.log('TXS amostra:', sample.join(' | '));
+    }
+
     // Contadores
     var hcpEl=document.getElementById('hc-pgto'); if(hcpEl) hcpEl.textContent=pgtos.length;
     var hctEl=document.getElementById('hc-task'); if(hctEl) hctEl.textContent=todPend.length;
