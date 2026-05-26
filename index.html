@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260525-195506</title>
+<title>Fluxo v20260526-012444</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2428,6 +2428,7 @@ function renderFixos(){
 var recurModalId = null;
 
 function openRecurModal(rid){
+  console.log('openRecurModal chamado, rid=', rid);
   // Buscar no RECUR pelo id
   var r = RECUR.find(function(x){ return String(x.id)===String(rid); });
   // Se não achou no RECUR, buscar task com esse recurId e usar seus dados
@@ -2455,7 +2456,9 @@ function openRecurModal(rid){
     }
     if(!found) catEl.selectedIndex=0;
   }
-  if(modal) modal.style.display = 'flex';
+  console.log('Mostrando modal, modal=', modal ? 'ok' : 'NULL');
+  if(modal) { modal.style.display = 'flex'; console.log('modal display set to flex'); }
+  else { alert('❌ Elemento recur-modal não encontrado no DOM!'); }
 }
 
 function closeRecurModal(){
@@ -3448,7 +3451,7 @@ function taskCard(t,wrap){
   }
   // Mostrar botão se tem recurId mesmo sem achar no RECUR (pode estar carregando)
   var recurTag = recurRid
-    ? '<button class="tag trecur" onclick="event.stopPropagation();openRecurModal(\''+recurRid+'\')" title="Clique para editar valor/categoria da recorrência">🔁 Mensal</button>'
+    ? '<button class="tag trecur" onclick="event.stopPropagation();openRecurModal(this.dataset.rid)" data-rid="'+recurRid+'" title="Clique para editar valor/categoria da recorrência">🔁 Mensal</button>'
     : '';
   var sid=String(t.id);
   var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
