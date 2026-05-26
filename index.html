@@ -1238,7 +1238,11 @@ select option{background:#1A2A3A}
       <input id="pag-nome" type="text" placeholder="Nome completo" maxlength="80" style="margin-bottom:10px">
       <div class="row2" style="margin-bottom:10px">
         <div><div class="fl">Telefone (WhatsApp)</div><input id="pag-tel" type="tel" placeholder="(47) 99999-0000" maxlength="20"></div>
-        <div><div class="fl">CPF / CNPJ (opcional)</div><input id="pag-doc" type="text" placeholder="000.000.000-00" maxlength="20"></div>
+        <div><div class="fl">CPF / CNPJ</div><input id="pag-doc" type="text" placeholder="000.000.000-00" maxlength="20"></div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div class="fl">📧 E-mail <span style="color:var(--t3);font-weight:400">(para lembretes automáticos)</span></div>
+        <input id="pag-email" type="email" placeholder="email@pagador.com" maxlength="80">
       </div>
       <button class="btn" onclick="addPagador()">+ Salvar Pagador</button>
     </div>
@@ -1613,16 +1617,32 @@ select option{background:#1A2A3A}
     <div style="margin-bottom:16px">
       <div class="fl">🏷️ Categoria</div>
       <select id="rm-cat" style="width:100%">
-        <option>🏠 Moradia</option><option>🚗 Transporte</option><option>🛒 Alimentação</option>
-        <option>💊 Saúde</option><option>📚 Educação</option><option>⚡ Utilidades</option>
-        <option>💳 Cartão de Crédito</option><option>🏦 Financiamento</option>
-        <option>📱 Assinatura</option><option>🎮 Lazer</option><option>📦 Outros</option>
+        <optgroup label="── Despesas ──">
+          <option>🍽️ Alimentação</option>
+          <option>🚗 Carro/Transporte</option>
+          <option>🏠 Casa/Moradia</option>
+          <option>💊 Saúde</option>
+          <option>📚 Educação</option>
+          <option>👗 Roupas</option>
+          <option>🎮 Lazer</option>
+          <option>💼 Empresa/Negócio</option>
+          <option>🏛️ Taxas/Impostos</option>
+          <option>💳 Cartão de Crédito</option>
+          <option>📈 Investimentos</option>
+          <option>🏦 Financiamentos</option>
+          <option>📦 Outros</option>
+        </optgroup>
+        <optgroup label="── Receitas ──">
+          <option>💰 Salário</option>
+          <option>⭐ Extra</option>
+        </optgroup>
       </select>
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;margin-bottom:8px">
       <button onclick="saveRecurEdit()" style="flex:1;padding:13px;border:none;border-radius:10px;background:var(--green);color:#0A1A12;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">✓ Salvar</button>
-      <button onclick="cancelRecurFromModal()" style="padding:13px 16px;border:none;border-radius:10px;background:var(--bg3);color:var(--t2);font-size:14px;cursor:pointer;font-family:inherit">✕</button>
+      <button onclick="closeRecurModal()" style="padding:13px 16px;border:none;border-radius:10px;background:var(--bg3);color:var(--t2);font-size:14px;cursor:pointer;font-family:inherit">✕</button>
     </div>
+    <button onclick="cancelRecurFromModal()" style="width:100%;padding:10px;border:none;border-radius:10px;background:transparent;color:var(--red);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🗑️ Excluir esta recorrência</button>
   </div>
 </div>
 
@@ -2501,17 +2521,31 @@ function saveRecurEdit(){
 
   TASKS.forEach(function(t){
     if(String(t.recurId) === String(recurModalId)){
-      // Atualizar mês atual e futuros (não alterar passados já concluídos)
-      var tMes = t.deadline ? t.deadline.substring(0,7) : '';
-      if(tMes >= mesMes || t.status === 'pend'){
+      var tMes = t.deadline ? ymds(t.deadline).substring(0,7) : '';
+      // Atualizar mês atual e futuros pendentes
+      if(t.status === 'pend' && tMes >= mesMes){
         t.value = newVal;
         t.cat   = newCat;
         updated++;
-        // Atualizar no servidor
         apiCall('updateTask', {id:t.id, value:newVal, cat:newCat}, function(){});
       }
     }
   });
+  // Se não encontrou tasks (ainda não geradas este mês), criar agora
+  if(updated === 0 && r){
+    var existeEsteMes = TASKS.some(function(t){
+      return String(t.recurId)===String(recurModalId) && t.deadline && ymds(t.deadline).startsWith(mesMes);
+    });
+    if(!existeEsteMes){
+      var day = r.date ? new Date((r.date||'2000-01-01')+'T12:00:00').getDate() : 1;
+      var dl  = mesMes+'-'+pad(day);
+      var novaTask = {id:Date.now(),desc:r.desc,type:r.type||'exp',deadline:dl,
+        value:newVal,cat:newCat,status:'pend',recurId:String(recurModalId)};
+      TASKS.unshift(novaTask);
+      apiCall('addTask', novaTask, function(){});
+      updated = 1;
+    }
+  }
 
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
 
@@ -4063,12 +4097,14 @@ function addPagador(){
   var doc =(document.getElementById('pag-doc') ||{}).value||'';
   nome=nome.trim();
   if(!nome){toast('⚠️ Informe o nome','err');return;}
-  var p={id:Date.now(),nome:nome,tel:tel,doc:doc};
+  var email=((document.getElementById('pag-email')||{}).value||'').trim();
+  var p={id:Date.now(),nome:nome,tel:tel,doc:doc,email:email};
   PAGADORES.unshift(p); savePagadores();
   apiPost('salvarPagador',p,function(){});
   document.getElementById('pag-nome').value='';
   document.getElementById('pag-tel').value='';
   document.getElementById('pag-doc').value='';
+  var pe=document.getElementById('pag-email'); if(pe) pe.value='';
   renderRecibos(); toast('✅ Pagador salvo!');
 }
 function delPagador(id){
@@ -4089,7 +4125,7 @@ function renderPagadores(){
     return '<div class="taski" style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
       '<div style="font-size:22px">👤</div>'+
       '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">'+esc(p.nome)+'</div>'+
-      '<div style="font-size:11px;color:var(--t3)">'+(p.tel?'📱 '+esc(p.tel):'')+(p.doc?' · '+esc(p.doc):'')+'</div></div>'+
+      '<div style="font-size:11px;color:var(--t3)">'+(p.tel?'📱 '+esc(p.tel):'')+(p.doc?' · '+esc(p.doc):'')+(p.email?'<br>📧 '+esc(p.email):'')+'</div></div>'+
       '<button class="tdel2" data-delpag="'+p.id+'">🗑️</button></div>';
   }).join('');
 }
