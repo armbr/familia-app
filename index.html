@@ -322,7 +322,7 @@ select option{background:#1A2A3A}
   padding:4px 0;user-select:none;
   -webkit-tap-highlight-color:rgba(46,204,154,.15);
 }
-.coll-arrow{font-size:16px;color:var(--t3);transition:transform .2s}
+.coll-arrow{font-size:20px;color:var(--green);transition:transform .2s;font-style:normal;line-height:1}
 .coll-body{margin-top:12px}
 
 /* ════════════════════════════════
@@ -781,7 +781,7 @@ select option{background:#1A2A3A}
 .doc-btn.del{color:var(--red);border-color:transparent}
 
 .docs-pasta-block{ margin-bottom:6px; }
-.docs-pasta-chevron{transition:transform .2s;display:inline-block;margin-left:auto;color:var(--t3);font-size:12px}
+.docs-pasta-chevron{transition:transform .2s;display:inline-block;margin-left:auto;color:var(--green);font-size:18px;font-weight:900}
 .docs-pasta-title{
   font-size:13px;font-weight:800;color:var(--t1);
   background:var(--card2);border:1px solid var(--border);
@@ -1234,6 +1234,11 @@ select option{background:#1A2A3A}
   <!-- ABA: PAGADORES -->
   <div id="rp-pagadores" style="display:none">
     <div class="card" style="margin-bottom:12px">
+      <div class="coll-hdr card-title" onclick="toggleColl('pag-form-body','pag-form-arrow')" style="margin-bottom:0">
+        <span>👤 Novo Pagador</span>
+        <span class="coll-arrow" id="pag-form-arrow" style="transform:rotate(-90deg)">▾</span>
+      </div>
+      <div id="pag-form-body" style="display:none;margin-top:12px">
       <div class="fl" style="margin-bottom:4px">Nome</div>
       <input id="pag-nome" type="text" placeholder="Nome completo" maxlength="80" style="margin-bottom:10px">
       <div class="row2" style="margin-bottom:10px">
@@ -1245,6 +1250,7 @@ select option{background:#1A2A3A}
         <input id="pag-email" type="email" placeholder="email@pagador.com" maxlength="80">
       </div>
       <button class="btn" onclick="addPagador()">+ Salvar Pagador</button>
+      </div><!-- /pag-form-body -->
     </div>
     <div class="slbl" style="margin-bottom:8px">Pagadores cadastrados</div>
     <div id="pag-list"></div>
@@ -1253,6 +1259,11 @@ select option{background:#1A2A3A}
   <!-- ABA: ALUGUÉIS -->
   <div id="rp-alugueis" style="display:none">
     <div class="card" style="margin-bottom:12px">
+      <div class="coll-hdr card-title" onclick="toggleColl('alug-form-body','alug-form-arrow')" style="margin-bottom:0">
+        <span>🏠 Novo Aluguel</span>
+        <span class="coll-arrow" id="alug-form-arrow" style="transform:rotate(-90deg)">▾</span>
+      </div>
+      <div id="alug-form-body" style="display:none;margin-top:12px">
       <div class="row2" style="margin-bottom:10px">
         <div><div class="fl">Inquilino</div>
           <select id="alug-pag"><option value="">— selecione —</option></select>
@@ -1270,6 +1281,7 @@ select option{background:#1A2A3A}
         </div>
       </div>
       <button class="btn" onclick="addAluguel()">+ Cadastrar Aluguel</button>
+      </div><!-- /alug-form-body -->
     </div>
     <div class="slbl" style="margin-bottom:8px">Aluguéis cadastrados</div>
     <div id="alug-list"></div>
@@ -1281,7 +1293,11 @@ select option{background:#1A2A3A}
 
     <!-- Formulário novo contrato -->
     <div class="card" style="margin-bottom:12px">
-      <div class="slbl" style="margin-bottom:10px">📄 Novo Contrato</div>
+      <div class="coll-hdr card-title" onclick="toggleColl('ct-form-body','ct-form-arrow')" style="margin-bottom:0">
+        <span>📄 Novo Contrato</span>
+        <span class="coll-arrow" id="ct-form-arrow" style="transform:rotate(-90deg)">▾</span>
+      </div>
+      <div id="ct-form-body" style="display:none;margin-top:12px">
 
       <!-- Tipo -->
       <div style="margin-bottom:10px">
@@ -1397,6 +1413,7 @@ select option{background:#1A2A3A}
       </div>
 
       <button class="btn" onclick="salvarContrato()" style="margin-bottom:8px">💾 Salvar Contrato</button>
+      </div><!-- /ct-form-body -->
     </div>
 
     <!-- Lista de contratos -->
@@ -4931,7 +4948,7 @@ function renderDocs(){
       '<div class="docs-pasta-title" data-pasta="'+esc(pasta)+'" style="cursor:pointer">'+
         '<span>'+( isCollapsed?'📁':'📂' )+' '+esc(pasta)+'</span>'+
         '<span class="docs-badge">'+totalDocs+'</span>'+
-        '<span class="docs-pasta-chevron" style="transform:'+(isCollapsed?'rotate(-90deg)':'')+'">▾</span>'+
+        '<span class="docs-pasta-chevron" style="transform:'+(isCollapsed?'rotate(-90deg)':'')+'">⌄</span>'+
       '</div>'+
       '<div class="docs-pasta-body" style="display:'+(isCollapsed?'none':'block')+'">';
 
