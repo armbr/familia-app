@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260526-012444</title>
+<title>Fluxo v20260526-014606</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3312,6 +3312,22 @@ function renderTasks(){
   if(curTaskView==='month') renderTM();
   if(curTaskView==='plan')  renderTP();
   bindTaskEvents();
+  bindRecurBtns();
+}
+
+function bindRecurBtns(){
+  document.querySelectorAll('[data-rid]').forEach(function(btn){
+    // Remover listener antigo se existir
+    var newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    newBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      e.preventDefault();
+      var rid = newBtn.getAttribute('data-rid');
+      console.log('🔁 Clique em recorrência, rid=', rid);
+      openRecurModal(rid);
+    });
+  });
 }
 
 function bindTaskEvents(){
@@ -3450,8 +3466,9 @@ function taskCard(t,wrap){
     if(recurEntry) recurRid = String(recurEntry.id);
   }
   // Mostrar botão se tem recurId mesmo sem achar no RECUR (pode estar carregando)
+  var recurBtnId = 'rb-'+recurRid;
   var recurTag = recurRid
-    ? '<button class="tag trecur" onclick="event.stopPropagation();openRecurModal(this.dataset.rid)" data-rid="'+recurRid+'" title="Clique para editar valor/categoria da recorrência">🔁 Mensal</button>'
+    ? '<button id="'+recurBtnId+'" class="tag trecur" data-rid="'+recurRid+'" title="Editar valor desta recorrência ('+recurRid+')">🔁 Mensal</button>'
     : '';
   var sid=String(t.id);
   var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
@@ -3838,6 +3855,8 @@ function renderHoje(){
     var temAlgo=todTasks.length||atrasados.length||pgtos.length||recs.length;
     var emp=document.getElementById('hoje-empty');
     if(emp) emp.style.display=temAlgo?'none':'block';
+
+    try{ bindRecurBtns(); }catch(e){}
 
   } catch(err) {
     console.error('🔴 renderHoje CATCH:', err.message, err.stack);
