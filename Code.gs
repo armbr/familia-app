@@ -381,13 +381,38 @@ function addRecur(body) {
   var sheet = ss2.getSheetByName('Recorrentes');
   if (!sheet) {
     sheet = ss2.insertSheet('Recorrentes');
-    sheet.appendRow(['id','type','desc','value','cat','date','createdAt']);
+    sheet.appendRow(['id','type','desc','value','cat','date','updatedAt','cartaoId']);
     sheet.setFrozenRows(1);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#162030').setFontColor('#FFF');
   }
-  var id = body.id || Date.now();
-  sheet.appendRow([id, body.type, body.desc, parseFloat(body.value), body.cat, body.date, new Date().toISOString()]);
-  return { ok: true, id: id };
+  var id = String(body.id || Date.now());
+  var now = new Date().toISOString();
+  var cartaoId = body.cartaoId || '';
+
+  // Verificar se já existe linha com esse id — se sim, atualizar
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === id) {
+      // Atualizar linha existente
+      sheet.getRange(i + 1, 1, 1, 8).setValues([[
+        id,
+        body.type  || data[i][1],
+        body.desc  || data[i][2],
+        parseFloat(body.value) || 0,
+        body.cat   || data[i][4],
+        body.date  || data[i][5],
+        now,
+        cartaoId
+      ]]);
+      Logger.log('addRecur: atualizado id=' + id + ' valor=' + body.value + ' cat=' + body.cat);
+      return { ok: true, id: id, updated: true };
+    }
+  }
+
+  // Não existe — inserir nova linha
+  sheet.appendRow([id, body.type, body.desc, parseFloat(body.value)||0, body.cat, body.date, now, cartaoId]);
+  Logger.log('addRecur: criado id=' + id + ' valor=' + body.value);
+  return { ok: true, id: id, created: true };
 }
 
 function deleteRecur(id) {
@@ -483,7 +508,7 @@ function limparTransacoesAutomaticas() {
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
 // Para múltiplos destinatários, separe com vírgula:
-// var EMAILS_DESTINO = ['armbr@gmail.com', 'email2@gmail.com'];
+// var EMAILS_DESTINO = ['armbr258@gmail.com', 'email2@gmail.com'];
 var EMAIL_DESTINO  = 'SEU_EMAIL@gmail.com';
 // Helper para enviar para múltiplos emails
 function enviarEmail(assunto, htmlBody, nomeRemetente) {
