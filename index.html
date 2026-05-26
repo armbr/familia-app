@@ -1424,6 +1424,11 @@ select option{background:#1A2A3A}
   <!-- ABA: RECIBOS -->
   <div id="rp-recibos" style="display:none">
     <div class="card" style="margin-bottom:12px">
+      <div class="coll-hdr card-title" onclick="toggleColl('rec-form-body','rec-form-arrow')" style="margin-bottom:0">
+        <span>🧾 Novo Recibo</span>
+        <span class="coll-arrow" id="rec-form-arrow" style="transform:rotate(-90deg)">▾</span>
+      </div>
+      <div id="rec-form-body" style="display:none;margin-top:12px">
       <div style="margin-bottom:10px">
         <div class="fl">Pagador</div>
         <select id="rec-pag"><option value="">— selecione ou preencha abaixo —</option></select>
@@ -1447,6 +1452,7 @@ select option{background:#1A2A3A}
         <input id="rec-obs" type="text" placeholder="Ex: Referente ao mês de março" maxlength="200">
       </div>
       <button class="btn" onclick="emitirRecibo()">Gerar Recibo 🧾</button>
+      </div><!-- /rec-form-body -->
     </div>
     <div class="slbl" style="margin-bottom:8px">Recibos emitidos</div>
     <div id="rec-hist-list"></div>
