@@ -2522,8 +2522,8 @@ function saveRecurEdit(){
   TASKS.forEach(function(t){
     if(String(t.recurId) === String(recurModalId)){
       var tMes = t.deadline ? ymds(t.deadline).substring(0,7) : '';
-      // Atualizar mês atual e futuros pendentes
-      if(t.status === 'pend' && tMes >= mesMes){
+      // Atualizar tasks pendentes — incluindo vencidas não pagas
+      if(t.status === 'pend'){
         t.value = newVal;
         t.cat   = newCat;
         updated++;
