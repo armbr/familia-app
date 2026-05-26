@@ -2470,36 +2470,58 @@ function closeRecurModal(){
 function saveRecurEdit(){
   if(!recurModalId) return;
   var r = RECUR.find(function(x){ return String(x.id)===String(recurModalId); });
-  if(!r){ closeRecurModal(); return; }
+  if(!r){
+    // Não achou no RECUR — criar entrada com dados do modal
+    var valEl2 = document.getElementById('rm-val');
+    var catEl2 = document.getElementById('rm-cat');
+    r = { id: recurModalId, value: parseFloat((valEl2||{}).value)||0, cat: (catEl2||{}).value||'📦 Outros' };
+    RECUR.unshift(r);
+  }
+
   var newVal = parseFloat(document.getElementById('rm-val').value)||0;
   var newCat = document.getElementById('rm-cat').value;
   var oldVal = r.value;
+  var oldCat = r.cat;
+
+  // Atualizar o objeto RECUR
   r.value = newVal;
   r.cat   = newCat;
   saveRecur();
-  apiCall('addRecur', r, function(){});
 
-  // Atualizar tasks do mês atual vinculadas a esta recorrência
+  // Enviar para servidor (upsert)
+  apiCall('addRecur', r, function(err){
+    if(err) console.error('Erro ao salvar recorrência:', err);
+    else console.log('✅ Recorrência salva no servidor');
+  });
+
+  // Atualizar TODAS as tasks vinculadas a esta recorrência (não só do mês atual)
   var now    = new Date();
   var mesMes = now.getFullYear()+'-'+pad(now.getMonth()+1);
   var updated = 0;
+
   TASKS.forEach(function(t){
-    if(String(t.recurId)===String(r.id) && t.deadline && t.deadline.startsWith(mesMes)){
-      t.value = newVal;
-      t.cat   = newCat;
-      updated++;
-      // Atualizar no servidor também
-      apiCall('updateTask', {id:t.id, value:newVal, cat:newCat}, function(){});
+    if(String(t.recurId) === String(recurModalId)){
+      // Atualizar mês atual e futuros (não alterar passados já concluídos)
+      var tMes = t.deadline ? t.deadline.substring(0,7) : '';
+      if(tMes >= mesMes || t.status === 'pend'){
+        t.value = newVal;
+        t.cat   = newCat;
+        updated++;
+        // Atualizar no servidor
+        apiCall('updateTask', {id:t.id, value:newVal, cat:newCat}, function(){});
+      }
     }
   });
+
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
 
   closeRecurModal();
   renderAll();
+
   if(updated > 0)
-    toast('✅ Valor atualizado! Task do mês corrigida de '+fmtBRL(oldVal)+' para '+fmtBRL(newVal));
+    toast('✅ Recorrência atualizada: '+fmtBRL(oldVal)+' → '+fmtBRL(newVal)+' ('+updated+' task'+(updated>1?'s':'')+')');
   else
-    toast('✅ Recorrência atualizada para '+fmtBRL(newVal)+'/mês');
+    toast('✅ Recorrência: '+fmtBRL(newVal)+'/mês ('+newCat+')');
 }
 
 function cancelRecurFromModal(){
