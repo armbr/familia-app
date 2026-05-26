@@ -2428,16 +2428,34 @@ function renderFixos(){
 var recurModalId = null;
 
 function openRecurModal(rid){
+  // Buscar no RECUR pelo id
   var r = RECUR.find(function(x){ return String(x.id)===String(rid); });
-  if(!r) return;
+  // Se não achou no RECUR, buscar task com esse recurId e usar seus dados
+  if(!r){
+    var t = TASKS.find(function(x){ return String(x.recurId)===String(rid); });
+    if(t){
+      r = { id: rid, desc: t.desc, value: t.value||0, cat: t.cat||'📦 Outros', date: t.deadline };
+    }
+  }
+  if(!r){ toast('Recorrência não encontrada — tente sincronizar','err'); return; }
   recurModalId = String(rid);
-  document.getElementById('rm-title').textContent = r.desc;
-  document.getElementById('rm-sub').textContent   = 'Todo dia '+pad(new Date((r.date||'2000-01-01')+'T12:00:00').getDate())+' de cada mês';
-  document.getElementById('rm-val').value = r.value || '';
-  var catEl = document.getElementById('rm-cat');
-  catEl.value = r.cat || '📦 Outros';
-  var modal = document.getElementById('recur-modal');
-  modal.style.display = 'flex';
+  var titleEl = document.getElementById('rm-title');
+  var subEl   = document.getElementById('rm-sub');
+  var valEl   = document.getElementById('rm-val');
+  var catEl   = document.getElementById('rm-cat');
+  var modal   = document.getElementById('recur-modal');
+  if(titleEl) titleEl.textContent = r.desc || 'Recorrência';
+  if(subEl)   subEl.textContent   = r.date ? 'Vencimento: todo dia '+pad(new Date((r.date||'2000-01-01')+'T12:00:00').getDate()) : 'Recorrente mensal';
+  if(valEl)   valEl.value         = r.value || '';
+  if(catEl){
+    // Tentar selecionar a categoria
+    var found = false;
+    for(var i=0;i<catEl.options.length;i++){
+      if(catEl.options[i].value===r.cat||catEl.options[i].text===r.cat){ catEl.selectedIndex=i; found=true; break; }
+    }
+    if(!found) catEl.selectedIndex=0;
+  }
+  if(modal) modal.style.display = 'flex';
 }
 
 function closeRecurModal(){
@@ -3419,14 +3437,18 @@ function taskCard(t,wrap){
     ?'<a href="'+esc(t.comprovUrl)+'" target="_blank" class="task-comprov-link">📎 Ver comprovante</a>':'';
   // Ícone de recorrência — por recurId ou por desc (fallback)
   var recurEntry = null;
+  var recurRid   = '';
   if(t.recurId){
     recurEntry = RECUR.find(function(r){ return String(r.id)===String(t.recurId); });
+    recurRid   = String(t.recurId);
   }
   if(!recurEntry){
     recurEntry = RECUR.find(function(r){ return r.desc===t.desc; });
+    if(recurEntry) recurRid = String(recurEntry.id);
   }
-  var recurTag = recurEntry
-    ? '<button class="tag trecur recur-manage-btn" data-rid="'+String(recurEntry.id)+'" title="Recorrente mensal — clique para gerenciar">🔁 Mensal</button>'
+  // Mostrar botão se tem recurId mesmo sem achar no RECUR (pode estar carregando)
+  var recurTag = recurRid
+    ? '<button class="tag trecur recur-manage-btn" data-rid="'+recurRid+'" title="Clique para editar valor/categoria da recorrência">🔁 Mensal</button>'
     : '';
   var sid=String(t.id);
   var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
