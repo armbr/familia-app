@@ -508,8 +508,8 @@ function limparTransacoesAutomaticas() {
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
 // Para múltiplos destinatários, separe com vírgula:
-// var EMAILS_DESTINO = ['armbr258@gmail.com', 'email2@gmail.com'];
-var EMAIL_DESTINO  = 'SEU_EMAIL@gmail.com';
+// var EMAILS_DESTINO = ['email1@gmail.com', 'email2@gmail.com'];
+var EMAIL_DESTINO  = 'armbr258@gmail.com'; // ← SUBSTITUA pelo seu email real
 // Helper para enviar para múltiplos emails
 function enviarEmail(assunto, htmlBody, nomeRemetente) {
   EMAILS_DESTINO.forEach(function(em) {
@@ -688,11 +688,13 @@ function enviarResumoDiario() {
 
   // Enviar push notification junto com o email
   try {
-    var pushMsg = totalTarefas > 0
-      ? totalTarefas + ' tarefa' + (totalTarefas > 1 ? 's' : '') + ' para hoje'
-        + (totalAtrasadas > 0 ? ' · ' + totalAtrasadas + ' atrasada' + (totalAtrasadas > 1 ? 's' : '') : '')
-      : totalAtrasadas > 0
-        ? totalAtrasadas + ' tarefa' + (totalAtrasadas > 1 ? 's atrasadas' : ' atrasada')
+    var nHoje     = tarefas.length;
+    var nAtrasadas = atrasadas.length;
+    var pushMsg = nHoje > 0
+      ? nHoje + ' compromisso' + (nHoje > 1 ? 's' : '') + ' para hoje'
+        + (nAtrasadas > 0 ? ' · ' + nAtrasadas + ' atrasado' + (nAtrasadas > 1 ? 's' : '') : '')
+      : nAtrasadas > 0
+        ? nAtrasadas + ' atrasado' + (nAtrasadas > 1 ? 's' : '')
         : 'Nenhum compromisso hoje 🎉';
     enviarPush('☀️ Fluxo — Resumo do dia', pushMsg);
     Logger.log('✅ Push enviado: ' + pushMsg);
