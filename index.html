@@ -3677,6 +3677,7 @@ function renderTW(){
   if(!total) h=emptyHTML('📅','Semana livre!','Nenhum compromisso nesta semana');
   document.getElementById('tw-list').innerHTML=h;
 }
+function shiftTD(n){ tdDate.setDate(tdDate.getDate()+n); renderTD(); }
 function shiftTW(n){ twStart.setDate(twStart.getDate()+n*7); renderTW(); }
 function taskWkDay(d){ tdDate=new Date(d+'T00:00:00'); setTaskView('day'); }
 
