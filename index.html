@@ -3284,9 +3284,39 @@ function confirmarComprov(){
   var id = comprovModalTaskId;
   closeComprovModal();
   if(!id) return;
+
+  // Marcar como paga
   chgTaskStatus(id, 'done');
-  if(taskComprovFile) uploadComprovante(id, taskComprovFile);
-  toast('✅ Despesa concluída!');
+
+  // Se tem arquivo, fazer upload e salvar link no card
+  if(taskComprovFile){
+    var t = TASKS.find(function(x){ return String(x.id)===String(id); });
+    var fname = ymd(new Date()).replace(/-/g,'')+'_'+(t?t.desc:'comprovante').replace(/[^a-zA-Z0-9À-ú ]/g,'').substring(0,30).trim();
+    toast('📎 Enviando comprovante...');
+    prepareFileB64(taskComprovFile, function(b64, mime){
+      apiPost('uploadComprovante', {name:fname, mimeType:mime, data:b64}, function(err, d){
+        if(err || !d || !d.ok){
+          toast('✅ Pago! ⚠️ Erro no comprovante: '+(err?err.message:(d&&d.error)||''), 'err');
+          return;
+        }
+        // Salvar URL na task
+        if(t){
+          t.comprovUrl = d.url;
+          localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+          apiCall('updateTask', {id:id, comprovUrl:d.url}, function(){});
+          renderAll();
+        }
+        toast('✅ Pago! 📎 Comprovante salvo no Drive');
+      });
+    });
+  } else {
+    toast('✅ Despesa concluída!');
+  }
+}
+
+function uploadComprovante(id, file){
+  // Alias — chama confirmarComprov já faz o upload
+  // Mantido para compatibilidade
 }
 
 function sendTaskComprov(){
