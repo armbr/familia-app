@@ -1737,3 +1737,34 @@ function getValorFaturaCartao(body) {
   }
   return { ok: true, total: total, gastos: gastos, porCat: porCat };
 }
+
+// ════════════════════════════════════════════════════════════
+//  TESTE DE PERMISSÃO DO DRIVE
+//  Execute testarDrive() uma vez para autorizar o acesso
+// ════════════════════════════════════════════════════════════
+function testarDrive() {
+  try {
+    // Tenta criar/acessar a pasta
+    var folders = DriveApp.getFoldersByName('Comprovantes Família');
+    var folder = folders.hasNext()
+      ? folders.next()
+      : DriveApp.createFolder('Comprovantes Família');
+
+    // Cria arquivo de teste
+    var blob = Utilities.newBlob('Teste de permissão - Fluxo App', 'text/plain', 'teste-permissao.txt');
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    Logger.log('✅ Drive OK! Pasta: ' + folder.getName());
+    Logger.log('✅ Arquivo teste: ' + file.getUrl());
+    Logger.log('✅ Agora os comprovantes serão salvos nesta pasta.');
+
+    // Remover arquivo de teste
+    file.setTrashed(true);
+    return { ok: true, folder: folder.getName(), id: folder.getId() };
+  } catch(e) {
+    Logger.log('❌ Erro Drive: ' + e.message);
+    Logger.log('Solução: Executar > Autorizar acesso no menu do Apps Script');
+    return { ok: false, error: e.message };
+  }
+}
