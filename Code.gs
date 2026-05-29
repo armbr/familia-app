@@ -507,19 +507,9 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-// Para múltiplos destinatários, separe com vírgula:
-// var EMAILS_DESTINO = ['email1@gmail.com', 'email2@gmail.com'];
-var EMAIL_DESTINO  = 'armbr258@gmail.com'; // ← SUBSTITUA pelo seu email real
-// Helper para enviar para múltiplos emails
-function enviarEmail(assunto, htmlBody, nomeRemetente) {
-  EMAILS_DESTINO.forEach(function(em) {
-    if (!em || em.indexOf('@') < 0) return;
-    GmailApp.sendEmail(em, assunto, '', { htmlBody: htmlBody, name: nomeRemetente || 'Fluxo App' });
-  });
-} // email principal
-var EMAILS_DESTINO = [EMAIL_DESTINO];       // lista — adicione mais aqui // email principal
-// Para múltiplos emails, adicione separados por vírgula:
-// var EMAIL_DESTINO = 'email1@gmail.com,email2@gmail.com';
+var EMAIL_DESTINO  = 'armbr258@gmail.com';
+var EMAILS_DESTINO = [EMAIL_DESTINO]; // Para adicionar mais: ['email1@gmail.com', 'email2@gmail.com']
+
 
 // Normaliza qualquer valor de data para string 'YYYY-MM-DD'
 function toDateStr(val) {
