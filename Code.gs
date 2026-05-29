@@ -602,75 +602,83 @@ function enviarResumoDiario() {
   }
 
   // ── Montar e-mail ────────────────────────────────────────
-  function fmtVal(v) {
-    if (!v || v <= 0) return '';
-    return ' — <strong>R$ ' + v.toFixed(2).replace('.', ',') + '</strong>';
-  }
-  function tipoIcon(t) {
-    if (t === 'exp')  return '🔴';
-    if (t === 'inc')  return '🟢';
-    return '📌';
-  }
   function fmtBRLTotal(v) {
-    return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return 'R$ ' + Number(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   }
 
-  var totalHoje     = tarefas.reduce(function(s,t){   return s+(t.type!=='task'?t.value:0);}, 0);
-  var totalAtrasado = atrasadas.reduce(function(s,t){ return s+(t.type!=='task'?t.value:0);}, 0);
+  function tipoDot(t) {
+    var cor = t === 'inc' ? '#2ecc9a' : t === 'exp' ? '#FF6B6B' : '#5B9BD5';
+    return '<div style="width:10px;height:10px;border-radius:50%;background:'+cor+';flex-shrink:0;margin-top:4px"></div>';
+  }
 
-  function linhaTabela(t, cor) {
+  var totalHoje     = tarefas.reduce(function(s,t){   return s+(t.type!=='task'?Number(t.value||0):0);}, 0);
+  var totalAtrasado = atrasadas.reduce(function(s,t){ return s+(t.type!=='task'?Number(t.value||0):0);}, 0);
+
+  function linhaItem(t, corTexto) {
     var dl = t.deadline ? t.deadline.split('-').reverse().slice(0,2).join('/') : '';
+    var valCor = t.type === 'inc' ? '#2ecc9a' : '#FF6B6B';
     return '<tr>'
-      + '<td style="padding:10px 12px;border-bottom:1px solid #2a2a2a;font-size:18px;width:30px">'+tipoIcon(t.type)+'</td>'
-      + '<td style="padding:10px 12px;border-bottom:1px solid #2a2a2a">'
-      +   '<div style="font-weight:700;color:'+(cor||'#eee')+'">'+t.desc+'</div>'
-      +   '<div style="font-size:12px;color:#888;margin-top:2px">'+(t.cat||'')+(dl&&cor?' · '+dl:'')+'</div>'
+      + '<td style="padding:12px 16px;border-bottom:1px solid #1e1e2e;vertical-align:top;width:22px">'
+      +   tipoDot(t.type)
       + '</td>'
-      + '<td style="padding:10px 12px;border-bottom:1px solid #2a2a2a;text-align:right;font-weight:800;color:'+(t.value>0?(t.type==='inc'?'#2ecc9a':'#FF6B6B'):'#555')+'">'
-      +   (t.value>0?fmtBRLTotal(t.value):'')
+      + '<td style="padding:12px 8px 12px 0;border-bottom:1px solid #1e1e2e;vertical-align:top">'
+      +   '<div style="font-size:14px;font-weight:700;color:'+(corTexto||'#eee')+'">'+t.desc+'</div>'
+      +   '<div style="font-size:12px;color:#666;margin-top:3px">'+(t.cat||'')+(dl?' &nbsp;·&nbsp; Vence '+dl:'')+'</div>'
+      + '</td>'
+      + '<td style="padding:12px 16px 12px 8px;border-bottom:1px solid #1e1e2e;text-align:right;vertical-align:top;white-space:nowrap">'
+      +   (t.value>0?'<span style="font-size:14px;font-weight:800;color:'+valCor+'">'+fmtBRLTotal(t.value)+'</span>':'')
       + '</td>'
       + '</tr>';
   }
 
   var secaoHoje = '';
   if (tarefas.length) {
-    secaoHoje = '<div style="padding:20px 24px">'
-      + '<div style="font-size:10px;font-weight:800;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;display:flex;justify-content:space-between">'
-      +   '<span>📅 Compromissos de hoje</span>'
-      +   (totalHoje>0?'<span style="color:#FF6B6B;font-size:13px">'+fmtBRLTotal(totalHoje)+'</span>':'')
+    secaoHoje = '<div style="padding:0 0 4px 0">'
+      + '<div style="padding:16px 20px 10px;background:#0d1117;border-bottom:1px solid #1e1e2e">'
+      +   '<span style="font-size:11px;font-weight:800;color:#2ecc9a;letter-spacing:1.5px;text-transform:uppercase">COMPROMISSOS DE HOJE</span>'
+      +   (totalHoje>0?' &nbsp;<span style="font-size:13px;font-weight:800;color:#FF6B6B;float:right">'+fmtBRLTotal(totalHoje)+'</span>':'')
       + '</div>'
       + '<table style="width:100%;border-collapse:collapse">'
-      + tarefas.map(function(t){ return linhaTabela(t, '#eee'); }).join('')
+      + tarefas.map(function(t){ return linhaItem(t, '#e8e8e8'); }).join('')
       + '</table></div>';
   }
 
   var secaoAtrasado = '';
   if (atrasadas.length) {
-    secaoAtrasado = '<div style="padding:20px 24px;border-top:1px solid #222">'
-      + '<div style="font-size:10px;font-weight:800;color:#FF6B6B;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;display:flex;justify-content:space-between">'
-      +   '<span>⚠️ Atrasados</span>'
-      +   (totalAtrasado>0?'<span style="font-size:13px">'+fmtBRLTotal(totalAtrasado)+'</span>':'')
+    secaoAtrasado = '<div style="padding:0 0 4px 0">'
+      + '<div style="padding:16px 20px 10px;background:#1a0a0a;border-bottom:1px solid #2a1010;border-top:2px solid #FF6B6B">'
+      +   '<span style="font-size:11px;font-weight:800;color:#FF6B6B;letter-spacing:1.5px;text-transform:uppercase">ATRASADOS</span>'
+      +   (totalAtrasado>0?' &nbsp;<span style="font-size:13px;font-weight:800;color:#FF6B6B;float:right">'+fmtBRLTotal(totalAtrasado)+'</span>':'')
       + '</div>'
       + '<table style="width:100%;border-collapse:collapse">'
-      + atrasadas.map(function(t){ return linhaTabela(t, '#FF6B6B'); }).join('')
+      + atrasadas.map(function(t){ return linhaItem(t, '#ffaaaa'); }).join('')
       + '</table></div>';
   }
 
-  var html = '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#111;color:#eee;border-radius:12px;overflow:hidden;border:1px solid #222">'
-    + '<div style="background:#0f0f1a;padding:22px 24px;border-bottom:1px solid #222">'
-    +   '<div style="font-size:20px;font-weight:800">⚡ Fluxo App</div>'
-    +   '<div style="color:#888;margin-top:4px;font-size:13px">'+diaSem+', '+diaFmt+'</div>'
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:20px;background:#0a0a0f;font-family:Arial,Helvetica,sans-serif">'
+    + '<div style="max-width:560px;margin:0 auto;background:#13131f;border-radius:12px;overflow:hidden;border:1px solid #1e1e2e">'
+
+    // Header
+    + '<div style="padding:22px 20px;background:#0d1117;border-bottom:2px solid #2ecc9a">'
+    +   '<div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px">Fluxo App</div>'
+    +   '<div style="color:#666;margin-top:4px;font-size:13px">'+diaSem+', '+diaFmt+'</div>'
     + '</div>'
+
     + secaoHoje
     + secaoAtrasado
-    + '<div style="padding:14px 24px;border-top:1px solid #222;color:#444;font-size:11px;text-align:center">Resumo automático diário · Fluxo App</div>'
-    + '</div>';
 
-  GmailApp.sendEmail(EMAIL_DESTINO,
-    '⚡ Fluxo — ' + (tarefas.length ? tarefas.length+' compromisso'+(tarefas.length>1?'s':'') : '') +
-    (atrasadas.length ? (tarefas.length?' · ':'') + atrasadas.length+' atrasado'+(atrasadas.length>1?'s':'') : '') +
-    ' · ' + diaFmt,
-    'Abra no Gmail para ver o e-mail formatado.',
+    // Footer
+    + '<div style="padding:14px 20px;border-top:1px solid #1e1e2e;text-align:center">'
+    +   '<span style="color:#333;font-size:11px">Resumo automatico diario · Fluxo App</span>'
+    + '</div>'
+
+    + '</div></body></html>';
+
+  GmailApp.sendEmail(
+    EMAIL_DESTINO,
+    'Fluxo ' + diaFmt + (tarefas.length ? ' — ' + tarefas.length + ' compromisso' + (tarefas.length>1?'s':'') + (totalHoje>0?' · '+fmtBRLTotal(totalHoje):'') : '') +
+    (atrasadas.length ? ' — ' + atrasadas.length + ' atrasado' + (atrasadas.length>1?'s':'') : ''),
+    'Abra no Gmail para ver o resumo formatado.',
     { htmlBody: html, name: 'Fluxo App' }
   );
 
