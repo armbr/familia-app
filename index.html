@@ -863,8 +863,14 @@ select option{background:#1A2A3A}
 
   <!-- balance + fin tabs: só aparece na aba Finanças -->
   <div id="fin-header-extra" style="display:none">
+    <!-- Seletor de mês -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <button onclick="shiftSelMonth(-1)" style="background:var(--card);border:1px solid var(--border);color:var(--t2);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;flex-shrink:0">‹</button>
+      <div id="month-chip" style="flex:1;text-align:center;font-size:14px;font-weight:700;color:var(--t1);background:var(--card);padding:7px 12px;border-radius:8px;border:1px solid var(--border);text-transform:capitalize">—</div>
+      <button onclick="shiftSelMonth(1)" id="btn-mes-prox" style="background:var(--card);border:1px solid var(--border);color:var(--t2);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;flex-shrink:0">›</button>
+    </div>
     <div id="bal" style="margin-bottom:12px">
-      <div class="lbl">Saldo do Mês — <span id="month-chip">—</span></div>
+      <div class="lbl">Saldo do Mês — <span id="bal-mes-lbl">—</span></div>
       <div id="bal-val">R$ 0,00</div>
       <div id="bal-row">
         <div class="bal-cell"><div class="bl inc">↑ Receitas</div><div class="bv" id="bi">R$ 0,00</div></div>
@@ -2034,6 +2040,7 @@ function boot(){
   try {
     var d=ymd(now);
     selMonth=now.getFullYear()+'-'+pad(now.getMonth()+1);
+    setTimeout(updateMonthChip, 100);
     var inputs=['tx-date','t-dead','rec-data','cg-data'];
     inputs.forEach(function(id){var el=document.getElementById(id);if(el)el.value=d;});
     var cml=document.getElementById('cat-month-lbl');
@@ -2251,6 +2258,34 @@ function renderAll(){
   try{renderFixos();}catch(e){}
 }
 
+function shiftSelMonth(n){
+  var parts = selMonth.split('-');
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1+n, 1);
+  selMonth = d.getFullYear()+'-'+pad(d.getMonth()+1);
+  updateMonthChip();
+  renderBal();
+  if(curFinTab==='hist')  renderHist();
+  if(curFinTab==='cat')   renderCat();
+  if(curFinTab==='cc')    renderFinCC();
+  // Desabilitar botão próximo se chegou no mês atual
+  var now = new Date();
+  var curMes = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var btn = document.getElementById('btn-mes-prox');
+  if(btn) btn.style.opacity = selMonth >= curMes ? '0.3' : '1';
+}
+
+function updateMonthChip(){
+  var parts = selMonth.split('-');
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, 1);
+  var lbl = d.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  var chip = document.getElementById('month-chip');
+  if(chip) chip.textContent = lbl;
+  var balLbl = document.getElementById('bal-mes-lbl');
+  if(balLbl) balLbl.textContent = lbl;
+  var cml = document.getElementById('cat-month-lbl');
+  if(cml)  cml.textContent = lbl;
+}
+
 function setTxType(t){
   curTxType=t;
   document.getElementById('bt-exp').className='ttype'+(t==='exp'?' exp':'');
@@ -2324,23 +2359,48 @@ function prepareFileB64(file, cb){
     // PDF — ler direto
     var r = new FileReader();
     r.onload = function(e){ cb(e.target.result.split(',')[1], file.type); };
+    r.onerror = function(){ cb(null, null, 'Erro ao ler PDF'); };
     r.readAsDataURL(file);
     return;
   }
-  // Imagem — redimensionar para max 1200px antes de enviar
+  // Imagem — redimensionar agressivamente para caber na URL do GAS
   var img = new Image();
   var objUrl = URL.createObjectURL(file);
+  img.onerror = function(){ URL.revokeObjectURL(objUrl); cb(null,null,'Erro ao carregar imagem'); };
   img.onload = function(){
-    var MAX = 800;
-    var w = img.width, h = img.height;
-    if(w > MAX){ h = Math.round(h * MAX / w); w = MAX; }
-    if(h > MAX){ w = Math.round(w * MAX / h); h = MAX; }
-    var canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
     URL.revokeObjectURL(objUrl);
-    var dataUrl = canvas.toDataURL('image/jpeg', 0.60);
-    cb(dataUrl.split(',')[1], 'image/jpeg');
+    try {
+      // Foto de câmera pode ser 4000x3000px+ — limitar a 1000px
+      var MAX = 1000;
+      var w = img.width, h = img.height;
+      if(w > MAX || h > MAX){
+        if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
+        else      { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      // Tentar qualidade 0.55, se ainda grande reduzir mais
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.55);
+      var sizeKB = Math.round(dataUrl.length * 0.75 / 1024);
+      // Se ainda > 800KB, reduzir mais
+      if(sizeKB > 800){
+        var MAX2 = 700;
+        var w2=w, h2=h;
+        if(w2>h2){ h2=Math.round(h2*MAX2/w2); w2=MAX2; }
+        else      { w2=Math.round(w2*MAX2/h2); h2=MAX2; }
+        var canvas2 = document.createElement('canvas');
+        canvas2.width=w2; canvas2.height=h2;
+        canvas2.getContext('2d').drawImage(img, 0, 0, w2, h2);
+        dataUrl = canvas2.toDataURL('image/jpeg', 0.45);
+      }
+      cb(dataUrl.split(',')[1], 'image/jpeg');
+    } catch(e){
+      // Canvas falhou (memória) — tentar ler o arquivo diretamente com qualidade menor
+      toast('⚠️ Imagem muito grande — tente uma foto menor ou do rolo','err');
+      cb(null, null, 'Memória insuficiente: ' + e.message);
+    }
   };
   img.src = objUrl;
 }
@@ -3293,7 +3353,11 @@ function confirmarComprov(){
     var t = TASKS.find(function(x){ return String(x.id)===String(id); });
     var fname = ymd(new Date()).replace(/-/g,'')+'_'+(t?t.desc:'comprovante').replace(/[^a-zA-Z0-9À-ú ]/g,'').substring(0,30).trim();
     toast('📎 Enviando comprovante...');
-    prepareFileB64(taskComprovFile, function(b64, mime){
+    prepareFileB64(taskComprovFile, function(b64, mime, err2){
+      if(!b64 || err2){
+        toast('⚠️ Erro ao processar imagem: '+(err2||'desconhecido')+'. Tente uma foto menor.','err');
+        return;
+      }
       apiPost('uploadComprovante', {name:fname, mimeType:mime, data:b64}, function(err, d){
         if(err || !d || !d.ok){
           toast('✅ Pago! ⚠️ Erro no comprovante: '+(err?err.message:(d&&d.error)||''), 'err');
