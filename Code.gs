@@ -1768,3 +1768,22 @@ function testarDrive() {
     return { ok: false, error: e.message };
   }
 }
+
+// ════════════════════════════════════════════════════════════
+//  DIAGNÓSTICO — execute para ver o estado da planilha
+// ════════════════════════════════════════════════════════════
+function diagnostico() {
+  var abas = ['Contratos','Aluguéis','Pagadores','Tarefas','Transações','Recorrentes','GastosCartao'];
+  abas.forEach(function(nome) {
+    var sheet = ss().getSheetByName(nome);
+    if (!sheet) {
+      Logger.log('❌ Aba não encontrada: ' + nome);
+    } else {
+      Logger.log('✅ ' + nome + ' — ' + (sheet.getLastRow()-1) + ' registros');
+    }
+  });
+
+  // Listar todas as abas existentes
+  var todas = ss().getSheets().map(function(s){ return s.getName(); });
+  Logger.log('Todas as abas: ' + todas.join(', '));
+}
