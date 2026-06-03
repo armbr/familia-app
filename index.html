@@ -991,7 +991,6 @@ select option{background:#1A2A3A}
 
     <!-- HISTORY -->
     <div class="pg" id="fp-hist">
-      <div class="mfrow" id="mf-row"></div>
       <div class="slbl">Lançamentos</div>
       <div class="txl" id="tx-list"></div>
     </div>
@@ -2845,15 +2844,7 @@ function renderBal(){
 
 function renderHist(){
   try{
-    var months=[...new Set(validTxs().map(function(t){
-      return ymds(t.date).substring(0,7);
-    }))].sort().reverse();
-    var mf=document.getElementById('mf-row');
-    if(mf) mf.innerHTML=months.map(function(m){
-      var p=m.split('-');
-      var lbl=new Date(p[0],parseInt(p[1])-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
-      return '<button class="mfc'+(m===selMonth?' on':'')+'" data-selmon="'+m+'">'+lbl+'</button>';
-    }).join('');
+    // chips de mês removidos — usar seletor do topo
     var txs=filteredTxs();
     var el=document.getElementById('tx-list');
     if(!el) return;
