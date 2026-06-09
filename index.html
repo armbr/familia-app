@@ -1704,7 +1704,9 @@ var TXS   = (function(){
   // Limpar cache: remover TXS inválidas (recurId sem fromAgenda, type inválido)
   return raw.filter(function(t){
     if(t.type !== 'inc' && t.type !== 'exp') return false;
-    if(t.recurId && t.recurId !== '' && !t.fromAgenda) return false;
+    // fromAgenda pode ser true (boolean) ou "true" (string) — tratar ambos
+    var isFromAgenda = t.fromAgenda === true || t.fromAgenda === 'true';
+    if(t.recurId && String(t.recurId) !== '' && !isFromAgenda) return false;
     return true;
   });
 })();
@@ -1847,8 +1849,10 @@ function save(){
 function txValida(t){
   // Só aceitar tipos financeiros
   if(t.type !== 'inc' && t.type !== 'exp') return false;
+  // fromAgenda pode ser boolean ou string
+  var isFromAgenda = t.fromAgenda === true || t.fromAgenda === 'true';
   // Rejeitar lançamentos automáticos da recorrência antiga (têm recurId sem fromAgenda)
-  if(t.recurId && t.recurId !== '' && !t.fromAgenda) return false;
+  if(t.recurId && String(t.recurId) !== '' && !isFromAgenda) return false;
   return true;
 }
 function balOf(list){
