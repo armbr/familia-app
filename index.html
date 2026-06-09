@@ -2232,7 +2232,13 @@ function setSection(s){
   // Render da seção
   if(s==='hoje') { try{ renderHoje();  }catch(e){ console.error('hoje:',e);  } }
   if(s==='task') { try{ renderTasks(); }catch(e){ console.error('task:',e);  } }
-  if(s==='fin')  { try{ renderBal(); renderHist(); }catch(e){ console.error('fin:',e); } }
+  if(s==='fin')  {
+    // Garantir que selMonth está no mês atual ao entrar em Finanças
+    var _now = new Date();
+    var _curMes = _now.getFullYear()+'-'+pad(_now.getMonth()+1);
+    if(selMonth !== _curMes){ selMonth = _curMes; updateMonthChip(); }
+    try{ renderBal(); renderHist(); renderCat(); }catch(e){ console.error('fin:',e); }
+  }
   if(s==='rec')  { try{ renderRecibos(); }catch(e){ console.error('rec:',e); } }
   if(s==='docs') { try{ renderDocs(); }catch(e){}; try{ if(online) syncDocs(); }catch(e){} }
 }
@@ -2255,7 +2261,7 @@ function ftab(t){
 
 function renderAll(){
   try{renderBal();}catch(e){}
-  if(curFinTab==='hist') try{renderHist();}catch(e){}
+  try{renderHist();}catch(e){}  // sempre atualizar histórico para refletir pagamentos
   if(curFinTab==='cat')  try{renderCat();}catch(e){}
   if(curFinTab==='cc')   try{renderFinCC();}catch(e){}
   if(curSection==='task') try{renderTasks();}catch(e){}
