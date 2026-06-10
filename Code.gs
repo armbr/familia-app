@@ -174,7 +174,8 @@ function addTransaction(body) {
     sheet.setFrozenRows(1);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#1E3A5F').setFontColor('#FFF');
   }
-  var id = Date.now();
+  // Usar o id enviado pelo cliente se disponível, para manter consistência no sync
+  var id = body.id ? String(body.id) : String(Date.now());
   sheet.appendRow([id, body.type, body.desc, parseFloat(body.value), body.cat, body.date, new Date().toISOString(), body.fromAgenda ? 'true' : '', body.recurId ? String(body.recurId) : '']);
   return { ok: true, id: id };
 }
@@ -1786,4 +1787,26 @@ function diagnostico() {
   // Listar todas as abas existentes
   var todas = ss().getSheets().map(function(s){ return s.getName(); });
   Logger.log('Todas as abas: ' + todas.join(', '));
+}
+
+// ════════════════════════════════════════════════════════════
+//  TESTE DE SYNC — execute para ver o que cada endpoint retorna
+// ════════════════════════════════════════════════════════════
+function testarSync() {
+  var abas = ['Contratos','Aluguéis','Pagadores'];
+  abas.forEach(function(nome) {
+    var result = getItemsSheet(nome);
+    Logger.log('=== ' + nome + ' ===');
+    Logger.log('ok: ' + result.ok + ' | itens: ' + result.data.length);
+    if (result.data.length > 0) {
+      Logger.log('Primeiro item: ' + JSON.stringify(result.data[0]).substring(0, 200));
+    } else {
+      // Verificar o conteúdo bruto da aba
+      var sheet = ss().getSheetByName(nome);
+      if (sheet && sheet.getLastRow() > 1) {
+        var raw = sheet.getRange(2, 1, Math.min(3, sheet.getLastRow()-1), 3).getValues();
+        Logger.log('Conteúdo bruto (3 linhas): ' + JSON.stringify(raw).substring(0, 300));
+      }
+    }
+  });
 }
