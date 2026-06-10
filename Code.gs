@@ -1035,9 +1035,70 @@ function getItemsSheet(nomeAba) {
 // ════════════════════════════════════════════════════════════
 
 function paginaInquilino(e) {
-  var ctId = e.parameter.ctId || '';
+  var ctId  = e.parameter.ctId  || '';
+  var recId = e.parameter.recId || '';
 
-  // Buscar contrato
+  // ── Exibir recibo avulso (sem contrato) ──────────────────
+  if (recId && !ctId) {
+    var recSheet = ss().getSheetByName('Recibos');
+    var recibo = null;
+    if (recSheet && recSheet.getLastRow() > 1) {
+      var recDados = recSheet.getDataRange().getValues();
+      for (var ri = 1; ri < recDados.length; ri++) {
+        if (!recDados[ri][1]) continue;
+        try {
+          var ro = JSON.parse(String(recDados[ri][1]));
+          if (String(ro.id) === String(recId)) { recibo = ro; break; }
+        } catch(re2) {}
+      }
+    }
+    if (!recibo) {
+      return HtmlService.createHtmlOutput(
+        '<div style="font-family:Arial;padding:40px;text-align:center;background:#0F1923;color:#EDF2F7;min-height:100vh">' +
+        '<h2 style="color:#FF6B6B">Recibo não encontrado</h2>' +
+        '<p style="color:#8FA8C4">Verifique o link com quem emitiu o recibo.</p></div>'
+      );
+    }
+    var dataFmt = recibo.data ? String(recibo.data).split('-').reverse().join('/') : '';
+    var valorFmt = 'R$ ' + Number(recibo.valor||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+    var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>Recibo '+recibo.codigo+'</title>' +
+      '<style>*{margin:0;padding:0;box-sizing:border-box}' +
+      'body{font-family:Arial,sans-serif;background:#0F1923;display:flex;justify-content:center;padding:20px;min-height:100vh}' +
+      '.card{background:#1A2A3A;border-radius:16px;overflow:hidden;width:100%;max-width:500px;border:1px solid rgba(255,255,255,.08)}' +
+      '.hdr{background:#0d1117;padding:20px;border-bottom:2px solid #2ECC9A;display:flex;justify-content:space-between;align-items:center}' +
+      '.hdr h1{color:#fff;font-size:18px;font-weight:900}' +
+      '.hdr span{color:#2ECC9A;font-family:monospace;font-size:13px}' +
+      '.body{padding:20px}' +
+      '.row{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:3px}' +
+      '.lbl{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#526680}' +
+      '.val{font-size:15px;font-weight:600;color:#EDF2F7}' +
+      '.total{background:#0a1421;border-radius:10px;padding:20px;text-align:center;margin-top:16px}' +
+      '.total .lbl{margin-bottom:6px}' +
+      '.total .amt{font-size:32px;font-weight:900;color:#2ECC9A}' +
+      '.footer{padding:14px 20px;text-align:center;color:#526680;font-size:11px;border-top:1px solid rgba(255,255,255,.06)}' +
+      '@media print{body{background:#fff}.card{border:1px solid #ddd;background:#fff}.hdr{background:#0d1117}.row{border-bottom:1px solid #eee}.total{background:#f5f5f5}}' +
+      '</style></head><body>' +
+      '<div class="card">' +
+      '<div class="hdr"><h1>⚡ Fluxo App</h1><span>'+recibo.codigo+'</span></div>' +
+      '<div class="body">' +
+      '<div class="row"><div class="lbl">Recebemos de</div><div class="val">'+recibo.pagador+(recibo.cpf?' — CPF: '+recibo.cpf:'')+'</div></div>' +
+      '<div class="row"><div class="lbl">Referente a</div><div class="val">'+recibo.desc+'</div></div>' +
+      '<div class="row"><div class="lbl">Data</div><div class="val">'+dataFmt+'</div></div>' +
+      (recibo.obs?'<div class="row"><div class="lbl">Observação</div><div class="val">'+recibo.obs+'</div></div>':'') +
+      '<div class="total"><div class="lbl">Valor pago</div><div class="amt">'+valorFmt+'</div></div>' +
+      '</div>' +
+      '<div class="footer">Emitido em '+recibo.emitidoEm+' · via Fluxo App</div>' +
+      '</div>' +
+      '<script>// Botão imprimir removido pois não necessário no mobile<\/script>' +
+      '</body></html>';
+    return HtmlService.createHtmlOutput(html)
+      .setTitle('Recibo '+recibo.codigo)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  // ── Exibir página do inquilino (contrato) ────────────────
   var ctSheet = ss().getSheetByName('Contratos');
   var ct = null;
   if (ctSheet) {
