@@ -74,6 +74,8 @@ function doGetInternal(action, body) {
     case 'paginaInquilino':   return { ok: false, error: 'Use GET direto para paginaInquilino' };
     case 'salvarFcmToken':    return salvarFcmToken(body);
     case 'getValorFaturaCartao': return getValorFaturaCartao(body);
+    case 'salvarRecibo':      return salvarItemSheet('Recibos', body);
+    case 'getRecibos':        return getItemsSheet('Recibos');
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
