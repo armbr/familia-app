@@ -3478,7 +3478,9 @@ function chgTaskStatus(id,s){
   var val = parseFloat(t.value||0);
   console.log('[chgTask] id='+id+' s='+s+' old='+old+' type='+t.type+' val='+val);
   if(s==='done' && old!=='done' && val>0 && t.type!=='task'){
+    var tmpId=Date.now();
     var tx={
+      id:         tmpId,  // usar mesmo id no servidor para evitar duplicatas no sync
       type:       t.type==='inc'?'inc':'exp',
       desc:       t.desc,
       value:      val,
@@ -3487,11 +3489,10 @@ function chgTaskStatus(id,s){
       fromAgenda: true,
       recurId:    t.recurId||''
     };
-    var tmpId=Date.now();
-    TXS.unshift(Object.assign({id:tmpId},tx));
+    TXS.unshift(Object.assign({},tx));
     localStorage.setItem('ff_txs',JSON.stringify(TXS));
     console.log('[chgTask] TX criada: val='+val+' TXS.length='+TXS.length+' filtradas='+filteredTxs().length);
-    toast('✅ '+t.desc+' — lançado R$ '+fmtBRL(val)+' em Finanças');
+    toast('✅ '+t.desc+' — lançado '+fmtBRL(val)+' em Finanças');
     apiCall('addTransaction',tx,function(err){
       if(err){ console.log('[chgTask] Erro API:',err); }
       else    { localStorage.setItem('ff_txs',JSON.stringify(TXS)); }
