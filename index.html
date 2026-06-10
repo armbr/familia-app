@@ -1332,6 +1332,9 @@ select option{background:#1A2A3A}
         <div><div class="fl">CPF</div><input id="ct-loc-cpf" type="text" placeholder="000.000.000-00" maxlength="14"></div>
         <div><div class="fl">RG</div><input id="ct-loc-rg" type="text" placeholder="0.000.000" maxlength="20"></div>
       </div>
+      <div style="margin-bottom:10px"><div class="fl">Endereço do locador</div>
+        <input id="ct-loc-end" type="text" placeholder="Rua, número, cidade" maxlength="120">
+      </div>
       <!-- Segundo locador (opcional) -->
       <div style="margin-bottom:8px">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--t2);cursor:pointer">
@@ -1397,15 +1400,16 @@ select option{background:#1A2A3A}
         </div>
       </div>
       <div class="row2" style="margin-bottom:10px">
-        <div><div class="fl">Início do contrato</div><input id="ct-inicio" type="date"></div>
+        <div><div class="fl">Início do contrato</div><input id="ct-inicio" type="date" onchange="calcFimContrato()"></div>
         <div><div class="fl">Duração</div>
-          <select id="ct-duracao">
+          <select id="ct-duracao" onchange="calcFimContrato()">
             <option value="12">12 meses</option>
             <option value="24">24 meses</option>
             <option value="6">6 meses</option>
             <option value="0">Indeterminado</option>
           </select>
         </div>
+        <input type="hidden" id="ct-fim">
       </div>
 
       <!-- Vistoria -->
@@ -1701,12 +1705,19 @@ window.onerror = function(msg, src, line, col, err){
 var API = ''; // will be loaded in init() after DOM ready
 var TXS   = (function(){
   var raw = JSON.parse(localStorage.getItem('ff_txs') || '[]');
-  // Limpar cache: remover TXS inválidas (recurId sem fromAgenda, type inválido)
-  return raw.filter(function(t){
+  // Filtrar entradas inválidas
+  var filtered = raw.filter(function(t){
     if(t.type !== 'inc' && t.type !== 'exp') return false;
-    // fromAgenda pode ser true (boolean) ou "true" (string) — tratar ambos
     var isFromAgenda = t.fromAgenda === true || t.fromAgenda === 'true';
     if(t.recurId && String(t.recurId) !== '' && !isFromAgenda) return false;
+    return true;
+  });
+  // Deduplicar: mesmo desc+date+value+type → manter apenas um
+  var seen = {};
+  return filtered.filter(function(t){
+    var k = [t.type, String(t.desc||'').trim().toLowerCase(), ymds(t.date||''), String(parseFloat(t.value||0).toFixed(2))].join('|');
+    if(seen[k]) return false;
+    seen[k] = true;
     return true;
   });
 })();
@@ -2079,7 +2090,7 @@ function syncAll(){
 
   function tick(){
     done++;
-    if(done===8){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
+    if(done===9){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
   apiCall('getRecur',null,function(err,d){
@@ -2091,6 +2102,18 @@ function syncAll(){
     }
     recurReady = true;
     tryProcessRecur();
+    tick();
+  });
+
+  apiCall('getRecibos',null,function(err,d){
+    if(!err && d && d.ok && d.data && d.data.length){
+      // Mesclar recibos do servidor com locais
+      var serverIds2={};
+      d.data.forEach(function(r){ serverIds2[String(r.id)]=true; });
+      var localOnly2=RECIBOS.filter(function(r){ return !serverIds2[String(r.id)]; });
+      RECIBOS = d.data.concat(localOnly2);
+      saveRecibos();
+    }
     tick();
   });
 
@@ -2134,7 +2157,15 @@ function syncAll(){
         return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp');
       });
 
-      TXS = serverTxs.concat(localOnly);
+      var merged = serverTxs.concat(localOnly);
+      // Deduplicar: mesmo desc+date+value+type → manter apenas um
+      var seenMerge = {};
+      TXS = merged.filter(function(t){
+        var k = [t.type, String(t.desc||'').trim().toLowerCase(), ymds(t.date||''), String(parseFloat(t.value||0).toFixed(2))].join('|');
+        if(seenMerge[k]) return false;
+        seenMerge[k] = true;
+        return true;
+      });
       // Ordenar por data desc
       TXS.sort(function(a,b){ return ymds(b.date) > ymds(a.date) ? 1 : -1; });
       save();
@@ -3476,7 +3507,6 @@ function chgTaskStatus(id,s){
   localStorage.setItem('ff_tasks',JSON.stringify(TASKS));
   // Ao concluir task com valor financeiro, lançar em TXS
   var val = parseFloat(t.value||0);
-  console.log('[chgTask] id='+id+' s='+s+' old='+old+' type='+t.type+' val='+val);
   if(s==='done' && old!=='done' && val>0 && t.type!=='task'){
     var tmpId=Date.now();
     var tx={
@@ -3491,16 +3521,14 @@ function chgTaskStatus(id,s){
     };
     TXS.unshift(Object.assign({},tx));
     localStorage.setItem('ff_txs',JSON.stringify(TXS));
-    console.log('[chgTask] TX criada: val='+val+' TXS.length='+TXS.length+' filtradas='+filteredTxs().length);
     toast('✅ '+t.desc+' — lançado '+fmtBRL(val)+' em Finanças');
     apiCall('addTransaction',tx,function(err){
-      if(err){ console.log('[chgTask] Erro API:',err); }
+      if(err){ console.warn('TX nao salva no servidor', err); }
       else    { localStorage.setItem('ff_txs',JSON.stringify(TXS)); }
     });
     renderBal();
     renderHist();
   } else {
-    console.log('[chgTask] SEM TX — val='+val+' type='+t.type+' cond='+(s==='done')+'/'+(old!=='done')+'/'+(val>0)+'/'+(t.type!=='task'));
     renderTasks();
     if(curSection==='hoje') renderHoje();
   }
@@ -3649,13 +3677,16 @@ function initTaskDelegation(){
       if(r && r.tel){
         var tel = r.tel.replace(/\D/g,'');
         var dataFmt = r.data ? r.data.split('-').reverse().join('/') : '';
+        var baseUrl = (localStorage.getItem('ff_api')||'').split('?')[0];
+        var linkRecibo = baseUrl ? baseUrl+'?action=paginaInquilino&recId='+encodeURIComponent(String(r.id)) : '';
         var msg = encodeURIComponent(
-          '🧾 *RECIBO*\n'+
+          '🧾 *RECIBO DE PAGAMENTO*\n'+
           'Código: '+r.codigo+'\n'+
           'Pagador: '+r.pagador+'\n'+
           'Referente: '+r.desc+'\n'+
           'Valor: '+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'\n'+
           'Data: '+dataFmt+'\n'+
+          (linkRecibo ? '\n📄 Ver recibo: '+linkRecibo+'\n' : '')+
           'Emitido via Fluxo App'
         );
         window.open('https://wa.me/'+tel+'?text='+msg,'_blank');
@@ -4362,6 +4393,7 @@ function emitirRecibo(){
   var recibo={id:Date.now(),codigo:codigo,pagador:nome,tel:tel,cpf:cpf,
     desc:desc,valor:val,data:data,obs:obs,emitidoEm:emitidoEm};
   RECIBOS.unshift(recibo); saveRecibos();
+  apiCall('salvarRecibo', recibo, function(err){ if(err) console.warn('Recibo não salvo no servidor:', err); });
   ['rec-pag','rec-pag-nome','rec-pag-cpf','rec-desc','rec-val','rec-obs','rec-data']
     .forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   renderRecibos(); abrirRecibo(recibo); toast('🧾 Recibo emitido!');
@@ -4847,6 +4879,18 @@ function abrirLinkInquilino(ctId){
 // ════════════════════════════════════════════════════════
 //  CONTRATOS
 // ════════════════════════════════════════════════════════
+
+function calcFimContrato(){
+  var inicio = document.getElementById('ct-inicio').value;
+  var dur    = parseInt(document.getElementById('ct-duracao').value||0);
+  var fimEl  = document.getElementById('ct-fim');
+  if(!fimEl) return;
+  if(!inicio || dur === 0){ fimEl.value = ''; return; }
+  var d = new Date(inicio+'T12:00:00');
+  d.setMonth(d.getMonth() + dur);
+  d.setDate(d.getDate() - 1);
+  fimEl.value = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+}
 
 function toggleCampo(id,show){
   var el=document.getElementById(id);
