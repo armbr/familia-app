@@ -2106,13 +2106,25 @@ function syncAll(){
   });
 
   apiCall('getRecibos',null,function(err,d){
-    if(!err && d && d.ok && d.data && d.data.length){
-      // Mesclar recibos do servidor com locais
+    if(!err && d && d.ok){
+      var serverRecibos = d.data || [];
       var serverIds2={};
-      d.data.forEach(function(r){ serverIds2[String(r.id)]=true; });
+      serverRecibos.forEach(function(r){ serverIds2[String(r.id)]=true; });
+      // Recibos locais que o servidor não tem — enviar agora
       var localOnly2=RECIBOS.filter(function(r){ return !serverIds2[String(r.id)]; });
-      RECIBOS = d.data.concat(localOnly2);
-      saveRecibos();
+      localOnly2.forEach(function(r){
+        apiCall('salvarRecibo', r, function(){});
+      });
+      // Mesclar: servidor + locais não enviados
+      if(serverRecibos.length > 0){
+        RECIBOS = serverRecibos.concat(localOnly2);
+        saveRecibos();
+      }
+      // Se servidor tem mais que local, salvar localmente
+      if(serverRecibos.length > RECIBOS.length){
+        RECIBOS = serverRecibos;
+        saveRecibos();
+      }
     }
     tick();
   });
