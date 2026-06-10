@@ -3471,15 +3471,17 @@ function chgTaskStatus(id,s){
   if(!t)return;
   var old=t.status;
   t.status=s;
-  if(s==='done') t.doneDate = ymd(new Date()); // guardar data do pagamento
+  if(s==='done') t.doneDate = ymd(new Date());
   else           delete t.doneDate;
   localStorage.setItem('ff_tasks',JSON.stringify(TASKS));
   // Ao concluir task com valor financeiro, lançar em TXS
-  if(s==='done' && old!=='done' && t.value && parseFloat(t.value)>0 && t.type!=='task'){
+  var val = parseFloat(t.value||0);
+  console.log('[chgTask] id='+id+' s='+s+' old='+old+' type='+t.type+' val='+val);
+  if(s==='done' && old!=='done' && val>0 && t.type!=='task'){
     var tx={
       type:       t.type==='inc'?'inc':'exp',
       desc:       t.desc,
-      value:      parseFloat(t.value),
+      value:      val,
       cat:        t.cat||(t.type==='inc'?'⭐ Extra':'📦 Outros'),
       date:       ymd(new Date()),
       fromAgenda: true,
@@ -3487,12 +3489,17 @@ function chgTaskStatus(id,s){
     };
     var tmpId=Date.now();
     TXS.unshift(Object.assign({id:tmpId},tx));
-    save();
+    localStorage.setItem('ff_txs',JSON.stringify(TXS));
+    console.log('[chgTask] TX criada: val='+val+' TXS.length='+TXS.length+' filtradas='+filteredTxs().length);
+    toast('✅ '+t.desc+' — lançado R$ '+fmtBRL(val)+' em Finanças');
     apiCall('addTransaction',tx,function(err){
-      if(err){ TXS=TXS.filter(function(x){return x.id!==tmpId;}); save(); }
+      if(err){ console.log('[chgTask] Erro API:',err); }
+      else    { localStorage.setItem('ff_txs',JSON.stringify(TXS)); }
     });
-    renderAll();
+    renderBal();
+    renderHist();
   } else {
+    console.log('[chgTask] SEM TX — val='+val+' type='+t.type+' cond='+(s==='done')+'/'+(old!=='done')+'/'+(val>0)+'/'+(t.type!=='task'));
     renderTasks();
     if(curSection==='hoje') renderHoje();
   }
