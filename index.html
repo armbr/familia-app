@@ -2105,29 +2105,7 @@ function syncAll(){
     tick();
   });
 
-  apiCall('getRecibos',null,function(err,d){
-    if(!err && d && d.ok){
-      var serverRecibos = d.data || [];
-      var serverIds2={};
-      serverRecibos.forEach(function(r){ serverIds2[String(r.id)]=true; });
-      // Recibos locais que o servidor não tem — enviar agora
-      var localOnly2=RECIBOS.filter(function(r){ return !serverIds2[String(r.id)]; });
-      localOnly2.forEach(function(r){
-        apiCall('salvarRecibo', r, function(){});
-      });
-      // Mesclar: servidor + locais não enviados
-      if(serverRecibos.length > 0){
-        RECIBOS = serverRecibos.concat(localOnly2);
-        saveRecibos();
-      }
-      // Se servidor tem mais que local, salvar localmente
-      if(serverRecibos.length > RECIBOS.length){
-        RECIBOS = serverRecibos;
-        saveRecibos();
-      }
-    }
-    tick();
-  });
+  sincronizarRecibos(function(){ tick(); });
 
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
@@ -2282,7 +2260,11 @@ function setSection(s){
     if(selMonth !== _curMes){ selMonth = _curMes; updateMonthChip(); }
     try{ renderBal(); renderHist(); renderCat(); }catch(e){ console.error('fin:',e); }
   }
-  if(s==='rec')  { try{ renderRecibos(); }catch(e){ console.error('rec:',e); } }
+  if(s==='rec'){
+    try{ renderRecibos(); }catch(e){ console.error('rec:',e); }
+    // Sincronizar recibos ao entrar na aba
+    if(API) sincronizarRecibos(function(){ renderRecibos(); });
+  }
   if(s==='docs') { try{ renderDocs(); }catch(e){}; try{ if(online) syncDocs(); }catch(e){} }
 }
 
@@ -4341,6 +4323,47 @@ function saveContratos(){localStorage.setItem('ff_contratos',JSON.stringify(CONT
 function savePagadores(){localStorage.setItem('ff_pagadores',JSON.stringify(PAGADORES));}
 function saveAlugueis(){ localStorage.setItem('ff_alugueis', JSON.stringify(ALUGUEIS)); }
 function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS)); }
+
+function sincronizarRecibos(cb){
+  // 1. Buscar recibos do servidor
+  apiCall('getRecibos', null, function(err, d){
+    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    var serverMap = {};
+    serverList.forEach(function(r){ serverMap[String(r.id)] = true; });
+
+    // 2. Enviar recibos locais que o servidor não tem
+    var pendentes = RECIBOS.filter(function(r){ return !serverMap[String(r.id)]; });
+    var enviados = 0;
+    if(pendentes.length === 0){
+      // Nada para enviar — apenas atualizar local com servidor
+      if(serverList.length > 0){
+        var localMap = {};
+        RECIBOS.forEach(function(r){ localMap[String(r.id)] = true; });
+        serverList.forEach(function(r){ if(!localMap[String(r.id)]) RECIBOS.unshift(r); });
+        saveRecibos();
+      }
+      if(cb) cb();
+      return;
+    }
+    pendentes.forEach(function(r, i){
+      apiCall('salvarRecibo', r, function(){
+        enviados++;
+        if(enviados === pendentes.length){
+          // Todos enviados — buscar lista atualizada do servidor
+          apiCall('getRecibos', null, function(err2, d2){
+            if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
+              var localMap2 = {};
+              RECIBOS.forEach(function(r){ localMap2[String(r.id)] = true; });
+              d2.data.forEach(function(r){ if(!localMap2[String(r.id)]) RECIBOS.unshift(r); });
+              saveRecibos();
+            }
+            if(cb) cb();
+          });
+        }
+      });
+    });
+  });
+}
 
 // ════════════════════════════════════════════════════════
 //  PAGADORES
