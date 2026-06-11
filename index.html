@@ -2120,24 +2120,7 @@ function syncAll(){
 
   sincronizarRecibos(function(){ tick(); });
 
-  // Sync cartões
-  apiCall('getCartoes', null, function(err, d){
-    if(!err && d && d.ok && d.data && d.data.length){
-      var serverIds = {};
-      d.data.forEach(function(cc){ serverIds[String(cc.id)] = true; });
-      var localOnly = CARTOES.filter(function(cc){ return !serverIds[String(cc.id)]; });
-      // Enviar locais que servidor não tem
-      localOnly.forEach(function(cc){ apiCall('salvarCartao', cc, function(){}); });
-      // Mesclar
-      var merged = d.data.concat(localOnly);
-      CARTOES = merged;
-      saveCartoes();
-    } else if(!err && d && d.ok && CARTOES.length) {
-      // Servidor vazio mas local tem — enviar todos
-      CARTOES.forEach(function(cc){ apiCall('salvarCartao', cc, function(){}); });
-    }
-    tick();
-  });
+  sincronizarCartoes(function(){ renderFinCC(); tick(); });
 
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
@@ -2313,7 +2296,10 @@ function ftab(t){
   if(tabs[idx[t]]) tabs[idx[t]].classList.add('on');
   if(t==='hist') try{renderHist();}catch(e){}
   if(t==='cat')  try{renderCat();}catch(e){}
-  if(t==='cc')   try{renderFinCC();}catch(e){console.error('renderFinCC',e);}
+  if(t==='cc'){
+    try{renderFinCC();}catch(e){console.error('renderFinCC',e);}
+    if(API) sincronizarCartoes(function(){ renderFinCC(); });
+  }
 }
 
 function renderAll(){
@@ -4401,6 +4387,49 @@ function syncDocs(){
 //  SAVE HELPERS
 // ════════════════════════════════════════════════════════
 function saveCartoes(){  localStorage.setItem('ff_cartoes',  JSON.stringify(CARTOES)); }
+
+function sincronizarCartoes(cb){
+  apiCall('getCartoes', null, function(err, d){
+    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    var serverMap = {};
+    serverList.forEach(function(cc){ serverMap[String(cc.id)] = true; });
+    // Enviar locais que servidor não tem
+    var pendentes = CARTOES.filter(function(cc){ return !serverMap[String(cc.id)]; });
+    if(pendentes.length === 0){
+      // Nada para enviar — atualizar local com servidor
+      if(serverList.length > 0){
+        var localMap = {};
+        CARTOES.forEach(function(cc){ localMap[String(cc.id)] = true; });
+        serverList.forEach(function(cc){ if(!localMap[String(cc.id)]) CARTOES.push(cc); });
+        // Substituir completamente com dados do servidor + locais únicos
+        var localOnly2 = CARTOES.filter(function(cc){ return !serverMap[String(cc.id)]; });
+        CARTOES = serverList.concat(localOnly2);
+        saveCartoes();
+      }
+      if(cb) cb();
+      return;
+    }
+    var enviados = 0;
+    pendentes.forEach(function(cc){
+      apiCall('salvarCartao', cc, function(){
+        enviados++;
+        if(enviados === pendentes.length){
+          // Todos enviados — buscar lista atualizada
+          apiCall('getCartoes', null, function(err2, d2){
+            if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
+              var localMap2 = {};
+              d2.data.forEach(function(cc){ localMap2[String(cc.id)] = true; });
+              CARTOES.forEach(function(cc){ if(!localMap2[String(cc.id)]) d2.data.push(cc); });
+              CARTOES = d2.data;
+              saveCartoes();
+            }
+            if(cb) cb();
+          });
+        }
+      });
+    });
+  });
+}
 function saveCGastos(){  localStorage.setItem('ff_cgastos',  JSON.stringify(CGASTOS)); }
 function saveContratos(){localStorage.setItem('ff_contratos',JSON.stringify(CONTRATOS));}
 function savePagadores(){localStorage.setItem('ff_pagadores',JSON.stringify(PAGADORES));}
