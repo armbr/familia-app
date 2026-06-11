@@ -1704,7 +1704,7 @@ window.onerror = function(msg, src, line, col, err){
 // ════════════════════════════════════════
 var API = ''; // will be loaded in init() after DOM ready
 var TXS   = (function(){
-  var raw = JSON.parse(localStorage.getItem('ff_txs') || '[]');
+  var raw; try{ raw=JSON.parse(localStorage.getItem('ff_txs')||'[]'); }catch(e){ console.warn('ff_txs corrompido'); localStorage.removeItem('ff_txs'); raw=[]; }
   // Filtrar entradas inválidas
   var filtered = raw.filter(function(t){
     if(t.type !== 'inc' && t.type !== 'exp') return false;
@@ -1722,7 +1722,7 @@ var TXS   = (function(){
   });
 })();
 var TASKS = (function(){
-  var raw = JSON.parse(localStorage.getItem('ff_tasks') || '[]');
+  var raw; try{ raw=JSON.parse(localStorage.getItem('ff_tasks')||'[]'); }catch(e){ console.warn('ff_tasks corrompido'); localStorage.removeItem('ff_tasks'); raw=[]; }
 
   // Normaliza desc: lowercase, sem espaços duplos, sem acentos simples
   function normDesc(s){
@@ -1766,14 +1766,14 @@ var TASKS = (function(){
 
   return result;
 })();
-var RECUR      = JSON.parse(localStorage.getItem('ff_recur')      || '[]');
-var PAGADORES  = JSON.parse(localStorage.getItem('ff_pagadores')  || '[]');
-var RECIBOS    = JSON.parse(localStorage.getItem('ff_recibos')    || '[]');
-var ALUGUEIS   = JSON.parse(localStorage.getItem('ff_alugueis')   || '[]');
-var CARTOES    = JSON.parse(localStorage.getItem('ff_cartoes')    || '[]');
-var CGASTOS    = JSON.parse(localStorage.getItem('ff_cgastos')    || '[]'); // gastos do cartão
-var CONTRATOS  = JSON.parse(localStorage.getItem('ff_contratos')  || '[]');
-var COLLAPSED_PASTAS = JSON.parse(localStorage.getItem('ff_collapsed') || '[]');
+var RECUR      = (function(){ try{ return JSON.parse(localStorage.getItem('ff_recur') || '[]') || []; }catch(e){ console.warn('localStorage ff_recur corrompido, resetando'); localStorage.removeItem('ff_recur'); return []; } })();
+var PAGADORES  = (function(){ try{ return JSON.parse(localStorage.getItem('ff_pagadores') || '[]') || []; }catch(e){ console.warn('localStorage ff_pagadores corrompido, resetando'); localStorage.removeItem('ff_pagadores'); return []; } })();
+var RECIBOS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_recibos') || '[]') || []; }catch(e){ console.warn('localStorage ff_recibos corrompido, resetando'); localStorage.removeItem('ff_recibos'); return []; } })();
+var ALUGUEIS   = (function(){ try{ return JSON.parse(localStorage.getItem('ff_alugueis') || '[]') || []; }catch(e){ console.warn('localStorage ff_alugueis corrompido, resetando'); localStorage.removeItem('ff_alugueis'); return []; } })();
+var CARTOES    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_cartoes') || '[]') || []; }catch(e){ console.warn('localStorage ff_cartoes corrompido, resetando'); localStorage.removeItem('ff_cartoes'); return []; } })();
+var CGASTOS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_cgastos') || '[]') || []; }catch(e){ console.warn('localStorage ff_cgastos corrompido, resetando'); localStorage.removeItem('ff_cgastos'); return []; } })(); // gastos do cartão
+var CONTRATOS  = (function(){ try{ return JSON.parse(localStorage.getItem('ff_contratos') || '[]') || []; }catch(e){ console.warn('localStorage ff_contratos corrompido, resetando'); localStorage.removeItem('ff_contratos'); return []; } })();
+var COLLAPSED_PASTAS = (function(){ try{ return JSON.parse(localStorage.getItem('ff_collapsed') || '[]') || []; }catch(e){ console.warn('localStorage ff_collapsed corrompido, resetando'); localStorage.removeItem('ff_collapsed'); return []; } })();
 
 
 var curRecur = false; // toggle do form
@@ -2025,6 +2025,19 @@ window.addEventListener('load', function(){
 });
 
 function boot(){
+  // Verificar e limpar qualquer chave corrompida no localStorage
+  ['ff_txs','ff_tasks','ff_recur','ff_pagadores','ff_recibos',
+   'ff_alugueis','ff_cartoes','ff_cgastos','ff_contratos','ff_docs','ff_collapsed']
+  .forEach(function(k){
+    try{
+      var v = localStorage.getItem(k);
+      if(v !== null) JSON.parse(v); // testa se é JSON válido
+    }catch(e){
+      console.warn('Limpando localStorage corrompido:', k);
+      localStorage.removeItem(k);
+    }
+  });
+
   var now = new Date();
 
   // Resetar datas
@@ -4176,7 +4189,7 @@ function hojePgtoToggle(id){
 // ════════════════════════════════════════
 //  DOCS — links para Google Drive
 // ════════════════════════════════════════
-var DOCS = JSON.parse(localStorage.getItem('ff_docs') || '[]');
+var DOCS = (function(){ try{ return JSON.parse(localStorage.getItem('ff_docs') || '[]') || []; }catch(e){ console.warn('localStorage ff_docs corrompido, resetando'); localStorage.removeItem('ff_docs'); return []; } })();
 var dfOpen = false;
 
 var DOC_ICONS = {
