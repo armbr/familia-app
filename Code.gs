@@ -76,6 +76,9 @@ function doGetInternal(action, body) {
     case 'getValorFaturaCartao': return getValorFaturaCartao(body);
     case 'salvarRecibo':      return salvarItemSheet('Recibos', body);
     case 'getRecibos':        return getItemsSheet('Recibos');
+    case 'salvarCartao':      return salvarItemSheet('Cartoes', body);
+    case 'getCartoes':        return getItemsSheet('Cartoes');
+    case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
