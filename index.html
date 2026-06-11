@@ -4710,7 +4710,8 @@ function addCartao(){
   var limite=parseFloat((document.getElementById('cc-limite')||{}).value||0);
   if(!nome){toast('⚠️ Informe o nome do cartão','err');return;}
   CARTOES.push({id:Date.now(),nome:nome,fech:fech,venc:venc,limite:limite});
-  saveCartoes(); apiCall('salvarCGasto',{},function(){});
+  saveCartoes();
+  // Não há endpoint salvarCartao — cartões ficam só no localStorage
   ['cc-nome','cc-fech','cc-venc','cc-limite'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   renderCC(); toast('✅ Cartão salvo!');
 }
@@ -4745,10 +4746,9 @@ function addGastoCartao(){
   // Atualizar tasks recorrentes vinculadas ao cartão com novo total
   if(cartao){
     var fatMesAtual = faturaDoGasto(new Date(data+'T12:00:00'), cartao.fech);
-    var novoTotal = totalFaturaCartao(cartaoId);
+    var novoTotal = totalFaturaCartao(cid);
     TASKS.forEach(function(t){
-      // Encontrar a task recorrente do cartão para o mês da fatura
-      var r = RECUR.find(function(x){ return String(x.cartaoId)===cartaoId; });
+      var r = RECUR.find(function(x){ return String(x.cartaoId)===cid; });
       if(r && String(t.recurId)===String(r.id) && t.deadline && t.deadline.startsWith(fatMesAtual)){
         t.value = novoTotal;
       }
