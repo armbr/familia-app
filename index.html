@@ -2103,7 +2103,7 @@ function syncAll(){
 
   function tick(){
     done++;
-    if(done===9){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
+    if(done===10){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
   apiCall('getRecur',null,function(err,d){
@@ -2119,6 +2119,25 @@ function syncAll(){
   });
 
   sincronizarRecibos(function(){ tick(); });
+
+  // Sync cartões
+  apiCall('getCartoes', null, function(err, d){
+    if(!err && d && d.ok && d.data && d.data.length){
+      var serverIds = {};
+      d.data.forEach(function(cc){ serverIds[String(cc.id)] = true; });
+      var localOnly = CARTOES.filter(function(cc){ return !serverIds[String(cc.id)]; });
+      // Enviar locais que servidor não tem
+      localOnly.forEach(function(cc){ apiCall('salvarCartao', cc, function(){}); });
+      // Mesclar
+      var merged = d.data.concat(localOnly);
+      CARTOES = merged;
+      saveCartoes();
+    } else if(!err && d && d.ok && CARTOES.length) {
+      // Servidor vazio mas local tem — enviar todos
+      CARTOES.forEach(function(cc){ apiCall('salvarCartao', cc, function(){}); });
+    }
+    tick();
+  });
 
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
@@ -3131,6 +3150,7 @@ function addCartaoFin(){
   var novoCC = {id:Date.now(), nome:nome, fech:fech, venc:venc, limite:limite};
   CARTOES.push(novoCC);
   saveCartoes();
+  apiCall('salvarCartao', novoCC, function(err){ if(err) console.warn('Cartão não salvo no servidor'); });
   curFinCCId = String(novoCC.id);
   // Sincronizar seletores em sec-cc também
   var opts = CARTOES.map(function(cc){ return '<option value="'+cc.id+'">'+esc(cc.nome)+'</option>'; }).join('');
@@ -4774,14 +4794,16 @@ function addCartao(){
   if(!nome){toast('⚠️ Informe o nome do cartão','err');return;}
   CARTOES.push({id:Date.now(),nome:nome,fech:fech,venc:venc,limite:limite});
   saveCartoes();
-  // Não há endpoint salvarCartao — cartões ficam só no localStorage
+
   ['cc-nome','cc-fech','cc-venc','cc-limite'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   renderCC(); toast('✅ Cartão salvo!');
 }
 function delCartao(id){
   if(!confirm('Remover este cartão?')) return;
   CARTOES=CARTOES.filter(function(c){return String(c.id)!==String(id);});
-  saveCartoes(); renderCC(); toast('🗑️ Cartão removido');
+  saveCartoes();
+  apiCall('deletarItemSheet', {aba:'Cartoes', id:id}, function(){});
+  renderFinCC(); toast('🗑️ Cartão removido');
 }
 function addGastoCartao(){
   var cid=(document.getElementById('cg-cartao')||{}).value||'';
