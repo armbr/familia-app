@@ -4812,11 +4812,11 @@ function renderListaGastos(){
   if(!recentes.length){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum gasto registrado</div>';return;}
   recentes.sort(function(a,b){return ymds(b.data)>ymds(a.data)?1:-1;});
   el.innerHTML=recentes.map(function(g){
-    return '<div class="cc-fatura-item"+(g.pago?" pago":"")>'+
+    return '<div class="cc-fatura-item'+(g.pago?' pago':'')+'" style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:7px">'+
       '<div style="font-size:20px">'+(g.pago?'✅':'🛍️')+'</div>'+
-      '<div class="fi-info"><div class="fi-desc">'+esc(g.desc)+'</div>'+
-      '<div class="fi-meta">'+esc(g.cartao)+' · '+esc(g.cat)+' · '+fmtDate(g.data)+'</div></div>'+
-      '<div class="fi-val">'+fmtBRL(g.val)+'</div>'+
+      '<div class="fi-info" style="flex:1;min-width:0"><div class="fi-desc" style="font-size:14px;font-weight:600">'+esc(g.desc)+'</div>'+
+      '<div class="fi-meta" style="font-size:11px;color:var(--t3)">'+esc(g.cartao||'')+' · '+esc(g.cat||'')+' · '+fmtDate(g.data)+'</div></div>'+
+      '<div class="fi-val" style="font-size:14px;font-weight:800;color:'+(g.pago?'var(--t3)':'var(--red)')+'">'+fmtBRL(g.val)+'</div>'+
       (!g.pago?'<button class="tdel2" data-delcg="'+g.id+'">🗑️</button>':'')+
     '</div>';
   }).join('');
