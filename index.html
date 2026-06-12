@@ -5077,11 +5077,28 @@ function salvarContrato(){
     if(!err) toast('📊 Ficha de pagamentos criada!');
   });
 
-  // Adicionar inquilino como pagador
-  if(ct.inqNome && !PAGADORES.some(function(p){return p.nome===ct.inqNome;})){
-    var p={id:Date.now()+1,nome:ct.inqNome,tel:'',doc:ct.inqCpf||''};
-    PAGADORES.unshift(p); savePagadores();
-    apiPost('salvarPagador',p,function(){});
+  // Adicionar inquilino como pagador (com email, telefone e WhatsApp)
+  if(ct.inqNome){
+    var pagExist = PAGADORES.find(function(p){return p.nome===ct.inqNome;});
+    if(!pagExist){
+      // Criar novo pagador com todos os dados
+      var p={
+        id:    Date.now()+1,
+        nome:  ct.inqNome,
+        tel:   ct.inqWhats||'',
+        doc:   ct.inqCpf||'',
+        email: ct.inqEmail||''
+      };
+      PAGADORES.unshift(p); savePagadores();
+      apiPost('salvarPagador',p,function(){});
+    } else {
+      // Atualizar pagador existente com dados que estiverem faltando
+      var updated = false;
+      if(!pagExist.email && ct.inqEmail){ pagExist.email = ct.inqEmail; updated=true; }
+      if(!pagExist.tel   && ct.inqWhats){ pagExist.tel   = ct.inqWhats; updated=true; }
+      if(!pagExist.doc   && ct.inqCpf)  { pagExist.doc   = ct.inqCpf;   updated=true; }
+      if(updated){ savePagadores(); apiPost('salvarPagador', pagExist, function(){}); }
+    }
   }
 
   // Criar aluguel recorrente
@@ -5089,7 +5106,9 @@ function salvarContrato(){
     var pag=PAGADORES.find(function(p){return p.nome===ct.inqNome;});
     if(pag){
       var alug={id:Date.now()+2,pagadorId:String(pag.id),nome:ct.inqNome,
-        tel:pag.tel||'',dia:parseInt(ct.diaPgto)||10,valorBase:ct.valor,
+        tel:pag.tel||ct.inqWhats||'',
+        email:pag.email||ct.inqEmail||'',
+        dia:parseInt(ct.diaPgto)||10,valorBase:ct.valor,
         ref:ct.imovel,parcelas:[],criadoEm:new Date().toISOString()};
       ALUGUEIS.unshift(alug); saveAlugueis();
       apiPost('salvarAluguel',alug,function(){});
