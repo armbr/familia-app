@@ -4597,7 +4597,9 @@ function abrirRecibo(r){
 }
 function delRecibo(id){
   RECIBOS=RECIBOS.filter(function(r){return String(r.id)!==String(id);});
-  saveRecibos(); renderRecibos(); toast('🗑️ Recibo removido');
+  saveRecibos();
+  apiCall('deletarItemSheet',{aba:'Recibos',id:id},function(){});
+  renderRecibos(); toast('🗑️ Recibo removido');
 }
 function renderHistRecibos(){
   var el=document.getElementById('rec-hist-list'); if(!el) return;
