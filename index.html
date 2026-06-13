@@ -2707,7 +2707,12 @@ function saveRecurEdit(){
 
 function cancelRecurFromModal(){
   if(!recurModalId) return;
-  if(!confirm('Cancelar esta recorrência? Os lançamentos já gerados permanecem.')) return;
+  var r = RECUR.find(function(x){ return String(x.id)===String(recurModalId); });
+  var isAluguel = r && r.aluguelId;
+  var msg = isAluguel
+    ? 'Desvincular da Agenda? O aluguel e contrato permanecem intactos. Apenas a recorrencia de receita sera removida.'
+    : 'Cancelar esta recorrencia? Os lancamentos ja gerados permanecem.';
+  if(!confirm(msg)) return;
   delRecur(recurModalId);
   closeRecurModal();
 }
@@ -3673,6 +3678,8 @@ function initTaskDelegation(){
     // Recibos
     var delpag = e.target.closest('[data-delpag]');
     if(delpag){ delPagador(delpag.getAttribute('data-delpag')); return; }
+    var editpag = e.target.closest('[data-editpag]');
+    if(editpag){ editarPagador(editpag.getAttribute('data-editpag')); return; }
     var delrec = e.target.closest('[data-delrec]');
     if(delrec){ delRecibo(delrec.getAttribute('data-delrec')); return; }
     var abrir = e.target.closest('[data-abrirec]');
@@ -4515,6 +4522,7 @@ function renderPagadores(){
       '<div style="font-size:22px">👤</div>'+
       '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">'+esc(p.nome)+'</div>'+
       '<div style="font-size:11px;color:var(--t3)">'+(p.tel?'📱 '+esc(p.tel):'')+(p.doc?' · '+esc(p.doc):'')+(p.email?'<br>📧 '+esc(p.email):'')+'</div></div>'+
+      '<button class="tdel2" data-editpag="'+p.id+'" style="margin-right:2px" title="Editar">✏️</button>'+
       '<button class="tdel2" data-delpag="'+p.id+'">🗑️</button></div>';
   }).join('');
 }
@@ -4522,6 +4530,36 @@ function renderPagadores(){
 // ════════════════════════════════════════════════════════
 //  RECIBOS
 // ════════════════════════════════════════════════════════
+function editarPagador(id){
+  var p = PAGADORES.find(function(x){ return String(x.id)===String(id); });
+  if(!p) return;
+  var novoNome  = prompt('Nome:', p.nome||'');
+  if(novoNome === null) return;
+  var novoTel   = prompt('Telefone/WhatsApp:', p.tel||'');
+  if(novoTel === null) return;
+  var novoEmail = prompt('E-mail:', p.email||'');
+  if(novoEmail === null) return;
+  var novoDoc   = prompt('CPF/CNPJ:', p.doc||'');
+  if(novoDoc === null) return;
+  p.nome  = novoNome.trim()  || p.nome;
+  p.tel   = novoTel.trim();
+  p.email = novoEmail.trim();
+  p.doc   = novoDoc.trim();
+  savePagadores();
+  apiPost('salvarPagador', p, function(){});
+  // Atualizar também nos aluguéis vinculados
+  ALUGUEIS.forEach(function(a){
+    if(String(a.pagadorId)===String(id)){
+      a.nome = p.nome;
+      a.tel  = p.tel;
+      if(p.email) a.email = p.email;
+    }
+  });
+  saveAlugueis();
+  renderRecibos();
+  toast('✅ Pagador atualizado!');
+}
+
 function emitirRecibo(){
   var pid=(document.getElementById('rec-pag')||{}).value||'';
   var pag=PAGADORES.find(function(p){return String(p.id)===pid;});
@@ -4541,9 +4579,37 @@ function emitirRecibo(){
     desc:desc,valor:val,data:data,obs:obs,emitidoEm:emitidoEm};
   RECIBOS.unshift(recibo); saveRecibos();
   apiCall('salvarRecibo', recibo, function(err){ if(err) console.warn('Recibo não salvo no servidor:', err); });
+
+  // Vincular recibo ao aluguel do pagador (marcar parcela do mês)
+  var mesRecibo = data.substring(0,7); // YYYY-MM
+  var alugVinc = ALUGUEIS.find(function(a){
+    return a.nome===nome || (pag && String(a.pagadorId)===String(pag.id));
+  });
+  if(alugVinc){
+    var jaExiste = (alugVinc.parcelas||[]).find(function(p){ return p.mesAno===mesRecibo; });
+    if(!jaExiste){
+      var parcelaAuto = {
+        mesAno:mesRecibo, valor:val, dataPgto:data,
+        codigo:codigo, emitidoEm:emitidoEm, recibId:recibo.id
+      };
+      if(!alugVinc.parcelas) alugVinc.parcelas=[];
+      alugVinc.parcelas.push(parcelaAuto);
+      saveAlugueis();
+      apiCall('registrarPagamentoAluguel',{
+        nome:alugVinc.nome, ref:alugVinc.ref, mesAno:mesRecibo,
+        valor:val, dataPgto:data, codigo:codigo, tel:alugVinc.tel
+      }, function(){});
+      toast('🧾 Recibo emitido e parcela de '+MESES_BR[parseInt(mesRecibo.split('-')[1])-1]+' atualizada!');
+    } else {
+      toast('🧾 Recibo emitido!');
+    }
+  } else {
+    toast('🧾 Recibo emitido!');
+  }
+
   ['rec-pag','rec-pag-nome','rec-pag-cpf','rec-desc','rec-val','rec-obs','rec-data']
     .forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  renderRecibos(); abrirRecibo(recibo); toast('🧾 Recibo emitido!');
+  renderRecibos(); abrirRecibo(recibo);
 }
 function abrirRecibo(r){
   var dataFmt=r.data?r.data.split('-').reverse().join('/') :'';
@@ -4637,8 +4703,25 @@ function addAluguel(){
     dia:dia,valorBase:val,ref:ref,parcelas:[],criadoEm:new Date().toISOString()};
   ALUGUEIS.unshift(alug); saveAlugueis();
   apiPost('salvarAluguel',alug,function(){});
+
+  // Criar recorrência de receita na Agenda (vinculada ao aluguel)
+  if(!RECUR.some(function(r){ return String(r.aluguelId)===String(alug.id); })){
+    var recurAlug = {
+      id:        Date.now()+10,
+      type:      'inc',
+      desc:      '🏠 Aluguel — ' + alug.nome + (alug.ref?' ('+alug.ref+')':''),
+      value:     alug.valorBase,
+      cat:       '⭐ Extra',
+      date:      ymd(new Date()).substring(0,7)+'-'+pad(alug.dia),
+      aluguelId: String(alug.id)  // vínculo — permite desvincular sem excluir aluguel
+    };
+    RECUR.unshift(recurAlug);
+    saveRecur();
+    apiCall('addRecur', recurAlug, function(){});
+  }
+
   ['alug-dia','alug-val','alug-ref'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
-  renderRecibos(); toast('✅ Aluguel cadastrado!');
+  renderRecibos(); toast('✅ Aluguel cadastrado e receita recorrente criada na Agenda!');
 }
 function delAluguel(id){
   if(!confirm('Remover este aluguel?')) return;
