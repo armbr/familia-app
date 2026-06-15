@@ -274,8 +274,10 @@ function addTask(body) {
 
 function updateTask(body) {
   var r = sheetRows('Tarefas');
-  var statusIdx    = r.headers.indexOf('status');
-  var comprovIdx   = r.headers.indexOf('comprovUrl');
+  var statusIdx  = r.headers.indexOf('status');
+  var valueIdx   = r.headers.indexOf('value');
+  var catIdx     = r.headers.indexOf('cat');
+  var comprovIdx = r.headers.indexOf('comprovUrl');
 
   // Criar coluna comprovUrl se não existir
   if (comprovIdx === -1 && body.comprovUrl) {
@@ -286,13 +288,26 @@ function updateTask(body) {
 
   for (var i = 0; i < r.rows.length; i++) {
     if (String(r.rows[i][0]) === String(body.id)) {
-      r.sheet.getRange(i + 2, statusIdx + 1).setValue(body.status);
+      // Atualizar status
+      if (body.status !== undefined && statusIdx > -1) {
+        r.sheet.getRange(i + 2, statusIdx + 1).setValue(body.status);
+      }
+      // Atualizar valor
+      if (body.value !== undefined && body.value !== null && valueIdx > -1) {
+        r.sheet.getRange(i + 2, valueIdx + 1).setValue(parseFloat(body.value));
+      }
+      // Atualizar categoria
+      if (body.cat !== undefined && body.cat !== null && catIdx > -1) {
+        r.sheet.getRange(i + 2, catIdx + 1).setValue(body.cat);
+      }
+      // Atualizar comprovante
       if (body.comprovUrl && comprovIdx > -1) {
         r.sheet.getRange(i + 2, comprovIdx + 1).setValue(body.comprovUrl);
       }
       return { ok: true };
     }
   }
+  // Task não encontrada — tentar criar (pode ser task nova ainda não sincronizada)
   return { ok: false, error: 'Tarefa não encontrada' };
 }
 
