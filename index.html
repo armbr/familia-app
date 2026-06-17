@@ -1234,6 +1234,7 @@ select option{background:#1A2A3A}
     <button class="vbtn"    id="rb-alugueis"   onclick="setRecTab('alugueis')"   style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">🏠 Alug.</button>
     <button class="vbtn on" id="rb-contratos"  onclick="setRecTab('contratos')"  style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">📄 Contratos</button>
     <button class="vbtn"    id="rb-recibos"    onclick="setRecTab('recibos')"    style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">🧾 Recibos</button>
+    <button class="vbtn"    id="rb-dividas"    onclick="setRecTab('dividas')"    style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">💰 Dívidas</button>
   </div>
 
   <!-- ABA: PAGADORES -->
@@ -1467,6 +1468,67 @@ select option{background:#1A2A3A}
     <div id="rec-hist-list"></div>
   </div>
 
+  <!-- ABA: DÍVIDAS -->
+  <div id="rp-dividas" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div class="coll-hdr card-title" onclick="toggleColl('div-form-body','div-form-arrow')" style="margin-bottom:0">
+        <span>💰 Nova Dívida</span>
+        <span class="coll-arrow" id="div-form-arrow" style="transform:rotate(-90deg)">▾</span>
+      </div>
+      <div id="div-form-body" style="display:none;margin-top:12px">
+        <div style="margin-bottom:10px">
+          <div class="fl">Pagador</div>
+          <select id="dv-pag"><option value="">— selecione um pagador —</option></select>
+        </div>
+        <div style="margin-bottom:10px"><div class="fl">Descrição</div>
+          <input id="dv-desc" type="text" placeholder="Ex: Empréstimo, parcela atrasada, acordo" maxlength="120">
+        </div>
+        <div class="row2" style="margin-bottom:10px">
+          <div><div class="fl">Valor original (R$)</div><div class="r-wrap"><input id="dv-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+          <div><div class="fl">Data de início</div><input id="dv-data" type="date"></div>
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="fl">Método de cálculo de juros</div>
+          <select id="dv-metodo" onchange="toggleCamposJuros()">
+            <option value="fixo_simples">Taxa fixa mensal — juros simples</option>
+            <option value="fixo_composto">Taxa fixa mensal — juros compostos</option>
+            <option value="indexador">Apenas indexador (IGPM/INPC/CDI/SELIC)</option>
+            <option value="indexador_mais_taxa">Indexador + taxa adicional</option>
+          </select>
+        </div>
+        <div class="row2" style="margin-bottom:10px">
+          <div id="dv-taxa-wrap"><div class="fl">Taxa mensal (%)</div><input id="dv-taxa" type="number" placeholder="Ex: 2" step="0.01" min="0" inputmode="decimal"></div>
+          <div id="dv-idx-wrap" style="display:none"><div class="fl">Indexador</div>
+            <select id="dv-indexador">
+              <option value="IGPM">IGPM</option>
+              <option value="INPC">INPC</option>
+              <option value="CDI">CDI</option>
+              <option value="SELIC">SELIC</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn" onclick="addDivida()">+ Registrar Dívida</button>
+      </div><!-- /div-form-body -->
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <div class="slbl" style="margin-bottom:0">Dívidas em aberto</div>
+      <div id="div-total-geral" style="font-size:13px;font-weight:800;color:var(--red)"></div>
+    </div>
+    <div id="div-list"></div>
+  </div>
+
+</div>
+
+<!-- Modal: Histórico da Dívida -->
+<div id="divhist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800" id="divhist-title">Histórico</div>
+      <button onclick="closeDivHistModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="divhist-body"></div>
+  </div>
 </div>
 
 <div id="sec-cc" style="display:none;padding:0 16px 100px">
@@ -1773,6 +1835,7 @@ var ALUGUEIS   = (function(){ try{ return JSON.parse(localStorage.getItem('ff_al
 var CARTOES    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_cartoes') || '[]') || []; }catch(e){ console.warn('localStorage ff_cartoes corrompido, resetando'); localStorage.removeItem('ff_cartoes'); return []; } })();
 var CGASTOS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_cgastos') || '[]') || []; }catch(e){ console.warn('localStorage ff_cgastos corrompido, resetando'); localStorage.removeItem('ff_cgastos'); return []; } })(); // gastos do cartão
 var CONTRATOS  = (function(){ try{ return JSON.parse(localStorage.getItem('ff_contratos') || '[]') || []; }catch(e){ console.warn('localStorage ff_contratos corrompido, resetando'); localStorage.removeItem('ff_contratos'); return []; } })();
+var DIVIDAS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_dividas') || '[]') || []; }catch(e){ console.warn('localStorage ff_dividas corrompido, resetando'); localStorage.removeItem('ff_dividas'); return []; } })();
 var COLLAPSED_PASTAS = (function(){ try{ return JSON.parse(localStorage.getItem('ff_collapsed') || '[]') || []; }catch(e){ console.warn('localStorage ff_collapsed corrompido, resetando'); localStorage.removeItem('ff_collapsed'); return []; } })();
 
 
@@ -2103,7 +2166,7 @@ function syncAll(){
 
   function tick(){
     done++;
-    if(done===10){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
+    if(done===11){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
   apiCall('getRecur',null,function(err,d){
@@ -2119,6 +2182,7 @@ function syncAll(){
   });
 
   sincronizarRecibos(function(){ tick(); });
+  sincronizarDividas(function(){ tick(); });
 
   sincronizarCartoes(function(){ renderFinCC(); tick(); });
 
@@ -3680,6 +3744,14 @@ function initTaskDelegation(){
     if(delpag){ delPagador(delpag.getAttribute('data-delpag')); return; }
     var editpag = e.target.closest('[data-editpag]');
     if(editpag){ editarPagador(editpag.getAttribute('data-editpag')); return; }
+    var baixadiv = e.target.closest('[data-baixadiv]');
+    if(baixadiv){ baixaDivida(baixadiv.getAttribute('data-baixadiv')); return; }
+    var renegdiv = e.target.closest('[data-renegdiv]');
+    if(renegdiv){ renegociarDivida(renegdiv.getAttribute('data-renegdiv')); return; }
+    var histdiv = e.target.closest('[data-histdiv]');
+    if(histdiv){ verHistoricoDivida(histdiv.getAttribute('data-histdiv')); return; }
+    var deldiv = e.target.closest('[data-deldiv]');
+    if(deldiv){ delDivida(deldiv.getAttribute('data-deldiv')); return; }
     var delrec = e.target.closest('[data-delrec]');
     if(delrec){ delRecibo(delrec.getAttribute('data-delrec')); return; }
     var abrir = e.target.closest('[data-abrirec]');
@@ -5083,13 +5155,17 @@ function renderCC(){
 var curRecTab='contratos';
 function setRecTab(t){
   curRecTab=t;
-  ['pagadores','alugueis','contratos','recibos'].forEach(function(tab){
+  ['pagadores','alugueis','contratos','recibos','dividas'].forEach(function(tab){
     var el=document.getElementById('rp-'+tab);
     if(el) el.style.display=tab===t?'block':'none';
     var btn=document.getElementById('rb-'+tab);
     if(btn) btn.classList.toggle('on',tab===t);
   });
   renderRecibos();
+  if(t==='dividas'){
+    try{ renderDividas(); }catch(e){ console.error('renderDividas',e); }
+    if(API) sincronizarDividas(function(){ renderDividas(); });
+  }
 }
 function renderRecibos(){
   try{renderAlugueisSection();}catch(e){console.error('renderAlugueisSection',e);}
@@ -5107,6 +5183,313 @@ function abrirLinkInquilino(ctId){
   var url=baseUrl+'?action=paginaInquilino&ctId='+encodeURIComponent(String(ct.id));
   if(navigator.clipboard) navigator.clipboard.writeText(url).then(function(){toast('🔗 Link copiado!');}).catch(function(){});
   window.open(url,'_blank');
+}
+
+// ════════════════════════════════════════════════════════════
+//  MÓDULO DÍVIDAS — saldo devedor, juros, renegociação, baixa
+// ════════════════════════════════════════════════════════════
+function saveDividas(){ localStorage.setItem('ff_dividas', JSON.stringify(DIVIDAS)); }
+
+function toggleCamposJuros(){
+  var metodo = document.getElementById('dv-metodo').value;
+  var taxaWrap = document.getElementById('dv-taxa-wrap');
+  var idxWrap  = document.getElementById('dv-idx-wrap');
+  if(metodo==='indexador'){
+    taxaWrap.style.display='none'; idxWrap.style.display='block';
+  } else if(metodo==='indexador_mais_taxa'){
+    taxaWrap.style.display='block'; idxWrap.style.display='block';
+  } else {
+    taxaWrap.style.display='block'; idxWrap.style.display='none';
+  }
+}
+
+function mesesEntreDatas(d1str, d2str){
+  var d1 = new Date(d1str+'T12:00:00');
+  var d2 = new Date(d2str+'T12:00:00');
+  var diffDays = (d2 - d1) / (1000*60*60*24);
+  return Math.max(0, diffDays / 30); // aproximação de meses corridos
+}
+
+function calcSaldoDivida(d, cb){
+  var principal = (d.valorPrincipalAtual !== undefined && d.valorPrincipalAtual !== null) ? d.valorPrincipalAtual : d.valorOriginal;
+  var dataBase  = d.dataBaseAtual || d.dataOriginal;
+  var hoje = ymd(new Date());
+  var meses = mesesEntreDatas(dataBase, hoje);
+
+  if(d.metodoJuros === 'fixo_simples'){
+    var juros = principal * ((d.taxaMensal||0)/100) * meses;
+    cb(null, {saldo: principal+juros, juros: juros, meses: meses});
+  } else if(d.metodoJuros === 'fixo_composto'){
+    var saldo = principal * Math.pow(1+((d.taxaMensal||0)/100), meses);
+    cb(null, {saldo: saldo, juros: saldo-principal, meses: meses});
+  } else {
+    // indexador ou indexador_mais_taxa — calcular no servidor (busca BCB)
+    apiCall('calcularSaldoDivida', {
+      valorPrincipal: principal, dataBase: dataBase, hoje: hoje,
+      metodoJuros: d.metodoJuros, taxaMensal: d.taxaMensal||0, indexador: d.indexador||''
+    }, function(err, resp){
+      if(err || !resp || !resp.ok){ cb(err||'Erro ao calcular índice', null); return; }
+      cb(null, {saldo: resp.saldoDevedor, juros: resp.jurosAcumulado, meses: resp.mesesAtraso});
+    });
+  }
+}
+
+function addDivida(){
+  var pagId   = document.getElementById('dv-pag').value;
+  var desc    = (document.getElementById('dv-desc').value||'').trim();
+  var val     = parseFloat(document.getElementById('dv-val').value||0);
+  var data    = document.getElementById('dv-data').value || ymd(new Date());
+  var metodo  = document.getElementById('dv-metodo').value;
+  var taxa    = parseFloat(document.getElementById('dv-taxa').value||0);
+  var idx     = document.getElementById('dv-indexador').value;
+
+  if(!pagId){ toast('⚠️ Selecione um pagador','err'); return; }
+  if(!desc){ toast('⚠️ Informe a descrição','err'); return; }
+  if(!val || val<=0){ toast('⚠️ Informe o valor original','err'); return; }
+
+  var pag = PAGADORES.find(function(p){ return String(p.id)===String(pagId); });
+
+  var divida = {
+    id: Date.now(), pagadorId: String(pagId), pagadorNome: pag?pag.nome:'',
+    desc: desc, valorOriginal: val, dataOriginal: data,
+    valorPrincipalAtual: val, dataBaseAtual: data,
+    metodoJuros: metodo, taxaMensal: taxa, indexador: idx,
+    status: 'pendente', pagamentos: [], renegociacoes: [],
+    criadoEm: new Date().toISOString()
+  };
+
+  DIVIDAS.unshift(divida); saveDividas();
+  apiCall('salvarDivida', divida, function(){});
+
+  ['dv-desc','dv-val'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  renderDividas();
+  toast('✅ Dívida registrada!');
+}
+
+function dividaCardHTML(d){
+  var pag = PAGADORES.find(function(p){ return String(p.id)===String(d.pagadorId); });
+  var nomePag = pag ? pag.nome : (d.pagadorNome||'—');
+  var metodoLabels = {
+    fixo_simples:        'Juros simples ' + (d.taxaMensal||0) + '%/mês',
+    fixo_composto:       'Juros compostos ' + (d.taxaMensal||0) + '%/mês',
+    indexador:            d.indexador,
+    indexador_mais_taxa:  d.indexador + ' + ' + (d.taxaMensal||0) + '%/mês'
+  };
+  var metodoLabel = metodoLabels[d.metodoJuros] || '';
+  var statusLabel = d.status==='parcial' ? 'PARCIAL' : 'PENDENTE';
+  var statusColor = d.status==='parcial' ? 'var(--yellow)' : 'var(--red)';
+
+  return '<div class="card" style="margin-bottom:10px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px">'+
+      '<div style="min-width:0"><div style="font-weight:800;font-size:14px">'+esc(nomePag)+'</div>'+
+      '<div style="font-size:12px;color:var(--t3)">'+esc(d.desc)+'</div></div>'+
+      '<span style="flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+statusColor+';color:'+statusColor+'">'+statusLabel+'</span>'+
+    '</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin:10px 0;padding:10px;background:var(--bg3);border-radius:8px">'+
+      '<div style="font-size:11px;color:var(--t3)">Saldo devedor hoje</div>'+
+      '<div id="dvsaldo-'+d.id+'" style="font-size:19px;font-weight:900;color:var(--red)">calculando...</div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+' · '+esc(metodoLabel)+'</div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button data-baixadiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">💵 Baixa</button>'+
+      '<button data-renegdiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Renegociar</button>'+
+      '<button data-histdiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Histórico</button>'+
+      '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderDividas(){
+  var pagSel = document.getElementById('dv-pag');
+  if(pagSel){
+    var opts = '<option value="">— selecione um pagador —</option>' +
+      PAGADORES.map(function(p){ return '<option value="'+p.id+'">'+esc(p.nome)+'</option>'; }).join('');
+    if(pagSel.innerHTML !== opts) pagSel.innerHTML = opts;
+  }
+
+  var el = document.getElementById('div-list');
+  if(!el) return;
+
+  var abertas = DIVIDAS.filter(function(d){ return d.status!=='pago' && d.status!=='renegociado'; });
+  var totalEl = document.getElementById('div-total-geral');
+
+  if(!abertas.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Nenhuma dívida em aberto 🎉</div>';
+    if(totalEl) totalEl.textContent = '';
+    return;
+  }
+
+  el.innerHTML = abertas.map(dividaCardHTML).join('');
+
+  var pending = abertas.length;
+  var totalGeral = 0;
+  abertas.forEach(function(d){
+    calcSaldoDivida(d, function(err, res){
+      var saldoEl = document.getElementById('dvsaldo-'+d.id);
+      if(!err && res){
+        if(saldoEl) saldoEl.textContent = fmtBRL(res.saldo);
+        d._saldoCache = res.saldo;
+        totalGeral += res.saldo;
+      } else {
+        if(saldoEl) saldoEl.textContent = '⚠️ erro no índice';
+      }
+      pending--;
+      if(pending===0 && totalEl){
+        totalEl.textContent = 'Total: ' + fmtBRL(totalGeral);
+      }
+    });
+  });
+}
+
+function baixaDivida(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  calcSaldoDivida(d, function(err, res){
+    if(err || !res){ toast('⚠️ Não foi possível calcular o saldo agora','err'); return; }
+    var saldoAtual = res.saldo;
+    var valorStr = prompt('Saldo devedor atual: '+fmtBRL(saldoAtual)+'\nValor do pagamento (R$):', '');
+    if(valorStr === null) return;
+    var valorPago = parseFloat(valorStr.replace(',','.'))||0;
+    if(valorPago<=0){ toast('⚠️ Valor inválido','err'); return; }
+
+    var hoje = ymd(new Date());
+    d.pagamentos = d.pagamentos || [];
+    d.pagamentos.push({data:hoje, valor:valorPago});
+
+    var novoSaldo = saldoAtual - valorPago;
+    if(novoSaldo <= 0.01){
+      d.status = 'pago';
+      d.valorPrincipalAtual = 0;
+      toast('✅ Dívida totalmente paga!');
+    } else {
+      d.status = 'parcial';
+      d.valorPrincipalAtual = novoSaldo; // reinicia contagem de juros sobre o restante
+      d.dataBaseAtual = hoje;
+      toast('💵 Baixa registrada. Saldo restante: '+fmtBRL(novoSaldo));
+    }
+    saveDividas();
+    apiCall('salvarDivida', d, function(){});
+    renderDividas();
+  });
+}
+
+function renegociarDivida(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  calcSaldoDivida(d, function(err, res){
+    var saldoAtual = (!err && res) ? res.saldo : d.valorPrincipalAtual;
+    var novoValorStr = prompt('Saldo devedor atual: '+fmtBRL(saldoAtual)+'\nNovo valor acordado (R$):', saldoAtual.toFixed(2).replace('.',','));
+    if(novoValorStr === null) return;
+    var novoValor = parseFloat(novoValorStr.replace(',','.'))||0;
+    if(novoValor<=0){ toast('⚠️ Valor inválido','err'); return; }
+
+    var novaTaxaStr = prompt('Nova taxa mensal % (deixe igual se não mudar):', String(d.taxaMensal||0));
+    var novaTaxa = novaTaxaStr!==null ? (parseFloat(novaTaxaStr.replace(',','.'))||0) : d.taxaMensal;
+
+    var hoje = ymd(new Date());
+    d.renegociacoes = d.renegociacoes || [];
+    d.renegociacoes.push({
+      data: hoje, valorAnterior: saldoAtual, valorNovo: novoValor,
+      taxaAnterior: d.taxaMensal, taxaNova: novaTaxa
+    });
+
+    d.valorPrincipalAtual = novoValor;
+    d.dataBaseAtual = hoje;
+    d.taxaMensal = novaTaxa;
+    d.status = 'pendente';
+
+    saveDividas();
+    apiCall('salvarDivida', d, function(){});
+    renderDividas();
+    toast('🔄 Dívida renegociada — novo valor: '+fmtBRL(novoValor));
+  });
+}
+
+function verHistoricoDivida(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  var pag = PAGADORES.find(function(p){ return String(p.id)===String(d.pagadorId); });
+  document.getElementById('divhist-title').textContent = 'Histórico — ' + (pag?pag.nome:d.pagadorNome||'');
+
+  var html = '<div style="font-size:12px;color:var(--t3);margin-bottom:14px">'+
+    'Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+'<br>'+esc(d.desc)+'</div>';
+
+  if((d.pagamentos||[]).length){
+    html += '<div class="slbl" style="margin-bottom:6px">💵 Pagamentos</div>';
+    d.pagamentos.forEach(function(p){
+      html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">'+
+        '<span>'+fmtDate(p.data)+'</span><span style="font-weight:700;color:var(--green)">'+fmtBRL(p.valor)+'</span></div>';
+    });
+  }
+
+  if((d.renegociacoes||[]).length){
+    html += '<div class="slbl" style="margin:14px 0 6px">🔄 Renegociações</div>';
+    d.renegociacoes.forEach(function(r){
+      html += '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">'+
+        '<div style="display:flex;justify-content:space-between"><span>'+fmtDate(r.data)+'</span>'+
+        '<span style="font-weight:700">'+fmtBRL(r.valorAnterior)+' → '+fmtBRL(r.valorNovo)+'</span></div>'+
+        (r.taxaAnterior!==r.taxaNova?'<div style="color:var(--t3);font-size:11px">Taxa: '+r.taxaAnterior+'% → '+r.taxaNova+'%</div>':'')+
+      '</div>';
+    });
+  }
+
+  if(!(d.pagamentos||[]).length && !(d.renegociacoes||[]).length){
+    html += '<div style="text-align:center;color:var(--t3);padding:16px">Nenhum movimento registrado ainda</div>';
+  }
+
+  document.getElementById('divhist-body').innerHTML = html;
+  document.getElementById('divhist-modal').style.display = 'flex';
+}
+
+function closeDivHistModal(){
+  document.getElementById('divhist-modal').style.display = 'none';
+}
+
+function delDivida(id){
+  if(!confirm('Excluir esta dívida e todo o histórico? Esta ação não pode ser desfeita.')) return;
+  DIVIDAS = DIVIDAS.filter(function(d){ return String(d.id)!==String(id); });
+  saveDividas();
+  apiCall('deletarItemSheet', {aba:'Dividas', id:id}, function(){});
+  renderDividas();
+  toast('🗑️ Dívida excluída');
+}
+
+function sincronizarDividas(cb){
+  apiCall('getDividas', null, function(err, d){
+    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    var serverMap = {};
+    serverList.forEach(function(x){ serverMap[String(x.id)] = true; });
+    var pendentes = DIVIDAS.filter(function(x){ return !serverMap[String(x.id)]; });
+    if(pendentes.length === 0){
+      if(serverList.length > 0){
+        var localMap = {};
+        DIVIDAS.forEach(function(x){ localMap[String(x.id)] = true; });
+        var localOnly = DIVIDAS.filter(function(x){ return !serverMap[String(x.id)]; });
+        DIVIDAS = serverList.concat(localOnly);
+        saveDividas();
+      }
+      if(cb) cb();
+      return;
+    }
+    var enviados = 0;
+    pendentes.forEach(function(x){
+      apiCall('salvarDivida', x, function(){
+        enviados++;
+        if(enviados === pendentes.length){
+          apiCall('getDividas', null, function(err2, d2){
+            if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
+              var localMap2 = {};
+              d2.data.forEach(function(x){ localMap2[String(x.id)] = true; });
+              DIVIDAS.forEach(function(x){ if(!localMap2[String(x.id)]) d2.data.push(x); });
+              DIVIDAS = d2.data;
+              saveDividas();
+            }
+            if(cb) cb();
+          });
+        }
+      });
+    });
+  });
 }
 
 
