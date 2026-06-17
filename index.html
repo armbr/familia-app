@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260617-183449</title>
+<title>Fluxo v20260617-194456</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -5256,7 +5256,7 @@ function calcSaldoDivida(d, cb){
       metodoJuros: d.metodoJuros, taxaMensal: d.taxaMensal||0, indexador: d.indexador||''
     }, function(err, resp){
       if(err || !resp || !resp.ok){ cb(err||'Erro ao calcular índice', null); return; }
-      cb(null, {saldo: resp.saldoDevedor, juros: resp.jurosAcumulado, meses: resp.mesesAtraso});
+      cb(null, {saldo: resp.saldoDevedor, juros: resp.jurosAcumulado, meses: resp.mesesAtraso, fator: resp.fatorIndexador});
     });
   }
 }
@@ -5324,7 +5324,8 @@ function dividaCardHTML(d){
       '<div style="font-size:11px;color:var(--t3)">Saldo '+(isDevo?'a pagar':'a receber')+' hoje</div>'+
       '<div id="dvsaldo-'+d.id+'" style="font-size:19px;font-weight:900;color:'+saldoColor+'">calculando...</div>'+
     '</div>'+
-    '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+' · '+esc(metodoLabel)+'</div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:4px">Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+' · '+esc(metodoLabel)+'</div>'+
+    '<div id="dvtaxa-'+d.id+'" style="font-size:11px;color:var(--blue);margin-bottom:10px;min-height:14px"></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
       '<button data-baixadiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">💵 Baixa</button>'+
       '<button data-renegdiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Renegociar</button>'+
@@ -5362,12 +5363,28 @@ function renderDividas(){
   abertas.forEach(function(d){
     calcSaldoDivida(d, function(err, res){
       var saldoEl = document.getElementById('dvsaldo-'+d.id);
+      var taxaEl  = document.getElementById('dvtaxa-'+d.id);
       if(!err && res){
         if(saldoEl) saldoEl.textContent = fmtBRL(res.saldo);
         d._saldoCache = res.saldo;
         totalGeral += res.saldo;
+
+        // Mostrar a taxa REAL aplicada no período
+        if(taxaEl){
+          if(d.metodoJuros === 'fixo_simples' || d.metodoJuros === 'fixo_composto'){
+            taxaEl.textContent = '📌 Taxa aplicada: ' + (d.taxaMensal||0) + '%/mês (' + (d.metodoJuros==='fixo_simples'?'simples':'composto') + ')';
+          } else if(res.fator !== undefined && res.fator !== null && res.meses > 0){
+            var pctPeriodo = ((res.fator - 1) * 100).toFixed(2);
+            var pctMensalEquiv = ((Math.pow(res.fator, 1/res.meses) - 1) * 100).toFixed(2);
+            var extra = d.metodoJuros==='indexador_mais_taxa' ? (' + ' + (d.taxaMensal||0) + '%/mês adicional') : '';
+            taxaEl.textContent = '📊 ' + d.indexador + ': +' + pctPeriodo + '% no período (≈ ' + pctMensalEquiv + '%/mês)' + extra;
+          } else {
+            taxaEl.textContent = '📊 ' + d.indexador;
+          }
+        }
       } else {
         if(saldoEl) saldoEl.textContent = '⚠️ erro no índice';
+        if(taxaEl) taxaEl.textContent = '⚠️ Não foi possível obter o índice agora';
       }
       pending--;
       if(pending===0 && totalEl){
