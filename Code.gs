@@ -22,6 +22,9 @@ function doGet(e) {
     if (action === 'paginaInquilino') {
       return paginaInquilino(e);
     }
+    if (action === 'paginaDivida') {
+      return paginaDivida(e);
+    }
 
     var body = {};
     if (params.payload) {
@@ -1105,7 +1108,7 @@ function garantirEstruturaDividas() {
 
   // ── Aba "Pagamentos_Dividas" ───────────────────────────
   var shP = sp.getSheetByName('Pagamentos_Dividas');
-  var headersP = ['id','dividaId','pagador','data','valor'];
+  var headersP = ['id','dividaId','pagador','data','valor','jurosPago','amortizacao','saldoApos'];
   if (!shP) shP = sp.insertSheet('Pagamentos_Dividas');
   var atuaisP = shP.getRange(1,1,1,Math.max(1,shP.getLastColumn())).getValues()[0];
   if (!headersP.every(function(h,i){ return atuaisP[i]===h; })) {
@@ -1114,7 +1117,7 @@ function garantirEstruturaDividas() {
     shP.setFrozenRows(1);
     shP.getRange(1,1,1,headersP.length).setFontWeight('bold').setBackground('#0F9D58').setFontColor('#FFF');
     shP.getRange('D2:D2000').setNumberFormat('dd/mm/yyyy');
-    shP.getRange('E2:E2000').setNumberFormat('R$ #,##0.00');
+    shP.getRange('E2:H2000').setNumberFormat('R$ #,##0.00');
   }
 
   // ── Aba "Renegociacoes_Dividas" ────────────────────────
@@ -1210,7 +1213,8 @@ function salvarDividaEstruturada(body) {
   if (body.pagamentos) {
     sincronizarSubArrayDivida(sheets.pagamentos, body.id, body.pagamentos, function(p) {
       return [Utilities.getUuid(), String(body.id), body.pagadorNome || '',
-              p.data ? new Date(p.data + 'T12:00:00') : '', parseFloat(p.valor) || 0];
+              p.data ? new Date(p.data + 'T12:00:00') : '', parseFloat(p.valor) || 0,
+              parseFloat(p.jurosPago) || 0, parseFloat(p.amortizacao) || 0, parseFloat(p.saldoApos) || 0];
     });
   }
   if (body.renegociacoes) {
@@ -1243,7 +1247,10 @@ function getDividasEstruturadas() {
   for (var i = 1; i < pDados.length; i++) {
     var did = String(pDados[i][1]); if (!did) continue;
     (pagamentosPorDivida[did] = pagamentosPorDivida[did] || []).push({
-      data: fmtDate(pDados[i][3]), valor: parseFloat(pDados[i][4]) || 0
+      data: fmtDate(pDados[i][3]), valor: parseFloat(pDados[i][4]) || 0,
+      jurosPago: parseFloat(pDados[i][5]) || 0,
+      amortizacao: parseFloat(pDados[i][6]) || 0,
+      saldoApos: parseFloat(pDados[i][7]) || 0
     });
   }
 
@@ -1309,6 +1316,131 @@ function getDividasSheetUrl() {
   var sh = sp.getSheetByName('Dívidas');
   var gid = sh ? sh.getSheetId() : 0;
   return { ok: true, url: sp.getUrl() + '#gid=' + gid };
+}
+
+// ════════════════════════════════════════════════════════════
+//  FICHA PÚBLICA DA DÍVIDA / EMPRÉSTIMO
+//  Extrato completo com todos os movimentos, compartilhável
+// ════════════════════════════════════════════════════════════
+function paginaDivida(e) {
+  var divId = e.parameter.divId || '';
+  var todos = getDividasEstruturadas();
+  var d = (todos.data || []).find(function(x){ return String(x.id) === String(divId); });
+
+  if (!d) {
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family:Arial;padding:40px;text-align:center;background:#0F1923;color:#EDF2F7;min-height:100vh">' +
+      '<h2 style="color:#FF6B6B">Registro não encontrado</h2>' +
+      '<p style="color:#8FA8C4">Verifique o link com quem compartilhou.</p></div>'
+    );
+  }
+
+  // Calcular saldo devedor atual (mesma lógica do app)
+  var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var calc = calcularSaldoDivida({
+    valorPrincipal: d.valorPrincipalAtual, dataBase: d.dataBaseAtual, hoje: hoje,
+    metodoJuros: d.metodoJuros, taxaMensal: d.taxaMensal, indexador: d.indexador
+  });
+  var saldoAtual = calc.ok ? calc.saldoDevedor : d.valorPrincipalAtual;
+
+  var isDevo = d.tipo !== 'recebo';
+  var corTema    = isDevo ? '#E0935C' : '#5CA8E0';
+  var corTemaBg  = isDevo ? '#2A1F14' : '#142436';
+  var tituloTipo = isDevo ? 'Empréstimo tomado' : 'Empréstimo concedido';
+
+  function brl(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function brDate(iso){ return iso ? String(iso).split('-').reverse().join('/') : '—'; }
+
+  var totalPago = (d.pagamentos||[]).reduce(function(s,p){ return s + (p.valor||0); }, 0);
+  var totalJuros = (d.pagamentos||[]).reduce(function(s,p){ return s + (p.jurosPago||0); }, 0);
+  var pctPago = d.valorOriginal > 0 ? Math.min(100, Math.round((totalPago / (d.valorOriginal + totalJuros)) * 100)) : 0;
+  // Aproximação simplificada de % pago — usa total pago vs (original + juros já pagos), apenas para a barra visual
+
+  var statusLabel = { pendente:'EM ABERTO', parcial:'PARCIALMENTE PAGO', pago:'PAGO INTEGRALMENTE', renegociado:'RENEGOCIADO' }[d.status] || d.status.toUpperCase();
+  var statusCor   = { pendente:'#E74C3C', parcial:'#E0A30C', pago:'#2ECC9A', renegociado:'#888' }[d.status] || '#888';
+
+  var linhasMovimentos = '';
+  var movimentos = [];
+  (d.pagamentos||[]).forEach(function(p){ movimentos.push({tipo:'pagamento', data:p.data, valor:p.valor, juros:p.jurosPago, amort:p.amortizacao, saldo:p.saldoApos}); });
+  (d.renegociacoes||[]).forEach(function(r){ movimentos.push({tipo:'renegociacao', data:r.data, valorAnterior:r.valorAnterior, valorNovo:r.valorNovo}); });
+  movimentos.sort(function(a,b){ return a.data < b.data ? -1 : 1; });
+
+  if (movimentos.length) {
+    movimentos.forEach(function(m){
+      if (m.tipo === 'pagamento') {
+        linhasMovimentos +=
+          '<tr>' +
+            '<td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">' + brDate(m.data) + '</td>' +
+            '<td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;text-align:right;color:#2ECC9A;font-weight:700">' + brl(m.valor) + '</td>' +
+            '<td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;text-align:right;color:#8FA8C4">' + brl(m.juros) + '</td>' +
+            '<td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;text-align:right;color:#8FA8C4">' + brl(m.amort) + '</td>' +
+            '<td style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px;text-align:right;font-weight:700">' + brl(m.saldo) + '</td>' +
+          '</tr>';
+      } else {
+        linhasMovimentos +=
+          '<tr style="background:rgba(244,81,30,.08)">' +
+            '<td colspan="5" style="padding:10px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;color:#F4511E">' +
+              '🔄 Renegociado em ' + brDate(m.data) + ' — ' + brl(m.valorAnterior) + ' → ' + brl(m.valorNovo) +
+            '</td>' +
+          '</tr>';
+      }
+    });
+  } else {
+    linhasMovimentos = '<tr><td colspan="5" style="padding:20px;text-align:center;color:#526680;font-size:13px">Nenhum movimento registrado ainda</td></tr>';
+  }
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Extrato — ' + d.desc + '</title>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:Arial,Helvetica,sans-serif;background:#0F1923;display:flex;justify-content:center;padding:20px;min-height:100vh}' +
+    '.card{background:#1A2A3A;border-radius:16px;overflow:hidden;width:100%;max-width:560px;border:1px solid rgba(255,255,255,.08)}' +
+    '.hdr{background:#0d1117;padding:22px 20px;border-bottom:2px solid ' + corTema + '}' +
+    '.hdr h1{color:#fff;font-size:18px;font-weight:900}' +
+    '.hdr .sub{color:' + corTema + ';font-size:12px;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}' +
+    '.body{padding:20px}' +
+    '.row{padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between;align-items:baseline}' +
+    '.lbl{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#526680}' +
+    '.val{font-size:14px;font-weight:600;color:#EDF2F7}' +
+    '.saldo-box{background:' + corTemaBg + ';border-radius:12px;padding:20px;text-align:center;margin:16px 0}' +
+    '.saldo-box .lbl{color:' + corTema + '}' +
+    '.saldo-box .amt{font-size:32px;font-weight:900;color:#fff;margin-top:6px}' +
+    '.progress-track{height:8px;background:rgba(255,255,255,.08);border-radius:4px;margin-top:14px;overflow:hidden}' +
+    '.progress-fill{height:8px;background:#2ECC9A;border-radius:4px}' +
+    '.progress-lbl{font-size:11px;color:#8FA8C4;margin-top:6px;text-align:center}' +
+    'table{width:100%;border-collapse:collapse;margin-top:8px}' +
+    'th{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#526680;text-align:left;padding:8px;border-bottom:2px solid rgba(255,255,255,.1)}' +
+    '.footer{padding:14px 20px;text-align:center;color:#526680;font-size:11px;border-top:1px solid rgba(255,255,255,.06)}' +
+    '@media print{body{background:#fff}.card{border:1px solid #ddd;background:#fff}}' +
+    '</style></head><body>' +
+    '<div class="card">' +
+      '<div class="hdr"><h1>⚡ ' + tituloTipo + '</h1><div class="sub">' + statusLabel + '</div></div>' +
+      '<div class="body">' +
+        '<div class="row"><span class="lbl">Pessoa</span><span class="val">' + d.pagadorNome + '</span></div>' +
+        '<div class="row"><span class="lbl">Descrição</span><span class="val">' + d.desc + '</span></div>' +
+        '<div class="row"><span class="lbl">Valor original</span><span class="val">' + brl(d.valorOriginal) + '</span></div>' +
+        '<div class="row"><span class="lbl">Data de início</span><span class="val">' + brDate(d.dataOriginal) + '</span></div>' +
+        '<div class="row"><span class="lbl">Total já pago</span><span class="val" style="color:#2ECC9A">' + brl(totalPago) + '</span></div>' +
+
+        '<div class="saldo-box">' +
+          '<div class="lbl">Saldo devedor atual</div>' +
+          '<div class="amt">' + (calc.ok ? brl(saldoAtual) : 'Indisponível') + '</div>' +
+          '<div class="progress-track"><div class="progress-fill" style="width:' + pctPago + '%"></div></div>' +
+          '<div class="progress-lbl">' + pctPago + '% do total já amortizado</div>' +
+        '</div>' +
+
+        '<table>' +
+          '<thead><tr><th>Data</th><th style="text-align:right">Pago</th><th style="text-align:right">Juros</th><th style="text-align:right">Amortiz.</th><th style="text-align:right">Saldo</th></tr></thead>' +
+          '<tbody>' + linhasMovimentos + '</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div class="footer">Extrato gerado em ' + brDate(hoje) + ' · via Fluxo App</div>' +
+    '</div>' +
+    '</body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Extrato — ' + d.desc)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 // ════════════════════════════════════════════════════════════
