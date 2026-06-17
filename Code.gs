@@ -79,6 +79,11 @@ function doGetInternal(action, body) {
     case 'salvarCartao':      return salvarItemSheet('Cartoes', body);
     case 'getCartoes':        return getItemsSheet('Cartoes');
     case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
+    case 'salvarDivida':      return salvarDividaEstruturada(body);
+    case 'getDividas':        return getDividasEstruturadas();
+    case 'calcularSaldoDivida': return calcularSaldoDivida(body);
+    case 'deletarDivida':     return deletarDivida(body.id);
+    case 'getDividasSheetUrl': return getDividasSheetUrl();
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
@@ -1035,16 +1040,393 @@ function deletarItemSheet(nomeAba, id) {
   return { ok: true };
 }
 
-function getItemsSheet(nomeAba) {
-  var sheet = ss().getSheetByName(nomeAba);
-  if (!sheet) return { ok: true, data: [] };
-  var dados = sheet.getDataRange().getValues();
-  var result = [];
+// ════════════════════════════════════════════════════════════
+//  DÍVIDAS — planilha DEDICADA de empréstimos e dívidas
+//  Cria automaticamente uma planilha Google SEPARADA com:
+//   • Aba "Dívidas"   — colunas reais + fórmulas vivas de saldo devedor
+//   • Aba "Pagamentos_Dividas" — histórico de baixas
+//   • Aba "Renegociacoes_Dividas" — histórico de renegociações
+//   • Aba "Resumo" — total que você deve / total que devem a você
+// ════════════════════════════════════════════════════════════
+
+// Para usar uma planilha já existente, cole o ID aqui.
+// Deixe em branco para o sistema criar uma planilha nova automaticamente
+// na primeira vez (o ID gerado é salvo nas Propriedades do Script).
+var DIVIDAS_SPREADSHEET_ID = '';
+
+function dividasSS() {
+  if (DIVIDAS_SPREADSHEET_ID) {
+    return SpreadsheetApp.openById(DIVIDAS_SPREADSHEET_ID);
+  }
+  var props = PropertiesService.getScriptProperties();
+  var storedId = props.getProperty('DIVIDAS_SS_ID');
+  if (storedId) {
+    try { return SpreadsheetApp.openById(storedId); }
+    catch (e) { /* planilha foi excluída — recriar abaixo */ }
+  }
+  var nova = SpreadsheetApp.create('Fluxo — Controle de Dívidas e Empréstimos');
+  props.setProperty('DIVIDAS_SS_ID', nova.getId());
+  return nova;
+}
+
+function garantirEstruturaDividas() {
+  var sp = dividasSS();
+
+  // ── Aba "Dívidas" — colunas + fórmulas vivas ──────────
+  var sh = sp.getSheetByName('Dívidas');
+  var headers = ['id','tipo','pagadorId','pagador','descricao','valorOriginal','dataOriginal',
+                 'metodoJuros','taxaMensal','indexador','valorPrincipalAtual','dataBaseAtual',
+                 'diasEmAtraso','saldoDevedorEstimado','status','criadoEm','atualizadoEm'];
+  if (!sh) sh = sp.insertSheet('Dívidas');
+  var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
+  var headersOk = headers.every(function(h,i){ return atuais[i]===h; });
+  if (!headersOk) {
+    sh.clear();
+    sh.getRange(1,1,1,headers.length).setValues([headers]);
+    sh.setFrozenRows(1);
+    sh.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground('#6D28D9').setFontColor('#FFF');
+    sh.setColumnWidth(4,140); sh.setColumnWidth(5,220);
+    sh.getRange('F2:F2000').setNumberFormat('R$ #,##0.00');
+    sh.getRange('K2:K2000').setNumberFormat('R$ #,##0.00');
+    sh.getRange('N2:N2000').setNumberFormat('R$ #,##0.00');
+    sh.getRange('G2:G2000').setNumberFormat('dd/mm/yyyy');
+    sh.getRange('L2:L2000').setNumberFormat('dd/mm/yyyy');
+    sh.getRange('P2:Q2000').setNumberFormat('dd/mm/yyyy hh:mm');
+    var rules = [
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('pendente').setBackground('#FCE4E4').setFontColor('#C0392B').setRanges([sh.getRange('O2:O2000')]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('parcial').setBackground('#FEF6E0').setFontColor('#B7791F').setRanges([sh.getRange('O2:O2000')]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('pago').setBackground('#E3FCEF').setFontColor('#1E7E45').setRanges([sh.getRange('O2:O2000')]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('renegociado').setBackground('#ECECEC').setFontColor('#666666').setRanges([sh.getRange('O2:O2000')]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('devo').setBackground('#FFF4E5').setFontColor('#C2680C').setRanges([sh.getRange('B2:B2000')]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('recebo').setBackground('#E5F3FF').setFontColor('#1565C0').setRanges([sh.getRange('B2:B2000')]).build()
+    ];
+    sh.setConditionalFormatRules(rules);
+  }
+
+  // ── Aba "Pagamentos_Dividas" ───────────────────────────
+  var shP = sp.getSheetByName('Pagamentos_Dividas');
+  var headersP = ['id','dividaId','pagador','data','valor'];
+  if (!shP) shP = sp.insertSheet('Pagamentos_Dividas');
+  var atuaisP = shP.getRange(1,1,1,Math.max(1,shP.getLastColumn())).getValues()[0];
+  if (!headersP.every(function(h,i){ return atuaisP[i]===h; })) {
+    shP.clear();
+    shP.getRange(1,1,1,headersP.length).setValues([headersP]);
+    shP.setFrozenRows(1);
+    shP.getRange(1,1,1,headersP.length).setFontWeight('bold').setBackground('#0F9D58').setFontColor('#FFF');
+    shP.getRange('D2:D2000').setNumberFormat('dd/mm/yyyy');
+    shP.getRange('E2:E2000').setNumberFormat('R$ #,##0.00');
+  }
+
+  // ── Aba "Renegociacoes_Dividas" ────────────────────────
+  var shR = sp.getSheetByName('Renegociacoes_Dividas');
+  var headersR = ['id','dividaId','pagador','data','valorAnterior','valorNovo','taxaAnterior','taxaNova'];
+  if (!shR) shR = sp.insertSheet('Renegociacoes_Dividas');
+  var atuaisR = shR.getRange(1,1,1,Math.max(1,shR.getLastColumn())).getValues()[0];
+  if (!headersR.every(function(h,i){ return atuaisR[i]===h; })) {
+    shR.clear();
+    shR.getRange(1,1,1,headersR.length).setValues([headersR]);
+    shR.setFrozenRows(1);
+    shR.getRange(1,1,1,headersR.length).setFontWeight('bold').setBackground('#F4511E').setFontColor('#FFF');
+    shR.getRange('D2:D2000').setNumberFormat('dd/mm/yyyy');
+    shR.getRange('E2:F2000').setNumberFormat('R$ #,##0.00');
+  }
+
+  // ── Aba "Resumo" — dashboard com totais ────────────────
+  var shS = sp.getSheetByName('Resumo');
+  if (!shS) {
+    shS = sp.insertSheet('Resumo', 0); // primeira aba
+    shS.getRange('A1').setValue('📊 Resumo — Dívidas e Empréstimos').setFontWeight('bold').setFontSize(16);
+    shS.getRange('A3').setValue('💸 Total que você DEVE (ativo)');
+    shS.getRange('B3').setFormula('=SUMPRODUCT(IFERROR((Dívidas!B2:B2000="devo")*(Dívidas!O2:O2000<>"pago")*(Dívidas!O2:O2000<>"renegociado")*Dívidas!N2:N2000,0))');
+    shS.getRange('A4').setValue('💰 Total que DEVEM a você (ativo)');
+    shS.getRange('B4').setFormula('=SUMPRODUCT(IFERROR((Dívidas!B2:B2000="recebo")*(Dívidas!O2:O2000<>"pago")*(Dívidas!O2:O2000<>"renegociado")*Dívidas!N2:N2000,0))');
+    shS.getRange('A5').setValue('⚖️ Saldo líquido (a receber - a pagar)');
+    shS.getRange('B5').setFormula('=B4-B3');
+    shS.getRange('B3:B5').setNumberFormat('R$ #,##0.00').setFontWeight('bold').setFontSize(13);
+    shS.getRange('A3:A5').setFontWeight('600');
+    shS.setColumnWidth(1,280); shS.setColumnWidth(2,160);
+    shS.getRange('A1:B1').setBackground('#6D28D9').setFontColor('#FFF');
+    shS.getRange('A7').setValue('Atualizado automaticamente conforme você usa o app Fluxo.').setFontColor('#888888').setFontStyle('italic');
+  }
+
+  return { dividas: sh, pagamentos: shP, renegociacoes: shR, resumo: shS };
+}
+
+// Monta as fórmulas vivas de "dias em atraso" e "saldo devedor estimado"
+// para juros fixos (simples/composto). Para indexador, mostra texto
+// indicando que precisa recalcular pelo app (depende de dados externos).
+function formulasLinhaDivida(linha) {
+  var diasFormula = '=IF(L' + linha + '="","",TODAY()-L' + linha + ')';
+  var saldoFormula =
+    '=IF(L' + linha + '="","",' +
+      'IF(H' + linha + '="fixo_simples", K' + linha + '*(1+(I' + linha + '/100)*((TODAY()-L' + linha + ')/30)), ' +
+      'IF(H' + linha + '="fixo_composto", K' + linha + '*(1+I' + linha + '/100)^((TODAY()-L' + linha + ')/30), ' +
+      '"Indexador — recalcular no app")))';
+  return { dias: diasFormula, saldo: saldoFormula };
+}
+
+function salvarDividaEstruturada(body) {
+  var sheets = garantirEstruturaDividas();
+  var sh = sheets.dividas;
+  var dados = sh.getDataRange().getValues();
+  var rowIdx = -1;
   for (var i = 1; i < dados.length; i++) {
-    if (!dados[i][1]) continue;
-    try { result.push(JSON.parse(String(dados[i][1]))); } catch(e) {}
+    if (String(dados[i][0]) === String(body.id)) { rowIdx = i + 1; break; }
+  }
+
+  var now = new Date();
+  var dataOriginalDate  = body.dataOriginal  ? new Date(body.dataOriginal  + 'T12:00:00') : '';
+  var dataBaseDate      = body.dataBaseAtual ? new Date(body.dataBaseAtual + 'T12:00:00') : dataOriginalDate;
+
+  var linha = rowIdx > -1 ? rowIdx : (sh.getLastRow() + 1);
+  var f = formulasLinhaDivida(linha);
+
+  var rowData = [
+    String(body.id),
+    body.tipo || 'devo',
+    String(body.pagadorId || ''),
+    body.pagadorNome || '',
+    body.desc || '',
+    parseFloat(body.valorOriginal) || 0,
+    dataOriginalDate,
+    body.metodoJuros || '',
+    parseFloat(body.taxaMensal) || 0,
+    body.indexador || '',
+    parseFloat(body.valorPrincipalAtual !== undefined ? body.valorPrincipalAtual : body.valorOriginal) || 0,
+    dataBaseDate,
+    f.dias,   // fórmula — dias em atraso
+    f.saldo,  // fórmula — saldo devedor estimado
+    body.status || 'pendente',
+    body.criadoEm ? new Date(body.criadoEm) : now,
+    now
+  ];
+
+  if (rowIdx > -1) {
+    sh.getRange(rowIdx, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sh.appendRow(rowData);
+  }
+
+  if (body.pagamentos) {
+    sincronizarSubArrayDivida(sheets.pagamentos, body.id, body.pagamentos, function(p) {
+      return [Utilities.getUuid(), String(body.id), body.pagadorNome || '',
+              p.data ? new Date(p.data + 'T12:00:00') : '', parseFloat(p.valor) || 0];
+    });
+  }
+  if (body.renegociacoes) {
+    sincronizarSubArrayDivida(sheets.renegociacoes, body.id, body.renegociacoes, function(r) {
+      return [Utilities.getUuid(), String(body.id), body.pagadorNome || '',
+              r.data ? new Date(r.data + 'T12:00:00') : '',
+              parseFloat(r.valorAnterior) || 0, parseFloat(r.valorNovo) || 0,
+              parseFloat(r.taxaAnterior) || 0, parseFloat(r.taxaNova) || 0];
+    });
+  }
+
+  return { ok: true };
+}
+
+function sincronizarSubArrayDivida(sheet, dividaId, novosItens, mapFn) {
+  var dados = sheet.getDataRange().getValues();
+  for (var i = dados.length - 1; i >= 1; i--) {
+    if (String(dados[i][1]) === String(dividaId)) sheet.deleteRow(i + 1);
+  }
+  novosItens.forEach(function(item) { sheet.appendRow(mapFn(item)); });
+}
+
+function getDividasEstruturadas() {
+  var sheets = garantirEstruturaDividas();
+  var dDados = sheets.dividas.getDataRange().getValues();
+  var pDados = sheets.pagamentos.getDataRange().getValues();
+  var rDados = sheets.renegociacoes.getDataRange().getValues();
+
+  var pagamentosPorDivida = {};
+  for (var i = 1; i < pDados.length; i++) {
+    var did = String(pDados[i][1]); if (!did) continue;
+    (pagamentosPorDivida[did] = pagamentosPorDivida[did] || []).push({
+      data: fmtDate(pDados[i][3]), valor: parseFloat(pDados[i][4]) || 0
+    });
+  }
+
+  var renegPorDivida = {};
+  for (var j = 1; j < rDados.length; j++) {
+    var did2 = String(rDados[j][1]); if (!did2) continue;
+    (renegPorDivida[did2] = renegPorDivida[did2] || []).push({
+      data: fmtDate(rDados[j][3]),
+      valorAnterior: parseFloat(rDados[j][4]) || 0,
+      valorNovo:     parseFloat(rDados[j][5]) || 0,
+      taxaAnterior:  parseFloat(rDados[j][6]) || 0,
+      taxaNova:      parseFloat(rDados[j][7]) || 0
+    });
+  }
+
+  var result = [];
+  for (var k = 1; k < dDados.length; k++) {
+    var row = dDados[k]; if (!row[0]) continue;
+    var id = String(row[0]);
+    result.push({
+      id: id,
+      tipo: row[1] || 'devo',
+      pagadorId: String(row[2] || ''),
+      pagadorNome: row[3] || '',
+      desc: row[4] || '',
+      valorOriginal: parseFloat(row[5]) || 0,
+      dataOriginal: fmtDate(row[6]),
+      metodoJuros: row[7] || '',
+      taxaMensal: parseFloat(row[8]) || 0,
+      indexador: row[9] || '',
+      valorPrincipalAtual: parseFloat(row[10]) || 0,
+      dataBaseAtual: fmtDate(row[11]),
+      // row[12] e row[13] são fórmulas (dias/saldo) — valores já calculados pela planilha
+      diasEmAtrasoPlanilha: row[12],
+      saldoDevedorPlanilha: (typeof row[13] === 'number') ? row[13] : null,
+      status: row[14] || 'pendente',
+      criadoEm: row[15] instanceof Date ? row[15].toISOString() : String(row[15] || ''),
+      pagamentos: pagamentosPorDivida[id] || [],
+      renegociacoes: renegPorDivida[id] || []
+    });
   }
   return { ok: true, data: result };
+}
+
+function deletarDivida(id) {
+  var sheets = garantirEstruturaDividas();
+  var dados = sheets.dividas.getDataRange().getValues();
+  for (var i = dados.length - 1; i >= 1; i--) {
+    if (String(dados[i][0]) === String(id)) sheets.dividas.deleteRow(i + 1);
+  }
+  [sheets.pagamentos, sheets.renegociacoes].forEach(function(sheet) {
+    var d2 = sheet.getDataRange().getValues();
+    for (var j = d2.length - 1; j >= 1; j--) {
+      if (String(d2[j][1]) === String(id)) sheet.deleteRow(j + 1);
+    }
+  });
+  return { ok: true };
+}
+
+function getDividasSheetUrl() {
+  var sp = dividasSS();
+  garantirEstruturaDividas();
+  var sh = sp.getSheetByName('Dívidas');
+  var gid = sh ? sh.getSheetId() : 0;
+  return { ok: true, url: sp.getUrl() + '#gid=' + gid };
+}
+
+// ════════════════════════════════════════════════════════════
+//  DÍVIDAS — cálculo de saldo devedor com juros e indexadores
+// ════════════════════════════════════════════════════════════
+
+// ════════════════════════════════════════════════════════════
+//  DÍVIDAS — cálculo de saldo devedor com juros e indexadores
+// ════════════════════════════════════════════════════════════
+
+// Códigos das séries do Banco Central (SGS) usados para indexadores
+var BCB_CODIGOS = {
+  'IGPM':  189,   // IGP-M (FGV) — variação % mensal
+  'INPC':  188,   // INPC (IBGE) — variação % mensal
+  'CDI':   4391,  // CDI acumulado no mês — % mensal
+  'SELIC': 4390   // SELIC acumulada no mês — % mensal
+};
+
+function calcularSaldoDivida(body) {
+  try {
+    var principal   = parseFloat(body.valorPrincipal) || 0;
+    var dataBase     = String(body.dataBase);
+    var hoje         = String(body.hoje || Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd'));
+    var metodo       = body.metodoJuros;
+    var taxaMensal   = parseFloat(body.taxaMensal) || 0;
+    var indexador    = body.indexador || '';
+
+    var d1 = new Date(dataBase + 'T12:00:00');
+    var d2 = new Date(hoje + 'T12:00:00');
+    var meses = Math.max(0, (d2 - d1) / (1000*60*60*24*30));
+
+    var saldo, juros, fatorIndexador;
+
+    if (metodo === 'indexador' || metodo === 'indexador_mais_taxa') {
+      fatorIndexador = buscarIndexadorAcumulado(indexador, dataBase, hoje);
+      if (fatorIndexador === null) {
+        return { ok: false, error: 'Não foi possível obter o índice ' + indexador + ' no momento.' };
+      }
+      var saldoIdx = principal * fatorIndexador;
+      if (metodo === 'indexador_mais_taxa') {
+        saldo = saldoIdx * Math.pow(1 + (taxaMensal/100), meses);
+      } else {
+        saldo = saldoIdx;
+      }
+      juros = saldo - principal;
+    } else if (metodo === 'fixo_composto') {
+      saldo = principal * Math.pow(1 + (taxaMensal/100), meses);
+      juros = saldo - principal;
+    } else {
+      // fixo_simples (padrão)
+      juros = principal * (taxaMensal/100) * meses;
+      saldo = principal + juros;
+    }
+
+    return {
+      ok: true,
+      saldoDevedor: Math.round(saldo * 100) / 100,
+      jurosAcumulado: Math.round(juros * 100) / 100,
+      mesesAtraso: Math.round(meses * 100) / 100,
+      fatorIndexador: fatorIndexador || null
+    };
+  } catch (e) {
+    return { ok: false, error: 'Erro no cálculo: ' + e.message };
+  }
+}
+
+// Busca o fator acumulado de um indexador entre duas datas, usando a API
+// pública do Banco Central (SGS). Resultado é cacheado por 12h para evitar
+// chamadas repetidas no mesmo dia.
+function buscarIndexadorAcumulado(tipo, dataInicioISO, dataFimISO) {
+  var codigo = BCB_CODIGOS[tipo];
+  if (!codigo) return null;
+
+  var cacheKey = 'idx_' + tipo + '_' + dataInicioISO + '_' + dataFimISO;
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(cacheKey);
+  if (cached !== null) {
+    return parseFloat(cached);
+  }
+
+  try {
+    var dIni = isoToBr(dataInicioISO);
+    var dFim = isoToBr(dataFimISO);
+    var url = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.' + codigo +
+              '/dados?formato=json&dataInicial=' + dIni + '&dataFinal=' + dFim;
+
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) {
+      Logger.log('BCB API erro: ' + resp.getResponseCode());
+      return null;
+    }
+
+    var dados = JSON.parse(resp.getContentText());
+    if (!dados || !dados.length) {
+      // Sem dados no período (ex: período muito curto) — fator neutro
+      cache.put(cacheKey, '1', 21600);
+      return 1;
+    }
+
+    var fator = 1;
+    dados.forEach(function(item) {
+      var valor = parseFloat(String(item.valor).replace(',', '.'));
+      if (!isNaN(valor)) {
+        fator *= (1 + valor/100);
+      }
+    });
+
+    cache.put(cacheKey, String(fator), 21600); // cache por 6 horas
+    return fator;
+  } catch (e) {
+    Logger.log('Erro ao buscar indexador ' + tipo + ': ' + e.message);
+    return null;
+  }
+}
+
+function isoToBr(isoDate) {
+  var p = isoDate.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
 }
 
 // ════════════════════════════════════════════════════════════
