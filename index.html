@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260617-134506</title>
+<title>Fluxo v20260617-181228</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1472,12 +1472,20 @@ select option{background:#1A2A3A}
   <div id="rp-dividas" style="display:none">
     <div class="card" style="margin-bottom:12px">
       <div class="coll-hdr card-title" onclick="toggleColl('div-form-body','div-form-arrow')" style="margin-bottom:0">
-        <span>💰 Nova Dívida</span>
+        <span>💰 Nova Dívida / Empréstimo</span>
         <span class="coll-arrow" id="div-form-arrow" style="transform:rotate(-90deg)">▾</span>
       </div>
       <div id="div-form-body" style="display:none;margin-top:12px">
         <div style="margin-bottom:10px">
-          <div class="fl">Pagador</div>
+          <div class="fl">Direção</div>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="dv-tipo-devo" onclick="setDvTipo('devo')" class="vbtn on" style="flex:1;padding:10px;border-radius:10px">😟 Eu devo</button>
+            <button type="button" id="dv-tipo-recebo" onclick="setDvTipo('recebo')" class="vbtn" style="flex:1;padding:10px;border-radius:10px">🤝 Me devem</button>
+          </div>
+          <input type="hidden" id="dv-tipo" value="devo">
+        </div>
+        <div style="margin-bottom:10px">
+          <div class="fl">Pagador / Pessoa</div>
           <select id="dv-pag"><option value="">— selecione um pagador —</option></select>
         </div>
         <div style="margin-bottom:10px"><div class="fl">Descrição</div>
@@ -1507,12 +1515,14 @@ select option{background:#1A2A3A}
             </select>
           </div>
         </div>
-        <button class="btn" onclick="addDivida()">+ Registrar Dívida</button>
+        <button class="btn" onclick="addDivida()">+ Registrar</button>
       </div><!-- /div-form-body -->
     </div>
 
+    <button onclick="abrirPlanilhaDividas()" style="width:100%;margin-bottom:14px;padding:11px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔗 Abrir planilha completa de dívidas</button>
+
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-      <div class="slbl" style="margin-bottom:0">Dívidas em aberto</div>
+      <div class="slbl" style="margin-bottom:0">Em aberto</div>
       <div id="div-total-geral" style="font-size:13px;font-weight:800;color:var(--red)"></div>
     </div>
     <div id="div-list"></div>
@@ -5190,6 +5200,21 @@ function abrirLinkInquilino(ctId){
 // ════════════════════════════════════════════════════════════
 function saveDividas(){ localStorage.setItem('ff_dividas', JSON.stringify(DIVIDAS)); }
 
+function setDvTipo(tipo){
+  document.getElementById('dv-tipo').value = tipo;
+  document.getElementById('dv-tipo-devo').classList.toggle('on', tipo==='devo');
+  document.getElementById('dv-tipo-recebo').classList.toggle('on', tipo==='recebo');
+}
+
+function abrirPlanilhaDividas(){
+  if(!API){ toast('⚠️ Configure a URL do Apps Script','err'); return; }
+  toast('🔗 Abrindo planilha...');
+  apiCall('getDividasSheetUrl', null, function(err, d){
+    if(err || !d || !d.ok){ toast('⚠️ Não foi possível abrir a planilha','err'); return; }
+    window.open(d.url, '_blank');
+  });
+}
+
 function toggleCamposJuros(){
   var metodo = document.getElementById('dv-metodo').value;
   var taxaWrap = document.getElementById('dv-taxa-wrap');
@@ -5235,6 +5260,7 @@ function calcSaldoDivida(d, cb){
 }
 
 function addDivida(){
+  var tipo    = document.getElementById('dv-tipo').value || 'devo';
   var pagId   = document.getElementById('dv-pag').value;
   var desc    = (document.getElementById('dv-desc').value||'').trim();
   var val     = parseFloat(document.getElementById('dv-val').value||0);
@@ -5250,7 +5276,7 @@ function addDivida(){
   var pag = PAGADORES.find(function(p){ return String(p.id)===String(pagId); });
 
   var divida = {
-    id: Date.now(), pagadorId: String(pagId), pagadorNome: pag?pag.nome:'',
+    id: Date.now(), tipo: tipo, pagadorId: String(pagId), pagadorNome: pag?pag.nome:'',
     desc: desc, valorOriginal: val, dataOriginal: data,
     valorPrincipalAtual: val, dataBaseAtual: data,
     metodoJuros: metodo, taxaMensal: taxa, indexador: idx,
@@ -5263,7 +5289,7 @@ function addDivida(){
 
   ['dv-desc','dv-val'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   renderDividas();
-  toast('✅ Dívida registrada!');
+  toast('✅ Registrado!');
 }
 
 function dividaCardHTML(d){
@@ -5278,16 +5304,23 @@ function dividaCardHTML(d){
   var metodoLabel = metodoLabels[d.metodoJuros] || '';
   var statusLabel = d.status==='parcial' ? 'PARCIAL' : 'PENDENTE';
   var statusColor = d.status==='parcial' ? 'var(--yellow)' : 'var(--red)';
+  var isDevo = d.tipo !== 'recebo';
+  var tipoLabel = isDevo ? '😟 Você deve' : '🤝 Devem a você';
+  var tipoColor = isDevo ? '#C2680C' : '#1565C0';
+  var saldoColor = isDevo ? 'var(--red)' : 'var(--green)';
 
-  return '<div class="card" style="margin-bottom:10px">'+
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px">'+
-      '<div style="min-width:0"><div style="font-weight:800;font-size:14px">'+esc(nomePag)+'</div>'+
-      '<div style="font-size:12px;color:var(--t3)">'+esc(d.desc)+'</div></div>'+
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+tipoColor+'">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
+      '<div style="min-width:0">'+
+        '<div style="font-size:10px;font-weight:800;color:'+tipoColor+';letter-spacing:.5px;margin-bottom:2px">'+tipoLabel+'</div>'+
+        '<div style="font-weight:800;font-size:14px">'+esc(nomePag)+'</div>'+
+        '<div style="font-size:12px;color:var(--t3)">'+esc(d.desc)+'</div>'+
+      '</div>'+
       '<span style="flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+statusColor+';color:'+statusColor+'">'+statusLabel+'</span>'+
     '</div>'+
     '<div style="display:flex;justify-content:space-between;align-items:baseline;margin:10px 0;padding:10px;background:var(--bg3);border-radius:8px">'+
-      '<div style="font-size:11px;color:var(--t3)">Saldo devedor hoje</div>'+
-      '<div id="dvsaldo-'+d.id+'" style="font-size:19px;font-weight:900;color:var(--red)">calculando...</div>'+
+      '<div style="font-size:11px;color:var(--t3)">Saldo '+(isDevo?'a pagar':'a receber')+' hoje</div>'+
+      '<div id="dvsaldo-'+d.id+'" style="font-size:19px;font-weight:900;color:'+saldoColor+'">calculando...</div>'+
     '</div>'+
     '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+' · '+esc(metodoLabel)+'</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
@@ -5449,9 +5482,9 @@ function delDivida(id){
   if(!confirm('Excluir esta dívida e todo o histórico? Esta ação não pode ser desfeita.')) return;
   DIVIDAS = DIVIDAS.filter(function(d){ return String(d.id)!==String(id); });
   saveDividas();
-  apiCall('deletarItemSheet', {aba:'Dividas', id:id}, function(){});
+  apiCall('deletarDivida', {id:id}, function(){});
   renderDividas();
-  toast('🗑️ Dívida excluída');
+  toast('🗑️ Excluído');
 }
 
 function sincronizarDividas(cb){
