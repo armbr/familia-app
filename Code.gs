@@ -79,6 +79,9 @@ function doGetInternal(action, body) {
     case 'salvarCartao':      return salvarItemSheet('Cartoes', body);
     case 'getCartoes':        return getItemsSheet('Cartoes');
     case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
+    case 'salvarDivida':      return salvarItemSheet('Dividas', body);
+    case 'getDividas':        return getItemsSheet('Dividas');
+    case 'calcularSaldoDivida': return calcularSaldoDivida(body);
     case 'ping':              return { ok: true, msg: 'pong' };
     default:                  return { ok: false, error: 'Ação inválida: ' + action };
   }
@@ -1045,6 +1048,120 @@ function getItemsSheet(nomeAba) {
     try { result.push(JSON.parse(String(dados[i][1]))); } catch(e) {}
   }
   return { ok: true, data: result };
+}
+
+// ════════════════════════════════════════════════════════════
+//  DÍVIDAS — cálculo de saldo devedor com juros e indexadores
+// ════════════════════════════════════════════════════════════
+
+// Códigos das séries do Banco Central (SGS) usados para indexadores
+var BCB_CODIGOS = {
+  'IGPM':  189,   // IGP-M (FGV) — variação % mensal
+  'INPC':  188,   // INPC (IBGE) — variação % mensal
+  'CDI':   4391,  // CDI acumulado no mês — % mensal
+  'SELIC': 4390   // SELIC acumulada no mês — % mensal
+};
+
+function calcularSaldoDivida(body) {
+  try {
+    var principal   = parseFloat(body.valorPrincipal) || 0;
+    var dataBase     = String(body.dataBase);
+    var hoje         = String(body.hoje || Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd'));
+    var metodo       = body.metodoJuros;
+    var taxaMensal   = parseFloat(body.taxaMensal) || 0;
+    var indexador    = body.indexador || '';
+
+    var d1 = new Date(dataBase + 'T12:00:00');
+    var d2 = new Date(hoje + 'T12:00:00');
+    var meses = Math.max(0, (d2 - d1) / (1000*60*60*24*30));
+
+    var saldo, juros, fatorIndexador;
+
+    if (metodo === 'indexador' || metodo === 'indexador_mais_taxa') {
+      fatorIndexador = buscarIndexadorAcumulado(indexador, dataBase, hoje);
+      if (fatorIndexador === null) {
+        return { ok: false, error: 'Não foi possível obter o índice ' + indexador + ' no momento.' };
+      }
+      var saldoIdx = principal * fatorIndexador;
+      if (metodo === 'indexador_mais_taxa') {
+        saldo = saldoIdx * Math.pow(1 + (taxaMensal/100), meses);
+      } else {
+        saldo = saldoIdx;
+      }
+      juros = saldo - principal;
+    } else if (metodo === 'fixo_composto') {
+      saldo = principal * Math.pow(1 + (taxaMensal/100), meses);
+      juros = saldo - principal;
+    } else {
+      // fixo_simples (padrão)
+      juros = principal * (taxaMensal/100) * meses;
+      saldo = principal + juros;
+    }
+
+    return {
+      ok: true,
+      saldoDevedor: Math.round(saldo * 100) / 100,
+      jurosAcumulado: Math.round(juros * 100) / 100,
+      mesesAtraso: Math.round(meses * 100) / 100,
+      fatorIndexador: fatorIndexador || null
+    };
+  } catch (e) {
+    return { ok: false, error: 'Erro no cálculo: ' + e.message };
+  }
+}
+
+// Busca o fator acumulado de um indexador entre duas datas, usando a API
+// pública do Banco Central (SGS). Resultado é cacheado por 12h para evitar
+// chamadas repetidas no mesmo dia.
+function buscarIndexadorAcumulado(tipo, dataInicioISO, dataFimISO) {
+  var codigo = BCB_CODIGOS[tipo];
+  if (!codigo) return null;
+
+  var cacheKey = 'idx_' + tipo + '_' + dataInicioISO + '_' + dataFimISO;
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(cacheKey);
+  if (cached !== null) {
+    return parseFloat(cached);
+  }
+
+  try {
+    var dIni = isoToBr(dataInicioISO);
+    var dFim = isoToBr(dataFimISO);
+    var url = 'https://api.bcb.gov.br/dados/serie/bcdata.sgs.' + codigo +
+              '/dados?formato=json&dataInicial=' + dIni + '&dataFinal=' + dFim;
+
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) {
+      Logger.log('BCB API erro: ' + resp.getResponseCode());
+      return null;
+    }
+
+    var dados = JSON.parse(resp.getContentText());
+    if (!dados || !dados.length) {
+      // Sem dados no período (ex: período muito curto) — fator neutro
+      cache.put(cacheKey, '1', 21600);
+      return 1;
+    }
+
+    var fator = 1;
+    dados.forEach(function(item) {
+      var valor = parseFloat(String(item.valor).replace(',', '.'));
+      if (!isNaN(valor)) {
+        fator *= (1 + valor/100);
+      }
+    });
+
+    cache.put(cacheKey, String(fator), 21600); // cache por 6 horas
+    return fator;
+  } catch (e) {
+    Logger.log('Erro ao buscar indexador ' + tipo + ': ' + e.message);
+    return null;
+  }
+}
+
+function isoToBr(isoDate) {
+  var p = isoDate.split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
 }
 
 // ════════════════════════════════════════════════════════════
