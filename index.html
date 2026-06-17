@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260617-181228</title>
+<title>Fluxo v20260617-183449</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3760,6 +3760,8 @@ function initTaskDelegation(){
     if(renegdiv){ renegociarDivida(renegdiv.getAttribute('data-renegdiv')); return; }
     var histdiv = e.target.closest('[data-histdiv]');
     if(histdiv){ verHistoricoDivida(histdiv.getAttribute('data-histdiv')); return; }
+    var linkdiv = e.target.closest('[data-linkdiv]');
+    if(linkdiv){ abrirLinkDivida(linkdiv.getAttribute('data-linkdiv')); return; }
     var deldiv = e.target.closest('[data-deldiv]');
     if(deldiv){ delDivida(deldiv.getAttribute('data-deldiv')); return; }
     var delrec = e.target.closest('[data-delrec]');
@@ -5327,6 +5329,7 @@ function dividaCardHTML(d){
       '<button data-baixadiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">💵 Baixa</button>'+
       '<button data-renegdiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Renegociar</button>'+
       '<button data-histdiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Histórico</button>'+
+      '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar extrato">🔗</button>'+
       '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
   '</div>';
@@ -5380,20 +5383,24 @@ function baixaDivida(id){
   calcSaldoDivida(d, function(err, res){
     if(err || !res){ toast('⚠️ Não foi possível calcular o saldo agora','err'); return; }
     var saldoAtual = res.saldo;
+    var jurosAcumulado = res.juros || 0;
     var valorStr = prompt('Saldo devedor atual: '+fmtBRL(saldoAtual)+'\nValor do pagamento (R$):', '');
     if(valorStr === null) return;
     var valorPago = parseFloat(valorStr.replace(',','.'))||0;
     if(valorPago<=0){ toast('⚠️ Valor inválido','err'); return; }
 
     var hoje = ymd(new Date());
-    d.pagamentos = d.pagamentos || [];
-    d.pagamentos.push({data:hoje, valor:valorPago});
+    var jurosPago    = Math.min(valorPago, Math.max(0, jurosAcumulado));
+    var amortizacao  = Math.max(0, valorPago - jurosPago);
+    var novoSaldo    = Math.max(0, saldoAtual - valorPago);
 
-    var novoSaldo = saldoAtual - valorPago;
+    d.pagamentos = d.pagamentos || [];
+    d.pagamentos.push({data:hoje, valor:valorPago, jurosPago:jurosPago, amortizacao:amortizacao, saldoApos:novoSaldo});
+
     if(novoSaldo <= 0.01){
       d.status = 'pago';
       d.valorPrincipalAtual = 0;
-      toast('✅ Dívida totalmente paga!');
+      toast('✅ Totalmente pago!');
     } else {
       d.status = 'parcial';
       d.valorPrincipalAtual = novoSaldo; // reinicia contagem de juros sobre o restante
@@ -5447,12 +5454,24 @@ function verHistoricoDivida(id){
   var html = '<div style="font-size:12px;color:var(--t3);margin-bottom:14px">'+
     'Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+'<br>'+esc(d.desc)+'</div>';
 
+  html += '<button data-linkdiv="'+d.id+'" style="width:100%;margin-bottom:14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Abrir/compartilhar extrato completo</button>';
+
   if((d.pagamentos||[]).length){
     html += '<div class="slbl" style="margin-bottom:6px">💵 Pagamentos</div>';
+    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:4px">'+
+      '<tr style="font-size:10px;color:var(--t3);text-transform:uppercase">'+
+        '<th style="text-align:left;padding:4px 0">Data</th><th style="text-align:right;padding:4px 0">Pago</th>'+
+        '<th style="text-align:right;padding:4px 0">Juros</th><th style="text-align:right;padding:4px 0">Saldo após</th>'+
+      '</tr>';
     d.pagamentos.forEach(function(p){
-      html += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">'+
-        '<span>'+fmtDate(p.data)+'</span><span style="font-weight:700;color:var(--green)">'+fmtBRL(p.valor)+'</span></div>';
+      html += '<tr style="font-size:12px;border-top:1px solid var(--border)">'+
+        '<td style="padding:6px 0">'+fmtDate(p.data)+'</td>'+
+        '<td style="padding:6px 0;text-align:right;color:var(--green);font-weight:700">'+fmtBRL(p.valor)+'</td>'+
+        '<td style="padding:6px 0;text-align:right;color:var(--t3)">'+fmtBRL(p.jurosPago||0)+'</td>'+
+        '<td style="padding:6px 0;text-align:right;font-weight:700">'+fmtBRL(p.saldoApos!==undefined?p.saldoApos:0)+'</td>'+
+      '</tr>';
     });
+    html += '</table>';
   }
 
   if((d.renegociacoes||[]).length){
@@ -5476,6 +5495,14 @@ function verHistoricoDivida(id){
 
 function closeDivHistModal(){
   document.getElementById('divhist-modal').style.display = 'none';
+}
+
+function abrirLinkDivida(id){
+  if(!API){ toast('⚠️ Configure a URL do Apps Script','err'); return; }
+  var baseUrl = API.split('?')[0];
+  var url = baseUrl + '?action=paginaDivida&divId=' + encodeURIComponent(String(id));
+  if(navigator.clipboard) navigator.clipboard.writeText(url).then(function(){ toast('🔗 Link copiado!'); }).catch(function(){});
+  window.open(url, '_blank');
 }
 
 function delDivida(id){
