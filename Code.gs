@@ -1319,6 +1319,66 @@ function getDividasSheetUrl() {
 }
 
 // ════════════════════════════════════════════════════════════
+//  ATUALIZAÇÃO AUTOMÁTICA DOS SALDOS COM INDEXADOR
+//  As fórmulas da planilha cobrem juros fixos automaticamente,
+//  mas indexadores (IGPM/INPC/CDI/SELIC) dependem de dados
+//  externos do Banco Central — por isso esta rotina roda todo
+//  dia e grava o saldo atualizado direto na planilha, mesmo que
+//  você nunca abra o app.
+// ════════════════════════════════════════════════════════════
+function atualizarSaldosDividasIndexadas() {
+  var sheets = garantirEstruturaDividas();
+  var sh = sheets.dividas;
+  var dados = sh.getDataRange().getValues();
+  var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var atualizados = 0;
+
+  for (var i = 1; i < dados.length; i++) {
+    var row = dados[i];
+    if (!row[0]) continue;
+    var metodo = row[7];   // coluna H
+    var status = row[14];  // coluna O
+    if (metodo !== 'indexador' && metodo !== 'indexador_mais_taxa') continue;
+    if (status === 'pago' || status === 'renegociado') continue;
+
+    var dataBaseAtual = row[11]; // coluna L
+    if (!dataBaseAtual) continue;
+
+    var calc = calcularSaldoDivida({
+      valorPrincipal: parseFloat(row[10]) || 0,   // K
+      dataBase: fmtDate(dataBaseAtual),
+      hoje: hoje,
+      metodoJuros: metodo,
+      taxaMensal: parseFloat(row[8]) || 0,        // I
+      indexador: row[9] || ''                     // J
+    });
+
+    if (calc.ok) {
+      sh.getRange(i + 1, 14).setValue(calc.saldoDevedor); // N — substitui o texto pelo valor real
+      sh.getRange(i + 1, 17).setValue(new Date());        // Q — atualizadoEm
+      atualizados++;
+    }
+  }
+  Logger.log('Saldos com indexador atualizados: ' + atualizados);
+  return atualizados;
+}
+
+// Execute esta função UMA VEZ para criar o gatilho diário automático
+function criarTriggerAtualizarIndices() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'atualizarSaldosDividasIndexadas') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger('atualizarSaldosDividasIndexadas')
+    .timeBased()
+    .everyDays(1)
+    .atHour(6)
+    .create();
+  Logger.log('✅ Gatilho criado — saldos com indexador serão atualizados todo dia às 6h');
+}
+
+// ════════════════════════════════════════════════════════════
 //  FICHA PÚBLICA DA DÍVIDA / EMPRÉSTIMO
 //  Extrato completo com todos os movimentos, compartilhável
 // ════════════════════════════════════════════════════════════
