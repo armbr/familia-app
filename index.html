@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260617-194456</title>
+<title>Fluxo v20260622-144033</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3020,10 +3020,16 @@ function renderCat(){
   });
 
   // 3. Tarefas da Agenda concluídas com valor no mês
+  //    EXCETO tarefas de pagamento de fatura de cartão — essas já são
+  //    contabilizadas por categoria real via CGASTOS/TXS (passos 1 e 2),
+  //    senão a fatura apareceria de novo como um bloco único.
   TASKS.filter(function(t){
-    return t.status==='done' && t.type==='exp' &&
-           t.deadline && ymds(t.deadline).substring(0,7)===moStr &&
-           parseFloat(t.value||0)>0;
+    if(t.status!=='done' || t.type!=='exp') return false;
+    if(!t.deadline || ymds(t.deadline).substring(0,7)!==moStr) return false;
+    if(parseFloat(t.value||0)<=0) return false;
+    var recurCartao = t.recurId ? RECUR.find(function(r){ return String(r.id)===String(t.recurId) && r.cartaoId; }) : null;
+    if(recurCartao) return false; // já contabilizado por categoria real
+    return true;
   }).forEach(function(t){
     var cat = t.cat || '📦 Outros';
     bc[cat] = (bc[cat]||0) + parseFloat(t.value||0);
@@ -3650,26 +3656,43 @@ function chgTaskStatus(id,s){
   // Ao concluir task com valor financeiro, lançar em TXS
   var val = parseFloat(t.value||0);
   if(s==='done' && old!=='done' && val>0 && t.type!=='task'){
-    var tmpId=Date.now();
-    var tx={
-      id:         tmpId,  // usar mesmo id no servidor para evitar duplicatas no sync
-      type:       t.type==='inc'?'inc':'exp',
-      desc:       t.desc,
-      value:      val,
-      cat:        t.cat||(t.type==='inc'?'⭐ Extra':'📦 Outros'),
-      date:       ymd(new Date()),
-      fromAgenda: true,
-      recurId:    t.recurId||''
-    };
-    TXS.unshift(Object.assign({},tx));
-    localStorage.setItem('ff_txs',JSON.stringify(TXS));
-    toast('✅ '+t.desc+' — lançado '+fmtBRL(val)+' em Finanças');
-    apiCall('addTransaction',tx,function(err){
-      if(err){ console.warn('TX nao salva no servidor', err); }
-      else    { localStorage.setItem('ff_txs',JSON.stringify(TXS)); }
-    });
-    renderBal();
-    renderHist();
+    // Verificar se é a tarefa de pagamento de fatura de cartão (recorrência com cartaoId)
+    var recurCartao = t.recurId ? RECUR.find(function(r){ return String(r.id)===String(t.recurId) && r.cartaoId; }) : null;
+
+    if(recurCartao){
+      // Fechar a fatura por categoria real, em vez de lançar um único item "Cartão de Crédito"
+      var mesAnoFatura = ymds(t.deadline).substring(0,7);
+      var totalFechado = fecharFaturaInterno(recurCartao.cartaoId, mesAnoFatura);
+      if(totalFechado !== null){
+        toast('✅ Fatura paga — lançada por categoria em Finanças');
+      } else {
+        toast('✅ '+t.desc+' marcado como pago');
+      }
+      renderBal();
+      renderHist();
+      try{ renderFinCC(); }catch(e){}
+    } else {
+      var tmpId=Date.now();
+      var tx={
+        id:         tmpId,  // usar mesmo id no servidor para evitar duplicatas no sync
+        type:       t.type==='inc'?'inc':'exp',
+        desc:       t.desc,
+        value:      val,
+        cat:        t.cat||(t.type==='inc'?'⭐ Extra':'📦 Outros'),
+        date:       ymd(new Date()),
+        fromAgenda: true,
+        recurId:    t.recurId||''
+      };
+      TXS.unshift(Object.assign({},tx));
+      localStorage.setItem('ff_txs',JSON.stringify(TXS));
+      toast('✅ '+t.desc+' — lançado '+fmtBRL(val)+' em Finanças');
+      apiCall('addTransaction',tx,function(err){
+        if(err){ console.warn('TX nao salva no servidor', err); }
+        else    { localStorage.setItem('ff_txs',JSON.stringify(TXS)); }
+      });
+      renderBal();
+      renderHist();
+    }
   } else {
     renderTasks();
     if(curSection==='hoje') renderHoje();
@@ -5046,6 +5069,48 @@ function delGasto(id){
   CGASTOS=CGASTOS.filter(function(g){return String(g.id)!==String(id);});
   saveCGastos(); renderCC(); toast('🗑️ Gasto removido');
 }
+// Fecha a fatura do cartão criando UM lançamento PARA CADA CATEGORIA
+// (não um único lançamento "Cartão de Crédito"), preservando a real
+// distribuição de gastos nos gráficos por categoria.
+function fecharFaturaInterno(cartaoId, mesAno){
+  var cartao = CARTOES.find(function(c){ return String(c.id)===String(cartaoId); });
+  var gastos = CGASTOS.filter(function(g){ return String(g.cartaoId)===String(cartaoId) && g.fatMes===mesAno && !g.pago; });
+  if(!gastos.length) return null;
+
+  var total = gastos.reduce(function(s,g){ return s+g.val; }, 0);
+  CGASTOS.forEach(function(g){ if(String(g.cartaoId)===String(cartaoId) && g.fatMes===mesAno) g.pago=true; });
+  saveCGastos();
+
+  var partes = mesAno.split('-');
+  var mesLabel = MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+  var nomeCartao = cartao ? cartao.nome : 'Cartão';
+
+  // Agrupar por categoria real do gasto
+  var porCat = {};
+  gastos.forEach(function(g){
+    var c = g.cat || '📦 Outros';
+    porCat[c] = (porCat[c]||0) + g.val;
+  });
+
+  Object.keys(porCat).forEach(function(cat){
+    var tx = {
+      type: 'exp',
+      desc: nomeCartao + ' · ' + mesLabel + ' — ' + cat,
+      value: porCat[cat],
+      cat: cat,
+      date: ymd(new Date()),
+      fromAgenda: true
+    };
+    var tmp = Date.now() + Math.random();
+    TXS.unshift(Object.assign({id:tmp}, tx));
+    apiCall('addTransaction', tx, function(err){
+      if(err){ TXS = TXS.filter(function(t){ return t.id!==tmp; }); save(); }
+    });
+  });
+  save();
+  return total;
+}
+
 function fecharFatura(cartaoId,mesAno){
   var cartao=CARTOES.find(function(c){return String(c.id)===cartaoId;});
   if(!cartao) return;
@@ -5054,13 +5119,9 @@ function fecharFatura(cartaoId,mesAno){
   var total=gastos.reduce(function(s,g){return s+g.val;},0);
   var partes=mesAno.split('-');
   var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
-  if(!confirm('Fechar fatura de '+cartao.nome+' — '+mesLabel+'\nTotal: '+fmtBRL(total)+'\n\nConfirmar?')) return;
-  CGASTOS.forEach(function(g){if(String(g.cartaoId)===cartaoId&&g.fatMes===mesAno) g.pago=true;});
-  saveCGastos();
-  var tx={type:'exp',desc:'Fatura '+cartao.nome+' '+mesLabel,value:total,cat:'💳 Cartão de Crédito',date:ymd(new Date())};
-  var tmp=Date.now(); TXS.unshift(Object.assign({id:tmp},tx)); save();
-  apiCall('addTransaction',tx,function(err){if(err){TXS=TXS.filter(function(t){return t.id!==tmp;});save();}});
-  renderCC(); renderBal(); toast('✅ Fatura fechada! '+fmtBRL(total));
+  if(!confirm('Fechar fatura de '+cartao.nome+' — '+mesLabel+'\nTotal: '+fmtBRL(total)+'\n\nOs valores serão lançados em Finanças por categoria real (não como um único item "Cartão de Crédito").\n\nConfirmar?')) return;
+  fecharFaturaInterno(cartaoId, mesAno);
+  renderCC(); renderBal(); renderAll(); toast('✅ Fatura fechada! '+fmtBRL(total));
 }
 function renderListaCartoes(){
   var el=document.getElementById('cc-list'); if(!el) return;
