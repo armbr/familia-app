@@ -232,7 +232,7 @@ function addTask(body) {
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#0F2438').setFontColor('#FFF');
   }
 
-  // Garantir colunas cat e recurId existem
+  // Garantir colunas cat, recurId e time existem
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   if (headers.indexOf('cat') === -1) {
     sheet.getRange(1, sheet.getLastColumn() + 1).setValue('cat');
@@ -240,6 +240,10 @@ function addTask(body) {
   }
   if (headers.indexOf('recurId') === -1) {
     sheet.getRange(1, sheet.getLastColumn() + 1).setValue('recurId');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+  if (headers.indexOf('time') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('time');
     headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   }
 
@@ -275,6 +279,7 @@ function addTask(body) {
   set('createdAt', new Date().toISOString());
   set('cat',       body.cat || '');
   set('recurId',   newRid);
+  set('time',      body.time || '');
 
   sheet.appendRow(row);
   return { ok: true, id: id };
@@ -282,16 +287,24 @@ function addTask(body) {
 
 function updateTask(body) {
   var r = sheetRows('Tarefas');
-  var statusIdx  = r.headers.indexOf('status');
-  var valueIdx   = r.headers.indexOf('value');
-  var catIdx     = r.headers.indexOf('cat');
-  var comprovIdx = r.headers.indexOf('comprovUrl');
+  var statusIdx   = r.headers.indexOf('status');
+  var valueIdx    = r.headers.indexOf('value');
+  var catIdx      = r.headers.indexOf('cat');
+  var comprovIdx  = r.headers.indexOf('comprovUrl');
+  var timeIdx     = r.headers.indexOf('time');
+  var deadlineIdx = r.headers.indexOf('deadline');
 
   // Criar coluna comprovUrl se não existir
   if (comprovIdx === -1 && body.comprovUrl) {
     r.sheet.getRange(1, r.headers.length + 1).setValue('comprovUrl');
     comprovIdx = r.headers.length;
     r.headers.push('comprovUrl');
+  }
+  // Criar coluna time se não existir
+  if (timeIdx === -1 && body.time !== undefined) {
+    r.sheet.getRange(1, r.headers.length + 1).setValue('time');
+    timeIdx = r.headers.length;
+    r.headers.push('time');
   }
 
   for (var i = 0; i < r.rows.length; i++) {
@@ -311,6 +324,14 @@ function updateTask(body) {
       // Atualizar comprovante
       if (body.comprovUrl && comprovIdx > -1) {
         r.sheet.getRange(i + 2, comprovIdx + 1).setValue(body.comprovUrl);
+      }
+      // Atualizar horário (ex: consulta remarcada)
+      if (body.time !== undefined && timeIdx > -1) {
+        r.sheet.getRange(i + 2, timeIdx + 1).setValue(body.time);
+      }
+      // Atualizar data (remarcação completa)
+      if (body.deadline !== undefined && body.deadline !== null && deadlineIdx > -1) {
+        r.sheet.getRange(i + 2, deadlineIdx + 1).setValue(body.deadline);
       }
       return { ok: true };
     }
@@ -2442,6 +2463,135 @@ function diagnostico() {
   // Listar todas as abas existentes
   var todas = ss().getSheets().map(function(s){ return s.getName(); });
   Logger.log('Todas as abas: ' + todas.join(', '));
+}
+
+// ════════════════════════════════════════════════════════════
+//  DIAGNÓSTICO — encontrar despesas sem categoria correta
+//  Execute para listar recorrências e tarefas com categoria
+//  vazia, que por isso caem em "📦 Outros" nos gráficos.
+// ════════════════════════════════════════════════════════════
+function diagnosticoCategorias() {
+  // ── Recorrentes ────────────────────────────────────────
+  var rSheet = ss().getSheetByName('Recorrentes');
+  if (rSheet) {
+    var rDados = rSheet.getDataRange().getValues();
+    var rHeaders = rDados[0];
+    var idxDesc = rHeaders.indexOf('desc');
+    var idxCat  = rHeaders.indexOf('cat');
+    var idxVal  = rHeaders.indexOf('value');
+    Logger.log('═══ RECORRENTES sem categoria ═══');
+    var semCatRecur = [];
+    for (var i = 1; i < rDados.length; i++) {
+      var cat = String(rDados[i][idxCat] || '').trim();
+      if (!cat) {
+        semCatRecur.push(rDados[i][idxDesc] + ' (R$ ' + rDados[i][idxVal] + ')');
+      }
+    }
+    if (semCatRecur.length) {
+      Logger.log(semCatRecur.length + ' recorrência(s) SEM categoria:');
+      semCatRecur.forEach(function(s){ Logger.log('  • ' + s); });
+    } else {
+      Logger.log('✅ Todas as recorrências têm categoria definida.');
+    }
+  }
+
+  // ── Tarefas ────────────────────────────────────────────
+  var tSheet = ss().getSheetByName('Tarefas');
+  if (tSheet) {
+    var tDados = tSheet.getDataRange().getValues();
+    var tHeaders = tDados[0];
+    var idxDescT = tHeaders.indexOf('desc');
+    var idxCatT  = tHeaders.indexOf('cat');
+    var idxValT  = tHeaders.indexOf('value');
+    var idxTypeT = tHeaders.indexOf('type');
+
+    Logger.log('');
+    Logger.log('═══ TAREFAS sem categoria (agrupado por descrição) ═══');
+    var semCatTarefas = {}; // desc -> {count, total}
+    for (var j = 1; j < tDados.length; j++) {
+      var tipo = String(tDados[j][idxTypeT] || '');
+      if (tipo === 'task') continue; // tarefas sem valor financeiro não importam aqui
+      var catT = String(tDados[j][idxCatT] || '').trim();
+      if (!catT) {
+        var descT = String(tDados[j][idxDescT] || '(sem descrição)');
+        if (!semCatTarefas[descT]) semCatTarefas[descT] = { count: 0, total: 0 };
+        semCatTarefas[descT].count++;
+        semCatTarefas[descT].total += parseFloat(tDados[j][idxValT]) || 0;
+      }
+    }
+    var chaves = Object.keys(semCatTarefas);
+    if (chaves.length) {
+      Logger.log(chaves.length + ' descrição(ões) diferentes SEM categoria:');
+      chaves.sort(function(a,b){ return semCatTarefas[b].total - semCatTarefas[a].total; });
+      chaves.forEach(function(desc){
+        var info = semCatTarefas[desc];
+        Logger.log('  • ' + desc + ' — ' + info.count + 'x — total R$ ' + info.total.toFixed(2));
+      });
+    } else {
+      Logger.log('✅ Todas as tarefas financeiras têm categoria definida.');
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  CORREÇÃO EM MASSA — define a categoria de todas as tarefas
+//  E recorrências que tenham uma DESCRIÇÃO específica.
+//  Edite o mapa abaixo com suas próprias descrições e categorias,
+//  depois execute esta função uma vez.
+// ════════════════════════════════════════════════════════════
+function corrigirCategoriasEmMassa() {
+  // ★ EDITE AQUI — descrição EXATA (como aparece na planilha) → categoria
+  var mapa = {
+    // 'Cartão de Crédito Nubank':  '💳 Cartão',
+    // 'Internet Casa':             '🏠 Casa',
+    // 'Celular TIM':               '📱 Telefone',
+  };
+
+  var chaves = Object.keys(mapa);
+  if (!chaves.length) {
+    Logger.log('⚠️ Mapa vazio — edite a função corrigirCategoriasEmMassa() com suas descrições e categorias antes de executar.');
+    return;
+  }
+
+  function normalizar(s) {
+    return String(s||'').trim().toLowerCase();
+  }
+  var mapaNorm = {};
+  chaves.forEach(function(k){ mapaNorm[normalizar(k)] = mapa[k]; });
+
+  var totalAtualizado = 0;
+
+  // Recorrentes
+  var rSheet = ss().getSheetByName('Recorrentes');
+  if (rSheet) {
+    var rDados = rSheet.getDataRange().getValues();
+    var idxDesc = rDados[0].indexOf('desc');
+    var idxCat  = rDados[0].indexOf('cat');
+    for (var i = 1; i < rDados.length; i++) {
+      var key = normalizar(rDados[i][idxDesc]);
+      if (mapaNorm[key]) {
+        rSheet.getRange(i+1, idxCat+1).setValue(mapaNorm[key]);
+        totalAtualizado++;
+      }
+    }
+  }
+
+  // Tarefas
+  var tSheet = ss().getSheetByName('Tarefas');
+  if (tSheet) {
+    var tDados = tSheet.getDataRange().getValues();
+    var idxDescT = tDados[0].indexOf('desc');
+    var idxCatT  = tDados[0].indexOf('cat');
+    for (var j = 1; j < tDados.length; j++) {
+      var keyT = normalizar(tDados[j][idxDescT]);
+      if (mapaNorm[keyT]) {
+        tSheet.getRange(j+1, idxCatT+1).setValue(mapaNorm[keyT]);
+        totalAtualizado++;
+      }
+    }
+  }
+
+  Logger.log('✅ ' + totalAtualizado + ' linha(s) atualizada(s) com nova categoria.');
 }
 
 // ════════════════════════════════════════════════════════════
