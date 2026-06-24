@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260624-181859</title>
+<title>Fluxo v20260624-195928</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2366,7 +2366,7 @@ function syncAll(){
 
   apiCall('getTasks',null,function(err,d){
     if(!err && d.ok){
-      TASKS = d.data.map(function(t){
+      var fresh = d.data.map(function(t){
         // Normalizar deadline — pode vir como string ISO, DD/MM/YYYY, ou YYYY-MM-DD
         var dl = t.deadline || t.prazo || t.due || '';
         // Se vier como número (timestamp Excel), converter
@@ -2381,7 +2381,15 @@ function syncAll(){
           recurId:   t.recurId ? String(t.recurId) : '',
           value:     parseFloat(t.value || 0)
         });
-      });
+      }).filter(function(t){ return !isTombstoned('tasks', t.id); }); // não ressuscitar excluídas
+
+      // Mesclar: preservar tarefas locais que o servidor ainda não tem
+      // (ex: criadas há poucos segundos, antes do servidor confirmar)
+      var serverIds = {};
+      fresh.forEach(function(t){ serverIds[String(t.id)] = true; });
+      var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !isTombstoned('tasks', t.id); });
+
+      TASKS = fresh.concat(localOnly);
       save();
     }
     tasksReady = true;
@@ -2922,6 +2930,8 @@ function processRecur(){
       if(ridIdx[rk]) return;
       // Já existe pelo desc normalizado?
       if(descIdx2[dk]) return;
+      // Usuário excluiu esta ocorrência de propósito — não regenerar
+      if(getRecurSkips().indexOf(rk) !== -1) return;
 
       var day = new Date((r.date||today)+'T12:00:00').getDate();
       var dl  = moStr+'-'+pad(day);
@@ -3839,6 +3849,11 @@ function chgTaskStatus(id,s){
       renderBal();
       renderHist();
     }
+    // Atualizar visualmente a tarefa (marca verde "Concluído") em
+    // qualquer aba — antes só acontecia no else, fazendo parecer que
+    // não sincronizou até clicar em Sync manualmente.
+    renderTasks();
+    if(curSection==='hoje') renderHoje();
   } else {
     renderTasks();
     if(curSection==='hoje') renderHoje();
@@ -3848,11 +3863,32 @@ function chgTaskStatus(id,s){
   });
 }
 
+function getRecurSkips(){
+  try{ return JSON.parse(localStorage.getItem('ff_recur_skip') || '[]'); }
+  catch(e){ return []; }
+}
+function addRecurSkip(rid, mo){
+  var list = getRecurSkips();
+  var key = 'rid:'+rid+'|'+mo;
+  if(list.indexOf(key) === -1){
+    list.push(key);
+    if(list.length > 300) list = list.slice(-300);
+    localStorage.setItem('ff_recur_skip', JSON.stringify(list));
+  }
+}
+
 function delTask(id){
+  addTombstone('tasks', id);
+  // Se a tarefa pertence a uma recorrência, marcar APENAS este mês para
+  // não ser regenerado — as demais ocorrências continuam normalmente.
+  var taskRef = TASKS.find(function(t){ return String(t.id)===String(id); });
+  if(taskRef && taskRef.recurId && taskRef.deadline){
+    addRecurSkip(taskRef.recurId, ymds(taskRef.deadline).substring(0,7));
+  }
   var bk=[].concat(TASKS);
   TASKS=TASKS.filter(function(t){return String(t.id)!==String(id);}); renderTasks();
   apiCall('deleteTask',{id:id},function(err){
-    if(err){TASKS=bk;renderTasks();toast('❌ Erro','err');}
+    if(err){TASKS=bk;removeTombstone('tasks',id);renderTasks();toast('❌ Erro','err');}
     else toast('🗑️ Removido');
   });
 }
@@ -4717,6 +4753,10 @@ function addTombstone(key, id){
 }
 function isTombstoned(key, id){
   return getTombstones(key).indexOf(String(id)) !== -1;
+}
+function removeTombstone(key, id){
+  var list = getTombstones(key).filter(function(x){ return x!==String(id); });
+  localStorage.setItem('ff_deleted_'+key, JSON.stringify(list));
 }
 
 function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS)); }
