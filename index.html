@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260624-133002</title>
+<title>Fluxo v20260624-181859</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1567,6 +1567,17 @@ select option{background:#1A2A3A}
   </div>
 </div>
 
+<!-- Modal: Detalhe da Categoria -->
+<div id="catmodal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:800" id="catmodal-title">Categoria</div>
+      <button onclick="closeCatModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="catmodal-body"></div>
+  </div>
+</div>
+
 <!-- Modal: Novo Movimento (Dívidas) -->
 <div id="divmov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
@@ -2343,7 +2354,11 @@ function syncAll(){
   // Sync Gastos Cartão
   apiCall('getCGastos',null,function(err,d){
     if(!err && d && d.ok && d.data){
-      CGASTOS = d.data;
+      var serverCG = d.data.filter(function(g){ return !isTombstoned('cgastos', g.id); });
+      var serverIdsCG = {};
+      serverCG.forEach(function(g){ serverIdsCG[String(g.id)] = true; });
+      var localOnlyCG = CGASTOS.filter(function(g){ return !serverIdsCG[String(g.id)] && !isTombstoned('cgastos', g.id); });
+      CGASTOS = serverCG.concat(localOnlyCG);
       saveCGastos();
     }
     tick();
@@ -3032,10 +3047,17 @@ function realizedTxs(){
 function renderBal(){
   try{
     var b=balOf(filteredTxs());
+    // Somar também os gastos de cartão do mês ainda não pagos (fatura
+    // aberta) para que o total de despesas coincida com o gráfico de
+    // categorias — a fatura migra para os TXS quando for fechada/paga.
+    var cgAbertos = totalCGastosAbertos(selMonth);
+    var despesasTotais = b.e + cgAbertos;
+
     var v=document.getElementById('bal-val');
-    if(v){ v.textContent=fmtBRL(Math.abs(b.b)); v.className=b.b<0?'neg':''; }
+    var saldoFinal = b.i - despesasTotais;
+    if(v){ v.textContent=fmtBRL(Math.abs(saldoFinal)); v.className=saldoFinal<0?'neg':''; }
     var bi=document.getElementById('bi'); if(bi) bi.textContent=fmtBRL(b.i);
-    var be=document.getElementById('be'); if(be) be.textContent=fmtBRL(b.e);
+    var be=document.getElementById('be'); if(be) be.textContent=fmtBRL(despesasTotais);
   }catch(e){ console.error('renderBal',e); }
 }
 
@@ -3060,41 +3082,51 @@ function selMon(m){
   if(curFinTab!=='hist') ftab('hist');
 }
 
+// Soma os gastos de cartão AINDA NÃO PAGOS de um mês — usado tanto no
+// saldo do mês quanto no gráfico de categorias, para que os dois sempre
+// coincidam.
+function totalCGastosAbertos(moStr){
+  return CGASTOS.filter(function(g){ return g.fatMes===moStr && !g.pago; })
+    .reduce(function(s,g){ return s+parseFloat(g.val||0); }, 0);
+}
+
 function renderCat(){
   var el=document.getElementById('cat-list');
   if(!el) return;
   var bc={};
+  var porCatItens={}; // guarda os itens de cada categoria, para expandir ao clicar
 
-  // 1. TXS reais do mês (diretas em Finanças)
+  function addItem(cat, item){
+    bc[cat] = (bc[cat]||0) + item.value;
+    (porCatItens[cat] = porCatItens[cat] || []).push(item);
+  }
+
+  // 1. TXS reais do mês (diretas em Finanças — já cobre QUALQUER
+  //    despesa paga, seja lançamento manual ou tarefa concluída na
+  //    Agenda, pois toda baixa de tarefa cria um TX correspondente)
   filteredTxs().filter(function(t){return t.type==='exp';})
-    .forEach(function(t){ bc[t.cat||'📦 Outros']=(bc[t.cat||'📦 Outros']||0)+parseFloat(t.value||0); });
+    .forEach(function(t){
+      addItem(t.cat||'📦 Outros', {desc:t.desc, value:parseFloat(t.value||0), date:t.date});
+    });
 
-  // 2. Gastos do cartão do mês (ainda não pagos — fatura aberta)
-  //    Mostrar por categoria real (alimentação, saúde etc.)
-  //    Excluir os que já viraram TXS (pago=true já gerou tx de fatura)
-  var moStr = selMonth; // YYYY-MM
+  // 2. Gastos do cartão do mês AINDA NÃO PAGOS (fatura aberta) —
+  //    mostrados pela categoria real (alimentação, saúde etc.) no
+  //    mês da COMPRA. Quando a fatura for fechada/paga, o valor migra
+  //    automaticamente para os TXS (passo 1) no mês do pagamento.
+  var moStr = selMonth;
   CGASTOS.filter(function(g){
     return g.fatMes === moStr && !g.pago;
   }).forEach(function(g){
     var cat = g.cat || '💳 Cartão de Crédito';
-    bc[cat] = (bc[cat]||0) + parseFloat(g.val||0);
+    addItem(cat, {desc:g.desc, value:parseFloat(g.val||0), date:g.data});
   });
 
-  // 3. Tarefas da Agenda concluídas com valor no mês
-  //    EXCETO tarefas de pagamento de fatura de cartão — essas já são
-  //    contabilizadas por categoria real via CGASTOS/TXS (passos 1 e 2),
-  //    senão a fatura apareceria de novo como um bloco único.
-  TASKS.filter(function(t){
-    if(t.status!=='done' || t.type!=='exp') return false;
-    if(!t.deadline || ymds(t.deadline).substring(0,7)!==moStr) return false;
-    if(parseFloat(t.value||0)<=0) return false;
-    var recurCartao = t.recurId ? RECUR.find(function(r){ return String(r.id)===String(t.recurId) && r.cartaoId; }) : null;
-    if(recurCartao) return false; // já contabilizado por categoria real
-    return true;
-  }).forEach(function(t){
-    var cat = t.cat || '📦 Outros';
-    bc[cat] = (bc[cat]||0) + parseFloat(t.value||0);
-  });
+  // OBS: tarefas concluídas NÃO são somadas aqui separadamente — toda
+  // tarefa paga já gera um TX (passo 1), dated no dia em que foi paga.
+  // Somar de novo pelo vencimento causaria duplicidade entre meses
+  // quando o pagamento acontece num mês diferente do vencimento.
+
+  window._catItens = porCatItens; // usado por abrirCategoriaModal()
 
   if(!Object.keys(bc).length){
     el.innerHTML=emptyHTML('📊','Sem despesas','Adicione despesas para ver o resumo');
@@ -3104,14 +3136,45 @@ function renderCat(){
   var sorted=Object.entries(bc).sort(function(a,b){return b[1]-a[1];});
   el.innerHTML=sorted.map(function(x){
     var pct=Math.round(x[1]/total*100);
-    return '<div class="cati">'+
+    return '<div class="cati" data-catopen="'+esc(x[0])+'" style="cursor:pointer">'+
       '<div class="cati-hdr">'+
-        '<div class="cati-name">'+esc(x[0])+'</div>'+
+        '<div class="cati-name">'+esc(x[0])+' <span style="color:var(--t3);font-size:10px">▸</span></div>'+
         '<div class="cati-amt">-'+fmtBRL(x[1])+' ('+pct+'%)</div>'+
       '</div>'+
       '<div class="bar-bg"><div class="bar-fg" style="width:'+pct+'%"></div></div>'+
     '</div>';
   }).join('');
+}
+
+function abrirCategoriaModal(cat){
+  var itens = (window._catItens && window._catItens[cat]) || [];
+  itens = itens.slice().sort(function(a,b){ return ymds(a.date) < ymds(b.date) ? 1 : -1; });
+  var total = itens.reduce(function(s,i){ return s+i.value; }, 0);
+
+  var html = '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">'+
+    '<div style="font-size:15px;font-weight:800">'+esc(cat)+'</div>'+
+    '<div style="font-size:16px;font-weight:900;color:var(--red)">'+fmtBRL(total)+'</div>'+
+  '</div>';
+
+  if(!itens.length){
+    html += '<div style="text-align:center;color:var(--t3);padding:16px">Nenhum item nesta categoria</div>';
+  } else {
+    html += itens.map(function(i){
+      return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">'+
+        '<div><div style="font-size:13px;font-weight:600">'+esc(i.desc)+'</div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+fmtDate(i.date)+'</div></div>'+
+        '<div style="font-size:13px;font-weight:700;color:var(--red)">'+fmtBRL(i.value)+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  document.getElementById('catmodal-title').textContent = '📊 ' + cat;
+  document.getElementById('catmodal-body').innerHTML = html;
+  document.getElementById('catmodal').style.display = 'flex';
+}
+
+function closeCatModal(){
+  document.getElementById('catmodal').style.display = 'none';
 }
 
 function txCard(t){
@@ -3814,18 +3877,9 @@ function renderTasks(){
 }
 
 function bindRecurBtns(){
-  document.querySelectorAll('[data-rid]').forEach(function(btn){
-    // Remover listener antigo se existir
-    var newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-    newBtn.addEventListener('click', function(e){
-      e.stopPropagation();
-      e.preventDefault();
-      var rid = newBtn.getAttribute('data-rid');
-      console.log('🔁 Clique em recorrência, rid=', rid);
-      openRecurModal(rid);
-    });
-  });
+  // Mantido apenas por compatibilidade — o clique já é tratado pela
+  // delegação global em initTaskDelegation() (funciona em qualquer aba,
+  // sem precisar religar listeners após cada renderização).
 }
 
 function bindTaskEvents(){
@@ -3862,6 +3916,10 @@ function initTaskDelegation(){
     if(editpag){ editarPagador(editpag.getAttribute('data-editpag')); return; }
     var addmov = e.target.closest('[data-addmov]');
     if(addmov){ abrirNovoMovimento(addmov.getAttribute('data-addmov')); return; }
+    var catopen = e.target.closest('[data-catopen]');
+    if(catopen){ abrirCategoriaModal(catopen.getAttribute('data-catopen')); return; }
+    var ridBtn = e.target.closest('[data-rid]');
+    if(ridBtn){ e.preventDefault(); openRecurModal(ridBtn.getAttribute('data-rid')); return; }
     var delmov = e.target.closest('[data-delmov]');
     if(delmov){
       var parts = delmov.getAttribute('data-delmov').split('|');
@@ -5202,8 +5260,14 @@ function addGastoCartao(){
   renderCC(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
 }
 function delGasto(id){
+  addTombstone('cgastos', id);
   CGASTOS=CGASTOS.filter(function(g){return String(g.id)!==String(id);});
-  saveCGastos(); renderCC(); toast('🗑️ Gasto removido');
+  saveCGastos();
+  apiCall('deletarItemSheet', {aba:'GastosCartao', id:id}, function(){});
+  renderCC();
+  renderBal();
+  renderHist();
+  toast('🗑️ Gasto removido');
 }
 // Fecha a fatura do cartão criando UM lançamento PARA CADA CATEGORIA
 // (não um único lançamento "Cartão de Crédito"), preservando a real
