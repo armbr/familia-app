@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260622-144033</title>
+<title>Fluxo v20260624-133002</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1229,19 +1229,19 @@ select option{background:#1A2A3A}
 <div id="sec-rec" style="display:none;padding:0 16px 100px">
 
   <!-- ABAS internas -->
-  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
-    <button class="vbtn" id="rb-pagadores"  onclick="setRecTab('pagadores')"  style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">👤 Pag.</button>
-    <button class="vbtn"    id="rb-alugueis"   onclick="setRecTab('alugueis')"   style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">🏠 Alug.</button>
-    <button class="vbtn on" id="rb-contratos"  onclick="setRecTab('contratos')"  style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">📄 Contratos</button>
-    <button class="vbtn"    id="rb-recibos"    onclick="setRecTab('recibos')"    style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">🧾 Recibos</button>
-    <button class="vbtn"    id="rb-dividas"    onclick="setRecTab('dividas')"    style="flex:1;min-width:70px;padding:8px 4px;border-radius:10px;font-size:10px">💰 Dívidas</button>
+  <div style="display:flex;gap:4px;margin-bottom:14px;flex-wrap:nowrap;overflow-x:auto">
+    <button class="vbtn" id="rb-pagadores"  onclick="setRecTab('pagadores')"  style="flex:1;min-width:0;padding:8px 2px;border-radius:9px;font-size:9.5px;white-space:nowrap">👥 Contatos</button>
+    <button class="vbtn"    id="rb-alugueis"   onclick="setRecTab('alugueis')"   style="flex:1;min-width:0;padding:8px 2px;border-radius:9px;font-size:9.5px;white-space:nowrap">🏠 Alug.</button>
+    <button class="vbtn on" id="rb-contratos"  onclick="setRecTab('contratos')"  style="flex:1;min-width:0;padding:8px 2px;border-radius:9px;font-size:9.5px;white-space:nowrap">📄 Contr.</button>
+    <button class="vbtn"    id="rb-recibos"    onclick="setRecTab('recibos')"    style="flex:1;min-width:0;padding:8px 2px;border-radius:9px;font-size:9.5px;white-space:nowrap">🧾 Recib.</button>
+    <button class="vbtn"    id="rb-dividas"    onclick="setRecTab('dividas')"    style="flex:1;min-width:0;padding:8px 2px;border-radius:9px;font-size:9.5px;white-space:nowrap">💰 Dív.</button>
   </div>
 
   <!-- ABA: PAGADORES -->
   <div id="rp-pagadores" style="display:none">
     <div class="card" style="margin-bottom:12px">
       <div class="coll-hdr card-title" onclick="toggleColl('pag-form-body','pag-form-arrow')" style="margin-bottom:0">
-        <span>👤 Novo Pagador</span>
+        <span>👥 Novo Contato</span>
         <span class="coll-arrow" id="pag-form-arrow" style="transform:rotate(-90deg)">▾</span>
       </div>
       <div id="pag-form-body" style="display:none;margin-top:12px">
@@ -1253,12 +1253,12 @@ select option{background:#1A2A3A}
       </div>
       <div style="margin-bottom:10px">
         <div class="fl">📧 E-mail <span style="color:var(--t3);font-weight:400">(para lembretes automáticos)</span></div>
-        <input id="pag-email" type="email" placeholder="email@pagador.com" maxlength="80">
+        <input id="pag-email" type="email" placeholder="email@contato.com" maxlength="80">
       </div>
-      <button class="btn" onclick="addPagador()">+ Salvar Pagador</button>
+      <button class="btn" onclick="addPagador()">+ Salvar Contato</button>
       </div><!-- /pag-form-body -->
     </div>
-    <div class="slbl" style="margin-bottom:8px">Pagadores cadastrados</div>
+    <div class="slbl" style="margin-bottom:8px">Contatos cadastrados</div>
     <div id="pag-list"></div>
   </div>
 
@@ -1485,8 +1485,8 @@ select option{background:#1A2A3A}
           <input type="hidden" id="dv-tipo" value="devo">
         </div>
         <div style="margin-bottom:10px">
-          <div class="fl">Pagador / Pessoa</div>
-          <select id="dv-pag"><option value="">— selecione um pagador —</option></select>
+          <div class="fl">Pessoa</div>
+          <select id="dv-pag"><option value="">— selecione uma pessoa —</option></select>
         </div>
         <div style="margin-bottom:10px"><div class="fl">Descrição</div>
           <input id="dv-desc" type="text" placeholder="Ex: Empréstimo, parcela atrasada, acordo" maxlength="120">
@@ -1538,6 +1538,67 @@ select option{background:#1A2A3A}
       <button onclick="closeDivHistModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
     </div>
     <div id="divhist-body"></div>
+  </div>
+</div>
+
+<!-- Modal: Editar Pagador -->
+<div id="editpag-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800">✏️ Editar Contato</div>
+      <button onclick="closeEditPagModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="margin-bottom:10px"><div class="fl">Nome</div>
+      <input id="ep-nome" type="text" maxlength="80">
+    </div>
+    <div style="margin-bottom:10px"><div class="fl">Telefone / WhatsApp</div>
+      <input id="ep-tel" type="text" placeholder="(00) 00000-0000" maxlength="20">
+    </div>
+    <div style="margin-bottom:10px"><div class="fl">E-mail</div>
+      <input id="ep-email" type="email" placeholder="email@exemplo.com" maxlength="80">
+    </div>
+    <div style="margin-bottom:16px"><div class="fl">CPF / CNPJ</div>
+      <input id="ep-doc" type="text" placeholder="000.000.000-00" maxlength="20">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="closeEditPagModal()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>
+      <button onclick="salvarEdicaoPagador()" style="flex:1;padding:12px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Novo Movimento (Dívidas) -->
+<div id="divmov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800">+ Novo Movimento</div>
+      <button onclick="closeMovModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div class="fl" style="margin-bottom:6px">Tipo de movimento</div>
+      <div style="display:flex;gap:6px">
+        <button type="button" id="movtipo-aporte" onclick="setMovTipo('aporte')" class="vbtn on" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">📥 Aporte</button>
+        <button type="button" id="movtipo-pagamento" onclick="setMovTipo('pagamento')" class="vbtn" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">💵 Pagamento</button>
+        <button type="button" id="movtipo-despesa" onclick="setMovTipo('despesa')" class="vbtn" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">🧾 Despesa</button>
+      </div>
+      <input type="hidden" id="mov-tipo" value="aporte">
+    </div>
+
+    <div style="margin-bottom:10px"><div class="fl">Valor (R$)</div>
+      <div class="r-wrap"><input id="mov-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+    </div>
+    <div style="margin-bottom:10px"><div class="fl">Data <span style="color:var(--t3);font-weight:400">(pode ser retroativa)</span></div>
+      <input id="mov-data" type="date">
+    </div>
+    <div style="margin-bottom:16px"><div class="fl" id="mov-obs-label">Observação (opcional)</div>
+      <input id="mov-obs" type="text" placeholder="Ex: conta de luz pagada para o credor" maxlength="160">
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button onclick="closeMovModal()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>
+      <button onclick="salvarMovimentoDivida()" style="flex:1;padding:12px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
+    </div>
   </div>
 </div>
 
@@ -3436,13 +3497,15 @@ function addTask(){
   var desc=document.getElementById('t-desc').value.trim();
   var type=document.getElementById('t-type').value;
   var dead=document.getElementById('t-dead').value;
+  var timeEl=document.getElementById('t-time');
+  var time=timeEl?timeEl.value:'';
   var valEl=document.getElementById('t-val');
   var val =type!=='task' ? parseFloat(valEl.value)||null : null;
   var cat = type!=='task' ? (document.getElementById('t-cat').value||'📦 Outros') : '';
   if(!desc){toast('⚠️ Informe a descrição','err');return;}
   if(type!=='task' && (!val||val<=0)){toast('⚠️ Informe o valor para '+( type==='exp'?'despesa':'receita'),'err');return;}
   var btn=document.getElementById('btn-add-task'); btn.disabled=true;
-  var task={desc:desc,type:type,deadline:dead,value:val,cat:cat,status:'pend'};
+  var task={desc:desc,type:type,deadline:dead,time:time,value:val,cat:cat,status:'pend'};
   var tmp=Date.now(); TASKS.unshift(Object.assign({id:tmp},task)); renderTasks();
   if(curRecur){
     var newRecurId = Date.now();
@@ -3465,7 +3528,27 @@ function addTask(){
   });
   document.getElementById('t-desc').value='';
   document.getElementById('t-val').value='';
+  if(timeEl) timeEl.value='';
   if(document.getElementById('t-cat')) document.getElementById('t-cat').value='📦 Outros';
+}
+
+function editarHorarioTask(id){
+  var t = TASKS.find(function(x){ return String(x.id)===String(id); });
+  if(!t) return;
+  var novoHorario = prompt('Horário do compromisso (HH:MM):', t.time||'');
+  if(novoHorario === null) return;
+  novoHorario = novoHorario.trim();
+  if(novoHorario && !/^([01]\d|2[0-3]):([0-5]\d)$/.test(novoHorario)){
+    toast('⚠️ Formato inválido. Use HH:MM, ex: 14:30','err');
+    return;
+  }
+  t.time = novoHorario;
+  localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+  apiCall('updateTask', {id:id, time:novoHorario}, function(err){
+    if(err) console.warn('Horário não salvo no servidor', err);
+  });
+  renderAll();
+  toast(novoHorario ? '⏰ Horário atualizado para '+novoHorario : '⏰ Horário removido');
 }
 
 function toggleTask(id){
@@ -3777,14 +3860,20 @@ function initTaskDelegation(){
     if(delpag){ delPagador(delpag.getAttribute('data-delpag')); return; }
     var editpag = e.target.closest('[data-editpag]');
     if(editpag){ editarPagador(editpag.getAttribute('data-editpag')); return; }
-    var baixadiv = e.target.closest('[data-baixadiv]');
-    if(baixadiv){ baixaDivida(baixadiv.getAttribute('data-baixadiv')); return; }
-    var renegdiv = e.target.closest('[data-renegdiv]');
-    if(renegdiv){ renegociarDivida(renegdiv.getAttribute('data-renegdiv')); return; }
+    var addmov = e.target.closest('[data-addmov]');
+    if(addmov){ abrirNovoMovimento(addmov.getAttribute('data-addmov')); return; }
+    var delmov = e.target.closest('[data-delmov]');
+    if(delmov){
+      var parts = delmov.getAttribute('data-delmov').split('|');
+      delMovimentoDivida(parts[0], parts[1]);
+      return;
+    }
     var histdiv = e.target.closest('[data-histdiv]');
     if(histdiv){ verHistoricoDivida(histdiv.getAttribute('data-histdiv')); return; }
     var linkdiv = e.target.closest('[data-linkdiv]');
     if(linkdiv){ abrirLinkDivida(linkdiv.getAttribute('data-linkdiv')); return; }
+    var edittime = e.target.closest('[data-edittime]');
+    if(edittime){ editarHorarioTask(edittime.getAttribute('data-edittime')); return; }
     var deldiv = e.target.closest('[data-deldiv]');
     if(deldiv){ delDivida(deldiv.getAttribute('data-deldiv')); return; }
     var delrec = e.target.closest('[data-delrec]');
@@ -3882,6 +3971,8 @@ function taskCard(t,wrap){
   var tod=ymd(new Date());
   var ov=t.deadline&&ymds(t.deadline)<tod&&!done;
   var dead=t.deadline?'<span class="'+(ov?'ov':'')+'">📅 '+fmtDate(t.deadline)+(ov?' ⚠️':'')+'</span>':'';
+  var timeTag = t.time ? '<span data-edittime="'+String(t.id)+'" style="cursor:pointer;border-bottom:1px dotted currentColor" title="Clique para alterar o horário">⏰ '+esc(t.time)+'</span>' : '';
+  var addTimeBtn = (!t.time && t.deadline) ? '<span data-edittime="'+String(t.id)+'" style="cursor:pointer;color:var(--t3);font-size:11px;border-bottom:1px dotted currentColor" title="Adicionar horário">+ horário</span>' : '';
   var comprovHTML=t.comprovUrl
     ?'<a href="'+esc(t.comprovUrl)+'" target="_blank" class="task-comprov-link">📎 Ver comprovante</a>':'';
   // Ícone de recorrência — por recurId ou por desc (fallback)
@@ -3908,7 +3999,7 @@ function taskCard(t,wrap){
     '<button class="tdel2" data-del="'+sid+'">🗑️</button>'+
     '</div>'+
     '<div class="tags">'+stag+ttag+recurTag+'</div>'+
-    '<div class="tmeta">'+dead+
+    '<div class="tmeta">'+dead+timeTag+addTimeBtn+
     (t.value?'<span>💰 '+fmtBRL(parseFloat(t.value))+'</span>':'')+
     (done?comprovHTML:'')+
     '</div></div>';
@@ -4548,12 +4639,36 @@ function saveCGastos(){  localStorage.setItem('ff_cgastos',  JSON.stringify(CGAS
 function saveContratos(){localStorage.setItem('ff_contratos',JSON.stringify(CONTRATOS));}
 function savePagadores(){localStorage.setItem('ff_pagadores',JSON.stringify(PAGADORES));}
 function saveAlugueis(){ localStorage.setItem('ff_alugueis', JSON.stringify(ALUGUEIS)); }
+// ════════════════════════════════════════════════════════════
+//  TOMBSTONES — evita que itens excluídos "ressuscitem" quando
+//  a sincronização busca a lista do servidor antes da exclusão
+//  remota ser processada (condição de corrida)
+// ════════════════════════════════════════════════════════════
+function getTombstones(key){
+  try{ return JSON.parse(localStorage.getItem('ff_deleted_'+key) || '[]'); }
+  catch(e){ return []; }
+}
+function addTombstone(key, id){
+  var list = getTombstones(key);
+  var sId = String(id);
+  if(list.indexOf(sId) === -1){
+    list.push(sId);
+    if(list.length > 200) list = list.slice(-200); // manter lista enxuta
+    localStorage.setItem('ff_deleted_'+key, JSON.stringify(list));
+  }
+}
+function isTombstoned(key, id){
+  return getTombstones(key).indexOf(String(id)) !== -1;
+}
+
 function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS)); }
 
 function sincronizarRecibos(cb){
   // 1. Buscar recibos do servidor
   apiCall('getRecibos', null, function(err, d){
     var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    // Remover qualquer item que foi excluído localmente (evita ressuscitar)
+    serverList = serverList.filter(function(r){ return !isTombstoned('recibos', r.id); });
     var serverMap = {};
     serverList.forEach(function(r){ serverMap[String(r.id)] = true; });
 
@@ -4578,9 +4693,10 @@ function sincronizarRecibos(cb){
           // Todos enviados — buscar lista atualizada do servidor
           apiCall('getRecibos', null, function(err2, d2){
             if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
+              var dataFiltrada = d2.data.filter(function(r){ return !isTombstoned('recibos', r.id); });
               var localMap2 = {};
               RECIBOS.forEach(function(r){ localMap2[String(r.id)] = true; });
-              d2.data.forEach(function(r){ if(!localMap2[String(r.id)]) RECIBOS.unshift(r); });
+              dataFiltrada.forEach(function(r){ if(!localMap2[String(r.id)]) RECIBOS.unshift(r); });
               saveRecibos();
             }
             if(cb) cb();
@@ -4623,7 +4739,7 @@ function renderPagadores(){
   var alugSel=document.getElementById('alug-pag');
   if(alugSel) alugSel.innerHTML='<option value="">— selecione —</option>'+
     PAGADORES.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>';}).join('');
-  if(!PAGADORES.length){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum pagador cadastrado</div>';return;}
+  if(!PAGADORES.length){el.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">Nenhum contato cadastrado</div>';return;}
   el.innerHTML=PAGADORES.map(function(p){
     return '<div class="taski" style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
       '<div style="font-size:22px">👤</div>'+
@@ -4637,32 +4753,51 @@ function renderPagadores(){
 // ════════════════════════════════════════════════════════
 //  RECIBOS
 // ════════════════════════════════════════════════════════
+var editPagId = null;
+
 function editarPagador(id){
   var p = PAGADORES.find(function(x){ return String(x.id)===String(id); });
   if(!p) return;
-  var novoNome  = prompt('Nome:', p.nome||'');
-  if(novoNome === null) return;
-  var novoTel   = prompt('Telefone/WhatsApp:', p.tel||'');
-  if(novoTel === null) return;
-  var novoEmail = prompt('E-mail:', p.email||'');
-  if(novoEmail === null) return;
-  var novoDoc   = prompt('CPF/CNPJ:', p.doc||'');
-  if(novoDoc === null) return;
-  p.nome  = novoNome.trim()  || p.nome;
-  p.tel   = novoTel.trim();
-  p.email = novoEmail.trim();
-  p.doc   = novoDoc.trim();
+  editPagId = id;
+  document.getElementById('ep-nome').value  = p.nome  || '';
+  document.getElementById('ep-tel').value   = p.tel   || '';
+  document.getElementById('ep-email').value = p.email || '';
+  document.getElementById('ep-doc').value   = p.doc   || '';
+  document.getElementById('editpag-modal').style.display = 'flex';
+}
+
+function closeEditPagModal(){
+  document.getElementById('editpag-modal').style.display = 'none';
+  editPagId = null;
+}
+
+function salvarEdicaoPagador(){
+  if(!editPagId) return;
+  var p = PAGADORES.find(function(x){ return String(x.id)===String(editPagId); });
+  if(!p) return;
+
+  var novoNome = (document.getElementById('ep-nome').value||'').trim();
+  if(!novoNome){ toast('⚠️ Informe o nome','err'); return; }
+
+  p.nome  = novoNome;
+  p.tel   = (document.getElementById('ep-tel').value||'').trim();
+  p.email = (document.getElementById('ep-email').value||'').trim();
+  p.doc   = (document.getElementById('ep-doc').value||'').trim();
+
   savePagadores();
   apiPost('salvarPagador', p, function(){});
+
   // Atualizar também nos aluguéis vinculados
   ALUGUEIS.forEach(function(a){
-    if(String(a.pagadorId)===String(id)){
+    if(String(a.pagadorId)===String(editPagId)){
       a.nome = p.nome;
       a.tel  = p.tel;
       if(p.email) a.email = p.email;
     }
   });
   saveAlugueis();
+
+  closeEditPagModal();
   renderRecibos();
   toast('✅ Pagador atualizado!');
 }
@@ -4769,6 +4904,7 @@ function abrirRecibo(r){
   else toast('⚠️ Permita pop-ups','err');
 }
 function delRecibo(id){
+  addTombstone('recibos', id);
   RECIBOS=RECIBOS.filter(function(r){return String(r.id)!==String(id);});
   saveRecibos();
   apiCall('deletarItemSheet',{aba:'Recibos',id:id},function(){});
@@ -5291,35 +5427,40 @@ function toggleCamposJuros(){
   }
 }
 
-function mesesEntreDatas(d1str, d2str){
-  var d1 = new Date(d1str+'T12:00:00');
-  var d2 = new Date(d2str+'T12:00:00');
-  var diffDays = (d2 - d1) / (1000*60*60*24);
-  return Math.max(0, diffDays / 30); // aproximação de meses corridos
+// ── Migração: dívidas antigas (modelo baixa/renegociação) ──
+// que ainda não têm "movimentos" ganham um histórico sintético
+// a partir dos campos antigos, na primeira vez que forem abertas.
+function garantirMovimentos(d){
+  if(d.movimentos && d.movimentos.length) return d.movimentos;
+  var movs = [];
+  if(d.valorOriginal && d.dataOriginal){
+    movs.push({id:Date.now()-1000, tipo:'aporte', valor:d.valorOriginal, data:d.dataOriginal, obs:'Empréstimo inicial'});
+  }
+  (d.pagamentos||[]).forEach(function(p,i){
+    movs.push({id:Date.now()-900+i, tipo:'pagamento', valor:p.valor, data:p.data, obs:''});
+  });
+  (d.renegociacoes||[]).forEach(function(r,i){
+    var diff = (r.valorNovo||0) - (r.valorAnterior||0);
+    if(diff > 0) movs.push({id:Date.now()-800+i, tipo:'aporte', valor:diff, data:r.data, obs:'Renegociação — acréscimo'});
+    else if(diff < 0) movs.push({id:Date.now()-800+i, tipo:'pagamento', valor:Math.abs(diff), data:r.data, obs:'Renegociação — abatimento'});
+  });
+  d.movimentos = movs;
+  return movs;
 }
 
-function calcSaldoDivida(d, cb){
-  var principal = (d.valorPrincipalAtual !== undefined && d.valorPrincipalAtual !== null) ? d.valorPrincipalAtual : d.valorOriginal;
-  var dataBase  = d.dataBaseAtual || d.dataOriginal;
-  var hoje = ymd(new Date());
-  var meses = mesesEntreDatas(dataBase, hoje);
-
-  if(d.metodoJuros === 'fixo_simples'){
-    var juros = principal * ((d.taxaMensal||0)/100) * meses;
-    cb(null, {saldo: principal+juros, juros: juros, meses: meses});
-  } else if(d.metodoJuros === 'fixo_composto'){
-    var saldo = principal * Math.pow(1+((d.taxaMensal||0)/100), meses);
-    cb(null, {saldo: saldo, juros: saldo-principal, meses: meses});
-  } else {
-    // indexador ou indexador_mais_taxa — calcular no servidor (busca BCB)
-    apiCall('calcularSaldoDivida', {
-      valorPrincipal: principal, dataBase: dataBase, hoje: hoje,
-      metodoJuros: d.metodoJuros, taxaMensal: d.taxaMensal||0, indexador: d.indexador||''
-    }, function(err, resp){
-      if(err || !resp || !resp.ok){ cb(err||'Erro ao calcular índice', null); return; }
-      cb(null, {saldo: resp.saldoDevedor, juros: resp.jurosAcumulado, meses: resp.mesesAtraso, fator: resp.fatorIndexador});
-    });
-  }
+// Calcula o extrato completo (linhas + saldo atual) percorrendo os
+// movimentos em ordem cronológica — sempre via servidor, pois pode
+// envolver múltiplos períodos com indexadores diferentes.
+function calcLedgerDivida(d, cb){
+  var movs = garantirMovimentos(d);
+  if(!movs.length){ cb(null, {linhas:[], saldoAtual:0, jurosDesdeUltimo:0}); return; }
+  apiCall('calcularLedgerDivida', {
+    movimentos: movs, metodoJuros: d.metodoJuros, taxaMensal: d.taxaMensal,
+    indexador: d.indexador, hoje: ymd(new Date())
+  }, function(err, resp){
+    if(err || !resp || !resp.ok){ cb(err||(resp&&resp.error)||'Erro ao calcular', null); return; }
+    cb(null, resp);
+  });
 }
 
 function addDivida(){
@@ -5332,18 +5473,17 @@ function addDivida(){
   var taxa    = parseFloat(document.getElementById('dv-taxa').value||0);
   var idx     = document.getElementById('dv-indexador').value;
 
-  if(!pagId){ toast('⚠️ Selecione um pagador','err'); return; }
+  if(!pagId){ toast('⚠️ Selecione uma pessoa','err'); return; }
   if(!desc){ toast('⚠️ Informe a descrição','err'); return; }
-  if(!val || val<=0){ toast('⚠️ Informe o valor original','err'); return; }
+  if(!val || val<=0){ toast('⚠️ Informe o valor inicial','err'); return; }
 
   var pag = PAGADORES.find(function(p){ return String(p.id)===String(pagId); });
 
   var divida = {
     id: Date.now(), tipo: tipo, pagadorId: String(pagId), pagadorNome: pag?pag.nome:'',
-    desc: desc, valorOriginal: val, dataOriginal: data,
-    valorPrincipalAtual: val, dataBaseAtual: data,
-    metodoJuros: metodo, taxaMensal: taxa, indexador: idx,
-    status: 'pendente', pagamentos: [], renegociacoes: [],
+    desc: desc, metodoJuros: metodo, taxaMensal: taxa, indexador: idx,
+    status: 'pendente',
+    movimentos: [{id:Date.now()+1, tipo:'aporte', valor:val, data:data, obs:'Empréstimo inicial'}],
     criadoEm: new Date().toISOString()
   };
 
@@ -5365,12 +5505,15 @@ function dividaCardHTML(d){
     indexador_mais_taxa:  d.indexador + ' + ' + (d.taxaMensal||0) + '%/mês'
   };
   var metodoLabel = metodoLabels[d.metodoJuros] || '';
-  var statusLabel = d.status==='parcial' ? 'PARCIAL' : 'PENDENTE';
-  var statusColor = d.status==='parcial' ? 'var(--yellow)' : 'var(--red)';
+  var statusLabel = d.status==='parcial' ? 'PARCIAL' : (d.status==='pago' ? 'PAGO' : 'PENDENTE');
+  var statusColor = d.status==='parcial' ? 'var(--yellow)' : (d.status==='pago' ? 'var(--green)' : 'var(--red)');
   var isDevo = d.tipo !== 'recebo';
   var tipoLabel = isDevo ? '😟 Você deve' : '🤝 Devem a você';
   var tipoColor = isDevo ? '#C2680C' : '#1565C0';
   var saldoColor = isDevo ? 'var(--red)' : 'var(--green)';
+
+  var movs = garantirMovimentos(d);
+  var primeiroMov = movs.length ? movs.slice().sort(function(a,b){return a.data<b.data?-1:1;})[0] : null;
 
   return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+tipoColor+'">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
@@ -5385,12 +5528,13 @@ function dividaCardHTML(d){
       '<div style="font-size:11px;color:var(--t3)">Saldo '+(isDevo?'a pagar':'a receber')+' hoje</div>'+
       '<div id="dvsaldo-'+d.id+'" style="font-size:19px;font-weight:900;color:'+saldoColor+'">calculando...</div>'+
     '</div>'+
-    '<div style="font-size:11px;color:var(--t3);margin-bottom:4px">Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+' · '+esc(metodoLabel)+'</div>'+
-    '<div id="dvtaxa-'+d.id+'" style="font-size:11px;color:var(--blue);margin-bottom:10px;min-height:14px"></div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:4px">'+
+      (primeiroMov?('Início: '+fmtBRL(primeiroMov.valor)+' em '+fmtDate(primeiroMov.data)):'')+' · '+esc(metodoLabel)+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">'+movs.length+' movimento'+(movs.length!==1?'s':'')+' registrado'+(movs.length!==1?'s':'')+'</div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-      '<button data-baixadiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">💵 Baixa</button>'+
-      '<button data-renegdiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Renegociar</button>'+
-      '<button data-histdiv="'+d.id+'" style="flex:1;min-width:85px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Histórico</button>'+
+      '<button data-addmov="'+d.id+'" style="flex:1;min-width:100px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">+ Movimento</button>'+
+      '<button data-histdiv="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Extrato</button>'+
       '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar extrato">🔗</button>'+
       '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
@@ -5400,7 +5544,7 @@ function dividaCardHTML(d){
 function renderDividas(){
   var pagSel = document.getElementById('dv-pag');
   if(pagSel){
-    var opts = '<option value="">— selecione um pagador —</option>' +
+    var opts = '<option value="">— selecione uma pessoa —</option>' +
       PAGADORES.map(function(p){ return '<option value="'+p.id+'">'+esc(p.nome)+'</option>'; }).join('');
     if(pagSel.innerHTML !== opts) pagSel.innerHTML = opts;
   }
@@ -5408,7 +5552,7 @@ function renderDividas(){
   var el = document.getElementById('div-list');
   if(!el) return;
 
-  var abertas = DIVIDAS.filter(function(d){ return d.status!=='pago' && d.status!=='renegociado'; });
+  var abertas = DIVIDAS.filter(function(d){ return d.status!=='pago'; });
   var totalEl = document.getElementById('div-total-geral');
 
   if(!abertas.length){
@@ -5422,30 +5566,17 @@ function renderDividas(){
   var pending = abertas.length;
   var totalGeral = 0;
   abertas.forEach(function(d){
-    calcSaldoDivida(d, function(err, res){
+    calcLedgerDivida(d, function(err, res){
       var saldoEl = document.getElementById('dvsaldo-'+d.id);
-      var taxaEl  = document.getElementById('dvtaxa-'+d.id);
       if(!err && res){
-        if(saldoEl) saldoEl.textContent = fmtBRL(res.saldo);
-        d._saldoCache = res.saldo;
-        totalGeral += res.saldo;
-
-        // Mostrar a taxa REAL aplicada no período
-        if(taxaEl){
-          if(d.metodoJuros === 'fixo_simples' || d.metodoJuros === 'fixo_composto'){
-            taxaEl.textContent = '📌 Taxa aplicada: ' + (d.taxaMensal||0) + '%/mês (' + (d.metodoJuros==='fixo_simples'?'simples':'composto') + ')';
-          } else if(res.fator !== undefined && res.fator !== null && res.meses > 0){
-            var pctPeriodo = ((res.fator - 1) * 100).toFixed(2);
-            var pctMensalEquiv = ((Math.pow(res.fator, 1/res.meses) - 1) * 100).toFixed(2);
-            var extra = d.metodoJuros==='indexador_mais_taxa' ? (' + ' + (d.taxaMensal||0) + '%/mês adicional') : '';
-            taxaEl.textContent = '📊 ' + d.indexador + ': +' + pctPeriodo + '% no período (≈ ' + pctMensalEquiv + '%/mês)' + extra;
-          } else {
-            taxaEl.textContent = '📊 ' + d.indexador;
-          }
-        }
+        if(saldoEl) saldoEl.textContent = fmtBRL(res.saldoAtual);
+        d._saldoCache = res.saldoAtual;
+        totalGeral += res.saldoAtual;
+        // Atualizar status localmente se mudou (ex: ficou pago)
+        var novoStatus = res.saldoAtual<=0.01 ? 'pago' : (d.movimentos.length>1?'parcial':'pendente');
+        if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
       } else {
-        if(saldoEl) saldoEl.textContent = '⚠️ erro no índice';
-        if(taxaEl) taxaEl.textContent = '⚠️ Não foi possível obter o índice agora';
+        if(saldoEl) saldoEl.textContent = '⚠️ erro';
       }
       pending--;
       if(pending===0 && totalEl){
@@ -5455,120 +5586,133 @@ function renderDividas(){
   });
 }
 
-function baixaDivida(id){
-  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+// ── Modal: Novo Movimento ──────────────────────────────────
+var movDividaId = null;
+
+function abrirNovoMovimento(dividaId){
+  movDividaId = dividaId;
+  setMovTipo('aporte');
+  document.getElementById('mov-valor').value = '';
+  document.getElementById('mov-data').value = ymd(new Date());
+  document.getElementById('mov-obs').value = '';
+  document.getElementById('divmov-modal').style.display = 'flex';
+}
+
+function closeMovModal(){
+  document.getElementById('divmov-modal').style.display = 'none';
+  movDividaId = null;
+}
+
+function setMovTipo(tipo){
+  document.getElementById('mov-tipo').value = tipo;
+  ['aporte','pagamento','despesa'].forEach(function(t){
+    var btn = document.getElementById('movtipo-'+t);
+    if(btn) btn.classList.toggle('on', t===tipo);
+  });
+  var obsLabel = document.getElementById('mov-obs-label');
+  if(obsLabel){
+    obsLabel.textContent = tipo==='despesa' ? 'Em nome de quem / motivo' : 'Observação (opcional)';
+  }
+}
+
+function salvarMovimentoDivida(){
+  if(!movDividaId) return;
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(movDividaId); });
   if(!d) return;
-  calcSaldoDivida(d, function(err, res){
-    if(err || !res){ toast('⚠️ Não foi possível calcular o saldo agora','err'); return; }
-    var saldoAtual = res.saldo;
-    var jurosAcumulado = res.juros || 0;
-    var valorStr = prompt('Saldo devedor atual: '+fmtBRL(saldoAtual)+'\nValor do pagamento (R$):', '');
-    if(valorStr === null) return;
-    var valorPago = parseFloat(valorStr.replace(',','.'))||0;
-    if(valorPago<=0){ toast('⚠️ Valor inválido','err'); return; }
 
-    var hoje = ymd(new Date());
-    var jurosPago    = Math.min(valorPago, Math.max(0, jurosAcumulado));
-    var amortizacao  = Math.max(0, valorPago - jurosPago);
-    var novoSaldo    = Math.max(0, saldoAtual - valorPago);
+  var tipo  = document.getElementById('mov-tipo').value;
+  var valor = parseFloat(document.getElementById('mov-valor').value||0);
+  var data  = document.getElementById('mov-data').value;
+  var obs   = (document.getElementById('mov-obs').value||'').trim();
 
-    d.pagamentos = d.pagamentos || [];
-    d.pagamentos.push({data:hoje, valor:valorPago, jurosPago:jurosPago, amortizacao:amortizacao, saldoApos:novoSaldo});
+  if(!valor || valor<=0){ toast('⚠️ Informe o valor','err'); return; }
+  if(!data){ toast('⚠️ Informe a data','err'); return; }
 
-    if(novoSaldo <= 0.01){
-      d.status = 'pago';
-      d.valorPrincipalAtual = 0;
-      toast('✅ Totalmente pago!');
-    } else {
-      d.status = 'parcial';
-      d.valorPrincipalAtual = novoSaldo; // reinicia contagem de juros sobre o restante
-      d.dataBaseAtual = hoje;
-      toast('💵 Baixa registrada. Saldo restante: '+fmtBRL(novoSaldo));
+  garantirMovimentos(d);
+  d.movimentos.push({id:Date.now(), tipo:tipo, valor:valor, data:data, obs:obs});
+  saveDividas();
+
+  closeMovModal();
+  toast('💾 Salvando e recalculando...');
+
+  apiCall('salvarDivida', d, function(err, resp){
+    if(!err && resp && resp.ok){
+      d.status = resp.status || d.status;
+      saveDividas();
     }
-    saveDividas();
-    apiCall('salvarDivida', d, function(){});
     renderDividas();
+    toast('✅ Movimento registrado!');
   });
 }
 
-function renegociarDivida(id){
-  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+function delMovimentoDivida(dividaId, movId){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(dividaId); });
   if(!d) return;
-  calcSaldoDivida(d, function(err, res){
-    var saldoAtual = (!err && res) ? res.saldo : d.valorPrincipalAtual;
-    var novoValorStr = prompt('Saldo devedor atual: '+fmtBRL(saldoAtual)+'\nNovo valor acordado (R$):', saldoAtual.toFixed(2).replace('.',','));
-    if(novoValorStr === null) return;
-    var novoValor = parseFloat(novoValorStr.replace(',','.'))||0;
-    if(novoValor<=0){ toast('⚠️ Valor inválido','err'); return; }
-
-    var novaTaxaStr = prompt('Nova taxa mensal % (deixe igual se não mudar):', String(d.taxaMensal||0));
-    var novaTaxa = novaTaxaStr!==null ? (parseFloat(novaTaxaStr.replace(',','.'))||0) : d.taxaMensal;
-
-    var hoje = ymd(new Date());
-    d.renegociacoes = d.renegociacoes || [];
-    d.renegociacoes.push({
-      data: hoje, valorAnterior: saldoAtual, valorNovo: novoValor,
-      taxaAnterior: d.taxaMensal, taxaNova: novaTaxa
-    });
-
-    d.valorPrincipalAtual = novoValor;
-    d.dataBaseAtual = hoje;
-    d.taxaMensal = novaTaxa;
-    d.status = 'pendente';
-
-    saveDividas();
-    apiCall('salvarDivida', d, function(){});
-    renderDividas();
-    toast('🔄 Dívida renegociada — novo valor: '+fmtBRL(novoValor));
-  });
+  if(!confirm('Remover este movimento do extrato?')) return;
+  d.movimentos = (d.movimentos||[]).filter(function(m){ return String(m.id)!==String(movId); });
+  saveDividas();
+  apiCall('salvarDivida', d, function(){});
+  verHistoricoDivida(dividaId); // re-renderiza o modal já aberto
+  renderDividas();
+  toast('🗑️ Movimento removido');
 }
 
 function verHistoricoDivida(id){
   var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
   if(!d) return;
   var pag = PAGADORES.find(function(p){ return String(p.id)===String(d.pagadorId); });
-  document.getElementById('divhist-title').textContent = 'Histórico — ' + (pag?pag.nome:d.pagadorNome||'');
+  document.getElementById('divhist-title').textContent = 'Extrato — ' + (pag?pag.nome:d.pagadorNome||'');
 
-  var html = '<div style="font-size:12px;color:var(--t3);margin-bottom:14px">'+
-    'Original: '+fmtBRL(d.valorOriginal)+' em '+fmtDate(d.dataOriginal)+'<br>'+esc(d.desc)+'</div>';
-
-  html += '<button data-linkdiv="'+d.id+'" style="width:100%;margin-bottom:14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Abrir/compartilhar extrato completo</button>';
-
-  if((d.pagamentos||[]).length){
-    html += '<div class="slbl" style="margin-bottom:6px">💵 Pagamentos</div>';
-    html += '<table style="width:100%;border-collapse:collapse;margin-bottom:4px">'+
-      '<tr style="font-size:10px;color:var(--t3);text-transform:uppercase">'+
-        '<th style="text-align:left;padding:4px 0">Data</th><th style="text-align:right;padding:4px 0">Pago</th>'+
-        '<th style="text-align:right;padding:4px 0">Juros</th><th style="text-align:right;padding:4px 0">Saldo após</th>'+
-      '</tr>';
-    d.pagamentos.forEach(function(p){
-      html += '<tr style="font-size:12px;border-top:1px solid var(--border)">'+
-        '<td style="padding:6px 0">'+fmtDate(p.data)+'</td>'+
-        '<td style="padding:6px 0;text-align:right;color:var(--green);font-weight:700">'+fmtBRL(p.valor)+'</td>'+
-        '<td style="padding:6px 0;text-align:right;color:var(--t3)">'+fmtBRL(p.jurosPago||0)+'</td>'+
-        '<td style="padding:6px 0;text-align:right;font-weight:700">'+fmtBRL(p.saldoApos!==undefined?p.saldoApos:0)+'</td>'+
-      '</tr>';
-    });
-    html += '</table>';
-  }
-
-  if((d.renegociacoes||[]).length){
-    html += '<div class="slbl" style="margin:14px 0 6px">🔄 Renegociações</div>';
-    d.renegociacoes.forEach(function(r){
-      html += '<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">'+
-        '<div style="display:flex;justify-content:space-between"><span>'+fmtDate(r.data)+'</span>'+
-        '<span style="font-weight:700">'+fmtBRL(r.valorAnterior)+' → '+fmtBRL(r.valorNovo)+'</span></div>'+
-        (r.taxaAnterior!==r.taxaNova?'<div style="color:var(--t3);font-size:11px">Taxa: '+r.taxaAnterior+'% → '+r.taxaNova+'%</div>':'')+
-      '</div>';
-    });
-  }
-
-  if(!(d.pagamentos||[]).length && !(d.renegociacoes||[]).length){
-    html += '<div style="text-align:center;color:var(--t3);padding:16px">Nenhum movimento registrado ainda</div>';
-  }
-
-  document.getElementById('divhist-body').innerHTML = html;
+  document.getElementById('divhist-body').innerHTML = '<div style="text-align:center;padding:20px;color:var(--t3)">Calculando extrato...</div>';
   document.getElementById('divhist-modal').style.display = 'flex';
+
+  calcLedgerDivida(d, function(err, res){
+    var html = '<button data-linkdiv="'+d.id+'" style="width:100%;margin-bottom:14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Abrir/compartilhar extrato completo</button>';
+
+    if(err || !res){
+      html += '<div style="text-align:center;padding:16px;color:var(--red)">⚠️ '+esc(err||'Erro ao calcular')+'</div>';
+      document.getElementById('divhist-body').innerHTML = html;
+      return;
+    }
+
+    html += '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:12px">'+
+      '<span style="font-size:11px;color:var(--t3)">Saldo atual</span>'+
+      '<span style="font-weight:800;font-size:15px">'+fmtBRL(res.saldoAtual)+'</span>'+
+    '</div>';
+
+    var tipoInfo = {
+      aporte:    {icon:'📥', label:'Aporte/Empréstimo', cor:'var(--orange)'},
+      pagamento: {icon:'💵', label:'Pagamento', cor:'var(--green)'},
+      despesa:   {icon:'🧾', label:'Despesa em nome', cor:'var(--blue)'}
+    };
+
+    if(res.linhas && res.linhas.length){
+      html += '<div class="slbl" style="margin-bottom:6px">📜 Movimentos (ordem cronológica)</div>';
+      res.linhas.forEach(function(l){
+        var info = tipoInfo[l.tipo] || {icon:'•',label:l.tipo,cor:'var(--t1)'};
+        var sinal = l.tipo==='aporte' ? '+' : '−';
+        html += '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;justify-content:space-between;align-items:baseline">'+
+            '<div style="font-size:12px;font-weight:700;color:'+info.cor+'">'+info.icon+' '+info.label+'</div>'+
+            '<button data-delmov="'+d.id+'|'+l.id+'" style="background:none;border:none;color:var(--t3);font-size:13px;cursor:pointer;padding:0 4px">🗑️</button>'+
+          '</div>'+
+          '<div style="display:flex;justify-content:space-between;margin-top:3px">'+
+            '<span style="font-size:11px;color:var(--t3)">'+fmtDate(l.data)+(l.obs?' · '+esc(l.obs):'')+'</span>'+
+            '<span style="font-size:13px;font-weight:700">'+sinal+' '+fmtBRL(l.valor)+'</span>'+
+          '</div>'+
+          (l.jurosNoPeriodo>0?'<div style="font-size:10px;color:var(--t3);margin-top:2px">Juros acumulados no período: '+fmtBRL(l.jurosNoPeriodo)+'</div>':'')+
+          '<div style="font-size:11px;font-weight:700;margin-top:3px">Saldo após: '+fmtBRL(l.saldoApos)+'</div>'+
+        '</div>';
+      });
+      if(res.jurosDesdeUltimo > 0){
+        html += '<div style="padding:10px 0;color:var(--t3);font-size:11px">+ '+fmtBRL(res.jurosDesdeUltimo)+' em juros desde o último movimento até hoje</div>';
+      }
+    } else {
+      html += '<div style="text-align:center;color:var(--t3);padding:16px">Nenhum movimento registrado ainda</div>';
+    }
+
+    document.getElementById('divhist-body').innerHTML = html;
+  });
 }
 
 function closeDivHistModal(){
@@ -5585,6 +5729,7 @@ function abrirLinkDivida(id){
 
 function delDivida(id){
   if(!confirm('Excluir esta dívida e todo o histórico? Esta ação não pode ser desfeita.')) return;
+  addTombstone('dividas', id);
   DIVIDAS = DIVIDAS.filter(function(d){ return String(d.id)!==String(id); });
   saveDividas();
   apiCall('deletarDivida', {id:id}, function(){});
@@ -5595,13 +5740,12 @@ function delDivida(id){
 function sincronizarDividas(cb){
   apiCall('getDividas', null, function(err, d){
     var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    serverList = serverList.filter(function(x){ return !isTombstoned('dividas', x.id); });
     var serverMap = {};
     serverList.forEach(function(x){ serverMap[String(x.id)] = true; });
     var pendentes = DIVIDAS.filter(function(x){ return !serverMap[String(x.id)]; });
     if(pendentes.length === 0){
       if(serverList.length > 0){
-        var localMap = {};
-        DIVIDAS.forEach(function(x){ localMap[String(x.id)] = true; });
         var localOnly = DIVIDAS.filter(function(x){ return !serverMap[String(x.id)]; });
         DIVIDAS = serverList.concat(localOnly);
         saveDividas();
@@ -5616,10 +5760,11 @@ function sincronizarDividas(cb){
         if(enviados === pendentes.length){
           apiCall('getDividas', null, function(err2, d2){
             if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
+              var dataFiltrada = d2.data.filter(function(x){ return !isTombstoned('dividas', x.id); });
               var localMap2 = {};
-              d2.data.forEach(function(x){ localMap2[String(x.id)] = true; });
-              DIVIDAS.forEach(function(x){ if(!localMap2[String(x.id)]) d2.data.push(x); });
-              DIVIDAS = d2.data;
+              dataFiltrada.forEach(function(x){ localMap2[String(x.id)] = true; });
+              DIVIDAS.forEach(function(x){ if(!localMap2[String(x.id)]) dataFiltrada.push(x); });
+              DIVIDAS = dataFiltrada;
               saveDividas();
             }
             if(cb) cb();
