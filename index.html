@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260701-193125</title>
+<title>Fluxo v20260701-194424</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1820,32 +1820,53 @@ select option{background:#1A2A3A}
       <input type="file" id="bank-ofx-input" accept=".ofx,.OFX" style="display:none" onchange="importarOFX(this)">
     </label>
 
-    <!-- Histórico de extratos importados -->
-    <div id="bank-extratos-hist" style="margin-bottom:12px"></div>
-
-    <!-- Filtros -->
+    <!-- Card unificado: Período + Filtros + Arquivos (colapsável) -->
     <div class="card" style="margin-bottom:12px">
-      <div class="slbl" style="margin-bottom:8px">🔍 Filtros</div>
-      <div style="margin-bottom:8px">
-        <input id="bk-busca" type="text" placeholder="Buscar por descrição..." oninput="renderExtrato()" style="width:100%">
-      </div>
-      <div class="row2" style="margin-bottom:8px">
-        <div><div class="fl">De</div><input id="bk-de" type="date" onchange="renderExtrato()"></div>
-        <div><div class="fl">Até</div><input id="bk-ate" type="date" onchange="renderExtrato()"></div>
-      </div>
-      <div class="row2" style="margin-bottom:8px">
-        <div><div class="fl">Tipo</div>
-          <select id="bk-tipo-fil" onchange="renderExtrato()">
-            <option value="">Todos</option>
-            <option value="D">Débitos</option>
-            <option value="C">Créditos</option>
-          </select>
-        </div>
-        <div><div class="fl">Valor mínimo (R$)</div>
-          <input id="bk-vmin" type="number" placeholder="0" step="0.01" inputmode="decimal" oninput="renderExtrato()">
+      <div class="coll-hdr" onclick="toggleColl('bank-filtros-body','bank-filtros-arrow')" style="margin-bottom:0;cursor:pointer">
+        <span style="font-weight:800;font-size:14px">📅 Período e Filtros</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span id="bank-filtros-label" style="font-size:11px;color:var(--t3)"></span>
+          <span class="coll-arrow" id="bank-filtros-arrow">▾</span>
         </div>
       </div>
-      <button onclick="limparFiltrosBanco()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t3);font-size:12px;cursor:pointer;font-family:inherit">✕ Limpar filtros</button>
+
+      <div id="bank-filtros-body" style="margin-top:12px">
+
+        <!-- Seletor de período -->
+        <div id="bank-extratos-hist" style="margin-bottom:12px"></div>
+
+        <!-- Filtros rápidos -->
+        <div style="margin-bottom:8px">
+          <input id="bk-busca" type="text" placeholder="🔍 Buscar por descrição..." oninput="renderExtrato();_atualizarLabelFiltros()" style="width:100%">
+        </div>
+        <div class="row2" style="margin-bottom:8px">
+          <div><div class="fl">De</div><input id="bk-de" type="date" onchange="renderExtrato()"></div>
+          <div><div class="fl">Até</div><input id="bk-ate" type="date" onchange="renderExtrato()"></div>
+        </div>
+        <div class="row2" style="margin-bottom:10px">
+          <div><div class="fl">Tipo</div>
+            <select id="bk-tipo-fil" onchange="renderExtrato();_atualizarLabelFiltros()">
+              <option value="">Todos</option>
+              <option value="D">Débitos</option>
+              <option value="C">Créditos</option>
+            </select>
+          </div>
+          <div><div class="fl">Valor mínimo (R$)</div>
+            <input id="bk-vmin" type="number" placeholder="0" step="0.01" inputmode="decimal" oninput="renderExtrato();_atualizarLabelFiltros()">
+          </div>
+        </div>
+        <button onclick="limparFiltrosBanco()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t3);font-size:12px;cursor:pointer;font-family:inherit">✕ Limpar filtros</button>
+
+        <!-- Arquivos importados (colapsados por padrão) -->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+          <div class="coll-hdr" onclick="toggleColl('bank-arquivos-body','bank-arquivos-arrow')" style="margin-bottom:0;cursor:pointer">
+            <span style="font-size:12px;font-weight:700;color:var(--t2)">📁 Arquivos importados</span>
+            <span class="coll-arrow" id="bank-arquivos-arrow" style="transform:rotate(-90deg);font-size:13px">▾</span>
+          </div>
+          <div id="bank-arquivos-body" style="display:none;margin-top:8px" id="bank-arquivos-list"></div>
+        </div>
+
+      </div>
     </div>
 
     <!-- Totalizadores -->
@@ -6435,8 +6456,42 @@ function _carregarExtrato(){
 function selecionarPeriodo(sel){
   curExtratoSel = sel === 'todos' ? 'todos' : parseInt(sel);
   _carregarExtrato();
+
+  // Preencher automaticamente os campos de data com o período do extrato
+  var deEl  = document.getElementById('bk-de');
+  var ateEl = document.getElementById('bk-ate');
+  if(deEl && ateEl){
+    if(curExtratoSel === 'todos'){
+      deEl.value = ''; ateEl.value = '';
+    } else {
+      var ex = (EXTRATOS[String(curBankContaId)]||[])[curExtratoSel];
+      if(ex){ deEl.value = ex.dataIni || ''; ateEl.value = ex.dataFim || ''; }
+    }
+  }
+
   renderHistExtratosImportados();
+  _atualizarLabelFiltros();
   renderExtrato();
+}
+
+function _atualizarLabelFiltros(){
+  var el = document.getElementById('bank-filtros-label');
+  if(!el) return;
+  var busca = (document.getElementById('bk-busca')||{}).value||'';
+  var tipo  = (document.getElementById('bk-tipo-fil')||{}).value||'';
+  var vmin  = parseFloat((document.getElementById('bk-vmin')||{}).value||0)||0;
+  var partes = [];
+  if(curExtratoSel !== 'todos'){
+    var ex = (EXTRATOS[String(curBankContaId)]||[])[curExtratoSel];
+    if(ex) partes.push(fmtDate(ex.dataIni)+'→'+fmtDate(ex.dataFim));
+  } else {
+    partes.push('Todos os períodos');
+  }
+  if(tipo==='D') partes.push('Débitos');
+  if(tipo==='C') partes.push('Créditos');
+  if(busca) partes.push('"'+busca+'"');
+  if(vmin>0) partes.push('≥ '+fmtBRL(vmin));
+  el.textContent = partes.join(' · ');
 }
 
 function renderContasBanco(){
@@ -6559,78 +6614,77 @@ function parseOFX(texto){
 }
 
 function renderHistExtratosImportados(){
+  _renderSeletorPeriodo();
+  _renderListaArquivos();
+  _atualizarLabelFiltros();
+}
+
+function _renderSeletorPeriodo(){
   var el = document.getElementById('bank-extratos-hist');
   if(!el) return;
   var lista = EXTRATOS[String(curBankContaId)] || [];
   if(!lista.length){ el.innerHTML=''; return; }
 
-  // Agrupar extratos por mês (YYYY-MM) para facilitar navegação
-  var grupos = {}; // { 'YYYY-MM': [{idx, ex}] }
+  var grupos = {};
   lista.forEach(function(ex, idx){
     var mes = (ex.dataIni||'').substring(0,7) || (ex.dataFim||'').substring(0,7) || 'sem-data';
     if(!grupos[mes]) grupos[mes] = [];
     grupos[mes].push({idx:idx, ex:ex});
   });
-  var meses = Object.keys(grupos).sort().reverse(); // mais recente primeiro
+  var meses = Object.keys(grupos).sort().reverse();
 
-  var html = '<div style="margin-bottom:10px">';
-  html += '<div class="slbl" style="margin-bottom:8px">📅 Período do extrato</div>';
+  var html = '<div class="slbl" style="margin-bottom:6px;font-size:11px">Período</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">';
 
-  // Botão "Todos"
   var todosAtivo = curExtratoSel === 'todos';
-  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
-  html += '<button onclick="selecionarPeriodo(\'todos\')" style="padding:7px 12px;border-radius:20px;border:2px solid '+(todosAtivo?'var(--blue)':'var(--border)')+';background:'+(todosAtivo?'rgba(93,130,240,.15)':'transparent')+';color:'+(todosAtivo?'var(--blue)':'var(--t2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Todos</button>';
+  html += _chipBtn('todos', '📋 Todos', todosAtivo);
 
-  // Botões por mês (se só 1 extrato no mês, mostra ele; se vários, agrupa)
   meses.forEach(function(mes){
     var itens = grupos[mes];
     if(itens.length === 1){
-      // Um único extrato nesse mês — exibe como chip de período
       var ex  = itens[0].ex;
       var idx = itens[0].idx;
       var ativo = curExtratoSel === idx;
       var label = mes !== 'sem-data'
         ? MESES_BR[parseInt(mes.split('-')[1])-1]+'/'+mes.split('-')[0]
-        : esc(ex.arquivo);
-      html += '<button onclick="selecionarPeriodo('+idx+')" style="padding:7px 12px;border-radius:20px;border:2px solid '+(ativo?'var(--blue)':'var(--border)')+';background:'+(ativo?'rgba(93,130,240,.15)':'transparent')+';color:'+(ativo?'var(--blue)':'var(--t2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';
+        : esc(ex.arquivo).substring(0,10);
+      html += _chipBtn(idx, label, ativo);
     } else {
-      // Vários extratos no mesmo mês — exibe cada um com data mais específica
       itens.forEach(function(item){
         var ativo = curExtratoSel === item.idx;
         var ini = item.ex.dataIni ? fmtDate(item.ex.dataIni) : '';
         var fim = item.ex.dataFim ? fmtDate(item.ex.dataFim) : '';
-        var label = ini && fim ? ini+' – '+fim : esc(item.ex.arquivo);
-        html += '<button onclick="selecionarPeriodo('+item.idx+')" style="padding:7px 12px;border-radius:20px;border:2px solid '+(ativo?'var(--blue)':'var(--border)')+';background:'+(ativo?'rgba(93,130,240,.15)':'transparent')+';color:'+(ativo?'var(--blue)':'var(--t2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';
+        var label = ini && fim ? ini+'→'+fim : esc(item.ex.arquivo).substring(0,12);
+        html += _chipBtn(item.idx, label, ativo);
       });
     }
   });
   html += '</div>';
-
-  // Detalhes do extrato selecionado
-  if(curExtratoSel !== 'todos'){
-    var exSel = lista[curExtratoSel];
-    if(exSel){
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:12px">'+
-        '<div>'+
-          '<div style="font-weight:700">'+esc(exSel.arquivo)+'</div>'+
-          '<div style="color:var(--t3)">'+
-            fmtDate(exSel.dataIni)+' → '+fmtDate(exSel.dataFim)+
-            ' · '+(exSel.txs||[]).length+' transações'+
-            (exSel.saldoFim?' · Saldo final: '+fmtBRL(exSel.saldoFim):'')+
-          '</div>'+
-        '</div>'+
-        '<button data-delextrato="'+curExtratoSel+'" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:4px" title="Remover este extrato">🗑️</button>'+
-      '</div>';
-    }
-  } else {
-    // Resumo geral quando "Todos" está selecionado
-    var totalTxs = lista.reduce(function(s,ex){ return s+(ex.txs||[]).length; },0);
-    html += '<div style="padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--t3)">'+
-      lista.length+' extrato'+(lista.length!==1?'s':'')+' importado'+(lista.length!==1?'s':'')+' · '+totalTxs+' transações no total</div>';
-  }
-
-  html += '</div>';
   el.innerHTML = html;
+}
+
+function _chipBtn(sel, label, ativo){
+  return '<button onclick="selecionarPeriodo(\''+sel+'\')" style="padding:5px 10px;border-radius:16px;border:2px solid '+(ativo?'var(--blue)':'var(--border)')+';background:'+(ativo?'rgba(93,130,240,.15)':'transparent')+';color:'+(ativo?'var(--blue)':'var(--t2)')+';font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">'+label+'</button>';
+}
+
+function _renderListaArquivos(){
+  var el = document.getElementById('bank-arquivos-body');
+  if(!el) return;
+  var lista = EXTRATOS[String(curBankContaId)] || [];
+  if(!lista.length){ el.innerHTML='<div style="font-size:12px;color:var(--t3)">Nenhum arquivo importado ainda.</div>'; return; }
+
+  el.innerHTML = lista.slice().reverse().map(function(ex, i){
+    var idx = lista.length - 1 - i;
+    var txCount = (ex.txs||[]).length;
+    var sel = curExtratoSel === idx;
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:'+(sel?'rgba(93,130,240,.08)':'var(--bg3)')+';border-radius:8px;margin-bottom:4px;gap:8px;border-left:3px solid '+(sel?'var(--blue)':'transparent')+'">' +
+      '<div style="min-width:0;cursor:pointer;flex:1" onclick="selecionarPeriodo('+idx+')">'+
+        '<div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ex.arquivo)+'</div>'+
+        '<div style="font-size:10px;color:var(--t3)">'+fmtDate(ex.dataIni)+' → '+fmtDate(ex.dataFim)+' · '+txCount+' tx'+(ex.saldoFim?' · saldo: '+fmtBRL(ex.saldoFim):'')+' · importado '+new Date(ex.importadoEm).toLocaleDateString('pt-BR')+'</div>'+
+      '</div>'+
+      '<button data-delextrato="'+idx+'" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;flex-shrink:0;padding:2px" title="Remover extrato">🗑️</button>'+
+    '</div>';
+  }).join('');
 }
 
 function delExtrato(idx){
@@ -6738,6 +6792,7 @@ function limparFiltrosBanco(){
     var el=document.getElementById(id); if(el) el.value='';
   });
   var tf=document.getElementById('bk-tipo-fil'); if(tf) tf.value='';
+  _atualizarLabelFiltros();
   renderExtrato();
 }
 
