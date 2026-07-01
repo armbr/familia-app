@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260701-134803</title>
+<title>Fluxo v20260701-184407</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -894,6 +894,7 @@ select option{background:#1A2A3A}
   <button class="nb"    id="nb-task" onclick="setSection('task')"><span class="ni">📅</span>Agenda</button>
   <button class="nb"    id="nb-rec"  onclick="setSection('rec')"><span class="ni">🧾</span>Recibos</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
+  <button class="nb"    id="nb-bank" onclick="setSection('bank')"><span class="ni">🏦</span>Bancos</button>
 </div>
 
 <!-- ══ CONTENT ══ -->
@@ -1760,6 +1761,118 @@ select option{background:#1A2A3A}
 
   </div><!-- /sec-docs -->
 
+<!-- ══ BANCOS ══ -->
+<div id="sec-bank" style="display:none;padding:0 16px 100px">
+
+  <!-- Cadastro de conta -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="coll-hdr card-title" onclick="toggleColl('bank-form-body','bank-form-arrow')" style="margin-bottom:0">
+      <span>🏦 Nova Conta Bancária</span>
+      <span class="coll-arrow" id="bank-form-arrow" style="transform:rotate(-90deg)">▾</span>
+    </div>
+    <div id="bank-form-body" style="display:none;margin-top:12px">
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Nome do banco</div>
+          <input id="bk-nome" type="text" placeholder="Ex: Sicoob, Nubank, Caixa" maxlength="40">
+        </div>
+        <div><div class="fl">Tipo</div>
+          <select id="bk-tipo">
+            <option value="corrente">Conta Corrente</option>
+            <option value="poupanca">Poupança</option>
+            <option value="pj">Conta PJ</option>
+            <option value="investimento">Investimento</option>
+            <option value="digital">Carteira Digital</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Agência (opcional)</div>
+          <input id="bk-agencia" type="text" placeholder="0001" maxlength="10">
+        </div>
+        <div><div class="fl">Conta (opcional)</div>
+          <input id="bk-conta" type="text" placeholder="00000-0" maxlength="20">
+        </div>
+      </div>
+      <div class="row2" style="margin-bottom:12px">
+        <div><div class="fl">Cor de identificação</div>
+          <input id="bk-cor" type="color" value="#6D28D9" style="height:38px;width:100%;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer">
+        </div>
+        <div><div class="fl">Saldo atual (R$)</div>
+          <div class="r-wrap"><input id="bk-saldo" type="number" placeholder="0,00" step="0.01" inputmode="decimal"></div>
+        </div>
+      </div>
+      <button class="btn" onclick="addContaBanco()">+ Cadastrar Conta</button>
+    </div>
+  </div>
+
+  <!-- Lista de contas -->
+  <div id="bank-contas-list" style="margin-bottom:16px"></div>
+
+  <!-- Área de extrato (aparece após selecionar conta) -->
+  <div id="bank-extrato-area" style="display:none">
+
+    <!-- Cabeçalho da conta selecionada -->
+    <div id="bank-extrato-header" style="margin-bottom:12px"></div>
+
+    <!-- Import OFX -->
+    <label id="bank-ofx-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px dashed var(--border);border-radius:12px;cursor:pointer;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--t2)">
+      📂 Importar extrato OFX
+      <input type="file" id="bank-ofx-input" accept=".ofx,.OFX" style="display:none" onchange="importarOFX(this)">
+    </label>
+
+    <!-- Histórico de extratos importados -->
+    <div id="bank-extratos-hist" style="margin-bottom:12px"></div>
+
+    <!-- Filtros -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="slbl" style="margin-bottom:8px">🔍 Filtros</div>
+      <div style="margin-bottom:8px">
+        <input id="bk-busca" type="text" placeholder="Buscar por descrição..." oninput="renderExtrato()" style="width:100%">
+      </div>
+      <div class="row2" style="margin-bottom:8px">
+        <div><div class="fl">De</div><input id="bk-de" type="date" onchange="renderExtrato()"></div>
+        <div><div class="fl">Até</div><input id="bk-ate" type="date" onchange="renderExtrato()"></div>
+      </div>
+      <div class="row2" style="margin-bottom:8px">
+        <div><div class="fl">Tipo</div>
+          <select id="bk-tipo-fil" onchange="renderExtrato()">
+            <option value="">Todos</option>
+            <option value="D">Débitos</option>
+            <option value="C">Créditos</option>
+          </select>
+        </div>
+        <div><div class="fl">Valor mínimo (R$)</div>
+          <input id="bk-vmin" type="number" placeholder="0" step="0.01" inputmode="decimal" oninput="renderExtrato()">
+        </div>
+      </div>
+      <button onclick="limparFiltrosBanco()" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t3);font-size:12px;cursor:pointer;font-family:inherit">✕ Limpar filtros</button>
+    </div>
+
+    <!-- Totalizadores -->
+    <div id="bank-totais" style="display:flex;gap:8px;margin-bottom:12px"></div>
+
+    <!-- Lista de transações -->
+    <div id="bank-txlist"></div>
+  </div>
+
+</div><!-- /sec-bank -->
+
+<!-- Modal: Nota OFX -->
+<div id="ofxnota-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-size:15px;font-weight:800">📝 Nota</div>
+      <button onclick="closeOfxNota()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="ofxnota-desc" style="font-size:12px;color:var(--t3);margin-bottom:10px"></div>
+    <textarea id="ofxnota-text" rows="3" placeholder="Observação sobre essa transação..." style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--t1);font-size:13px;font-family:inherit;resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="closeOfxNota()" style="flex:1;padding:11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>
+      <button onclick="salvarOfxNota()" style="flex:1;padding:11px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;align-items:flex-end;justify-content:center">
   <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto">
     <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:4px">✅ Marcar como concluída</div>
@@ -1917,6 +2030,12 @@ var ALUGUEIS   = (function(){ try{ return JSON.parse(localStorage.getItem('ff_al
 var CARTOES    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_cartoes') || '[]') || []; }catch(e){ console.warn('localStorage ff_cartoes corrompido, resetando'); localStorage.removeItem('ff_cartoes'); return []; } })();
 var CGASTOS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_cgastos') || '[]') || []; }catch(e){ console.warn('localStorage ff_cgastos corrompido, resetando'); localStorage.removeItem('ff_cgastos'); return []; } })(); // gastos do cartão
 var CONTRATOS  = (function(){ try{ return JSON.parse(localStorage.getItem('ff_contratos') || '[]') || []; }catch(e){ console.warn('localStorage ff_contratos corrompido, resetando'); localStorage.removeItem('ff_contratos'); return []; } })();
+var CONTAS_BANCO = (function(){ try{ return JSON.parse(localStorage.getItem('ff_contas_banco') || '[]') || []; }catch(e){ localStorage.removeItem('ff_contas_banco'); return []; } })();
+var EXTRATOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_extratos')    || '{}') || {}; }catch(e){ localStorage.removeItem('ff_extratos');    return {}; } })();
+var NOTAS_OFX    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_notas_ofx')  || '{}') || {}; }catch(e){ localStorage.removeItem('ff_notas_ofx');   return {}; } })();
+var curBankContaId = null;   // conta bancária selecionada atualmente
+var curExtrato     = [];     // transações do extrato em exibição
+var ofxNotaFitId   = null;  // fitId da transação sendo anotada
 var DIVIDAS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_dividas') || '[]') || []; }catch(e){ console.warn('localStorage ff_dividas corrompido, resetando'); localStorage.removeItem('ff_dividas'); return []; } })();
 var COLLAPSED_PASTAS = (function(){ try{ return JSON.parse(localStorage.getItem('ff_collapsed') || '[]') || []; }catch(e){ console.warn('localStorage ff_collapsed corrompido, resetando'); localStorage.removeItem('ff_collapsed'); return []; } })();
 
@@ -2412,7 +2531,7 @@ function setSection(s){
   curSection = s;
 
   // Mostrar/ocultar seções
-  var allSecs = ['fin','task','hoje','docs','rec','cc'];
+  var allSecs = ['fin','task','hoje','docs','rec','cc','bank'];
   allSecs.forEach(function(x){
     var el = document.getElementById('sec-'+x);
     if(el) el.style.display = (x===s) ? 'block' : 'none';
@@ -2444,6 +2563,7 @@ function setSection(s){
     if(API) sincronizarRecibos(function(){ renderRecibos(); });
   }
   if(s==='docs') { try{ renderDocs(); }catch(e){}; try{ if(online) syncDocs(); }catch(e){} }
+  if(s==='bank') { try{ renderContasBanco(); }catch(e){ console.error('bank',e); } }
 }
 
 function ftab(t){
@@ -3986,6 +4106,13 @@ function initTaskDelegation(){
     if(linkdiv){ abrirLinkDivida(linkdiv.getAttribute('data-linkdiv')); return; }
     var edittime = e.target.closest('[data-edittime]');
     if(edittime){ editarHorarioTask(edittime.getAttribute('data-edittime')); return; }
+    // Bancos
+    var delconta = e.target.closest('[data-delconta]');
+    if(delconta){ delContaBanco(delconta.getAttribute('data-delconta')); return; }
+    var delextrato = e.target.closest('[data-delextrato]');
+    if(delextrato){ delExtrato(parseInt(delextrato.getAttribute('data-delextrato'))); return; }
+    var ofxnota = e.target.closest('[data-ofxnota]');
+    if(ofxnota){ abrirOfxNota(ofxnota.getAttribute('data-ofxnota'), ofxnota.getAttribute('data-ofxdesc')); return; }
     var deldiv = e.target.closest('[data-deldiv]');
     if(deldiv){ delDivida(deldiv.getAttribute('data-deldiv')); return; }
     var delrec = e.target.closest('[data-delrec]');
@@ -6216,6 +6343,350 @@ function registrarPgtoContrato(ctId){
   apiCall('registrarPagamentoContrato',{inqNome:ct.inqNome,mesAno:mesAno,
     valor:valN,dataPgto:ymd(now),codigo:codigo},function(){});
   renderRecibos(); abrirRecibo(recibo); toast('✅ Pagamento registrado!');
+}
+
+// ════════════════════════════════════════════════════════════
+//  MÓDULO BANCOS — Extrato OFX + Gestão de Contas
+// ════════════════════════════════════════════════════════════
+
+function saveContasBanco(){ localStorage.setItem('ff_contas_banco', JSON.stringify(CONTAS_BANCO)); }
+function saveExtratos()   { localStorage.setItem('ff_extratos',     JSON.stringify(EXTRATOS));     }
+function saveNotasOFX()   { localStorage.setItem('ff_notas_ofx',    JSON.stringify(NOTAS_OFX));    }
+
+var TIPO_BANCO_LABEL = {
+  corrente: 'Conta Corrente', poupanca: 'Poupança',
+  pj: 'Conta PJ', investimento: 'Investimento', digital: 'Carteira Digital'
+};
+
+// ── Cadastro de contas ────────────────────────────────────
+function addContaBanco(){
+  var nome   = (document.getElementById('bk-nome').value||'').trim();
+  var tipo   = document.getElementById('bk-tipo').value;
+  var ag     = (document.getElementById('bk-agencia').value||'').trim();
+  var conta  = (document.getElementById('bk-conta').value||'').trim();
+  var cor    = document.getElementById('bk-cor').value || '#6D28D9';
+  var saldo  = parseFloat(document.getElementById('bk-saldo').value||0);
+  if(!nome){ toast('⚠️ Informe o nome do banco','err'); return; }
+  var c = {id: Date.now(), nome: nome, tipo: tipo, agencia: ag, conta: conta, cor: cor, saldo: saldo};
+  CONTAS_BANCO.push(c);
+  saveContasBanco();
+  ['bk-nome','bk-agencia','bk-conta','bk-saldo'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  renderContasBanco();
+  toast('✅ Conta cadastrada!');
+}
+
+function delContaBanco(id){
+  if(!confirm('Excluir esta conta e todos os extratos importados?')) return;
+  CONTAS_BANCO = CONTAS_BANCO.filter(function(c){ return String(c.id)!==String(id); });
+  delete EXTRATOS[String(id)];
+  saveContasBanco(); saveExtratos();
+  if(String(curBankContaId)===String(id)){
+    curBankContaId = null; curExtrato = [];
+    document.getElementById('bank-extrato-area').style.display = 'none';
+  }
+  renderContasBanco();
+  toast('🗑️ Conta removida');
+}
+
+function selecionarConta(id){
+  curBankContaId = id;
+  curExtrato = [];
+  var extratos = EXTRATOS[String(id)] || [];
+  // Combina todas as transações de todos os extratos importados para essa conta
+  var txMap = {};
+  extratos.forEach(function(ex){
+    (ex.txs||[]).forEach(function(tx){ txMap[tx.fitId] = tx; });
+  });
+  curExtrato = Object.values(txMap).sort(function(a,b){ return a.data < b.data ? 1 : -1; });
+
+  var area = document.getElementById('bank-extrato-area');
+  area.style.display = 'block';
+
+  var c = CONTAS_BANCO.find(function(x){ return String(x.id)===String(id); });
+  var hdr = document.getElementById('bank-extrato-header');
+  if(c && hdr){
+    hdr.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:10px;border-left:4px solid '+c.cor+'">'+
+      '<div><div style="font-weight:800;font-size:15px">'+esc(c.nome)+'</div>'+
+      '<div style="font-size:11px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+''+
+      (c.agencia?' · Ag: '+esc(c.agencia):'')+(c.conta?' · Cc: '+esc(c.conta):'')+
+      '</div></div>'+
+      '<div style="margin-left:auto;text-align:right">'+
+        '<div style="font-size:11px;color:var(--t3)">Saldo cadastrado</div>'+
+        '<div style="font-weight:800;font-size:14px">'+fmtBRL(c.saldo)+'</div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  renderHistExtratosImportados();
+  renderExtrato();
+  renderContasBanco(); // atualiza seleção visual
+}
+
+function renderContasBanco(){
+  var el = document.getElementById('bank-contas-list');
+  if(!el) return;
+  if(!CONTAS_BANCO.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhuma conta cadastrada ainda.<br>Adicione uma conta acima para começar.</div>';
+    return;
+  }
+  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">'+
+    CONTAS_BANCO.map(function(c){
+      var sel = String(c.id)===String(curBankContaId);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:2px solid '+(sel?c.cor:'var(--border)')+';background:'+(sel?'rgba(0,0,0,.08)':'transparent')+';cursor:pointer;min-width:140px;flex:1" onclick="selecionarConta(\''+c.id+'\')">'+
+        '<div style="width:12px;height:12px;border-radius:50%;background:'+c.cor+';flex-shrink:0"></div>'+
+        '<div style="min-width:0">'+
+          '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.nome)+'</div>'+
+          '<div style="font-size:10px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+'</div>'+
+        '</div>'+
+        '<button data-delconta="'+c.id+'" style="margin-left:auto;background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir conta">🗑️</button>'+
+      '</div>';
+    }).join('')+
+  '</div>';
+}
+
+// ── Parser OFX ───────────────────────────────────────────
+function importarOFX(input){
+  if(!curBankContaId){ toast('⚠️ Selecione uma conta antes de importar','err'); input.value=''; return; }
+  var file = input.files[0];
+  if(!file){ return; }
+  toast('📂 Lendo arquivo...');
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var texto = e.target.result;
+      // Detectar encoding (alguns OFX vêm em ISO-8859-1)
+      var parsed = parseOFX(texto);
+      if(!parsed.txs.length){ toast('⚠️ Nenhuma transação encontrada no arquivo','err'); return; }
+
+      var extrato = {
+        id:        Date.now(),
+        arquivo:   file.name,
+        banco:     parsed.banco,
+        conta:     parsed.contaNum,
+        dataIni:   parsed.dataIni,
+        dataFim:   parsed.dataFim,
+        saldoFim:  parsed.saldoFim,
+        importadoEm: new Date().toISOString(),
+        txs:       parsed.txs
+      };
+
+      var cid = String(curBankContaId);
+      if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
+      EXTRATOS[cid].push(extrato);
+      saveExtratos();
+
+      // Recarregar extrato combinado
+      selecionarConta(curBankContaId);
+      toast('✅ '+parsed.txs.length+' transações importadas!');
+    } catch(err){
+      console.error('OFX parse error:', err);
+      toast('❌ Erro ao ler o arquivo: '+err.message,'err');
+    }
+    input.value = '';
+  };
+  reader.onerror = function(){ toast('❌ Erro ao ler o arquivo','err'); };
+  reader.readAsText(file, 'ISO-8859-1');
+}
+
+function parseOFX(texto){
+  // Normalizar quebras de linha
+  var t = texto.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+
+  function tag(nome){ // extrai valor de uma tag OFX
+    var re = new RegExp('<'+nome+'>([^<\\n]+)','i');
+    var m  = t.match(re);
+    return m ? m[1].trim() : '';
+  }
+  function tagAll(nome){ // extrai todos os valores de uma tag repetida
+    var re = new RegExp('<'+nome+'>([^<\\n]+)','gi');
+    var out=[]; var m;
+    while((m=re.exec(t))!==null) out.push(m[1].trim());
+    return out;
+  }
+
+  function parseOfxDate(d){
+    // Formato OFX: YYYYMMDDHHMMSS ou YYYYMMDD
+    if(!d) return '';
+    d = d.replace(/\[.*\]/,'').trim(); // remover timezone
+    if(d.length>=8) return d.substring(0,4)+'-'+d.substring(4,6)+'-'+d.substring(6,8);
+    return '';
+  }
+
+  // Separar blocos de transação
+  var blocos = t.split(/<STMTTRN>/i).slice(1);
+  var txs = blocos.map(function(b, idx){
+    var tipo = (b.match(/<TRNTYPE>([^\n<]+)/i)||[])[1]||'';
+    var data = parseOfxDate((b.match(/<DTPOSTED>([^\n<]+)/i)||[])[1]||'');
+    var val  = parseFloat((b.match(/<TRNAMT>([^\n<]+)/i)||[])[1]||0);
+    var fitId= (b.match(/<FITID>([^\n<]+)/i)||[])[1]||('tx'+idx);
+    var memo = (b.match(/<MEMO>([^\n<]+)/i)||[])[1]||'';
+    var name = (b.match(/<NAME>([^\n<]+)/i)||[])[1]||'';
+    var desc = (memo||name||'—').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();
+    return {
+      fitId: fitId.trim(),
+      tipo:  (tipo.trim().toUpperCase() === 'CREDIT' || val > 0) ? 'C' : 'D',
+      data:  data,
+      valor: Math.abs(val),
+      desc:  desc
+    };
+  }).filter(function(tx){ return tx.data && tx.valor > 0; });
+
+  return {
+    banco:    tag('BANKID') || tag('ORG') || 'Banco',
+    contaNum: tag('ACCTID') || '',
+    dataIni:  parseOfxDate(tag('DTSTART')),
+    dataFim:  parseOfxDate(tag('DTEND')),
+    saldoFim: parseFloat(tag('BALAMT')) || 0,
+    txs:      txs
+  };
+}
+
+function renderHistExtratosImportados(){
+  var el = document.getElementById('bank-extratos-hist');
+  if(!el) return;
+  var lista = EXTRATOS[String(curBankContaId)] || [];
+  if(!lista.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="slbl" style="margin-bottom:6px">Extratos importados ('+lista.length+')</div>'+
+    lista.slice().reverse().map(function(ex, i){
+      var idx = lista.length - 1 - i;
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg3);border-radius:8px;margin-bottom:4px;font-size:12px">'+
+        '<div>'+
+          '<div style="font-weight:700">'+esc(ex.arquivo)+'</div>'+
+          '<div style="color:var(--t3)">'+fmtDate(ex.dataIni)+' → '+fmtDate(ex.dataFim)+' · '+(ex.txs||[]).length+' transações</div>'+
+        '</div>'+
+        '<button data-delextrato="'+idx+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer">🗑️</button>'+
+      '</div>';
+    }).join('');
+}
+
+function delExtrato(idx){
+  var cid = String(curBankContaId);
+  if(!EXTRATOS[cid]) return;
+  EXTRATOS[cid].splice(idx, 1);
+  saveExtratos();
+  selecionarConta(curBankContaId);
+  toast('🗑️ Extrato removido');
+}
+
+// ── Detecção de recorrências ─────────────────────────────
+function detectarRecorrencias(txs){
+  // Agrupa por descrição normalizada e conta ocorrências
+  var freq = {};
+  txs.forEach(function(tx){
+    var k = tx.desc.toLowerCase().replace(/\s+/g,' ').trim();
+    freq[k] = (freq[k]||0) + 1;
+  });
+  // Considera recorrente se aparece 2+ vezes
+  var recorrentes = {};
+  Object.keys(freq).forEach(function(k){ if(freq[k]>=2) recorrentes[k]=true; });
+  return recorrentes;
+}
+
+// ── Render do extrato com filtros ─────────────────────────
+function renderExtrato(){
+  var el = document.getElementById('bank-txlist');
+  var totEl = document.getElementById('bank-totais');
+  if(!el) return;
+
+  var busca  = (document.getElementById('bk-busca')||{}).value||'';
+  var de     = (document.getElementById('bk-de')||{}).value||'';
+  var ate    = (document.getElementById('bk-ate')||{}).value||'';
+  var tipoF  = (document.getElementById('bk-tipo-fil')||{}).value||'';
+  var vmin   = parseFloat((document.getElementById('bk-vmin')||{}).value||0)||0;
+
+  var txs = curExtrato.filter(function(tx){
+    if(busca && tx.desc.toLowerCase().indexOf(busca.toLowerCase())===-1) return false;
+    if(de  && tx.data < de)  return false;
+    if(ate && tx.data > ate) return false;
+    if(tipoF && tx.tipo !== tipoF) return false;
+    if(vmin>0 && tx.valor < vmin) return false;
+    return true;
+  });
+
+  // Totalizadores
+  var totC = txs.filter(function(t){return t.tipo==='C';}).reduce(function(s,t){return s+t.valor;},0);
+  var totD = txs.filter(function(t){return t.tipo==='D';}).reduce(function(s,t){return s+t.valor;},0);
+  if(totEl){
+    totEl.innerHTML =
+      '<div style="flex:1;padding:10px;background:rgba(46,204,154,.1);border-radius:10px;text-align:center">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px">Entradas</div>'+
+        '<div style="font-size:15px;font-weight:900;color:var(--green)">'+fmtBRL(totC)+'</div>'+
+      '</div>'+
+      '<div style="flex:1;padding:10px;background:rgba(255,107,107,.1);border-radius:10px;text-align:center">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px">Saídas</div>'+
+        '<div style="font-size:15px;font-weight:900;color:var(--red)">'+fmtBRL(totD)+'</div>'+
+      '</div>'+
+      '<div style="flex:1;padding:10px;background:var(--bg3);border-radius:10px;text-align:center">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Líquido</div>'+
+        '<div style="font-size:15px;font-weight:900;color:'+(totC-totD>=0?'var(--green)':'var(--red)')+'">'+fmtBRL(Math.abs(totC-totD))+'</div>'+
+      '</div>';
+  }
+
+  if(!txs.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhuma transação encontrada</div>';
+    return;
+  }
+
+  var recorr = detectarRecorrencias(txs);
+
+  el.innerHTML = txs.map(function(tx){
+    var isCredito = tx.tipo === 'C';
+    var cor = isCredito ? 'var(--green)' : 'var(--red)';
+    var sinal = isCredito ? '+' : '-';
+    var nota = NOTAS_OFX[tx.fitId] || '';
+    var kNorm = tx.desc.toLowerCase().replace(/\s+/g,' ').trim();
+    var isRecorr = recorr[kNorm];
+
+    return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+        '<div style="min-width:0;flex:1">'+
+          '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
+            esc(tx.desc)+
+            (isRecorr?'<span style="margin-left:6px;font-size:9px;font-weight:800;color:var(--blue);border:1px solid var(--blue);padding:1px 5px;border-radius:4px;vertical-align:middle">RECORRENTE</span>':'')+
+          '</div>'+
+          '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+fmtDate(tx.data)+'</div>'+
+          (nota?'<div style="font-size:11px;color:var(--blue);margin-top:3px;font-style:italic">📝 '+esc(nota)+'</div>':'')+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
+          '<div style="font-size:14px;font-weight:800;color:'+cor+'">'+sinal+' '+fmtBRL(tx.valor)+'</div>'+
+          '<button data-ofxnota="'+esc(tx.fitId)+'" data-ofxdesc="'+esc(tx.desc)+'" '+
+            'style="background:none;border:none;color:'+(nota?'var(--blue)':'var(--t3)')+';font-size:14px;cursor:pointer;padding:4px" title="Adicionar nota">📝</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function limparFiltrosBanco(){
+  ['bk-busca','bk-de','bk-ate','bk-vmin'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  var tf=document.getElementById('bk-tipo-fil'); if(tf) tf.value='';
+  renderExtrato();
+}
+
+// ── Notas manuais em transações ───────────────────────────
+function abrirOfxNota(fitId, desc){
+  ofxNotaFitId = fitId;
+  var descEl = document.getElementById('ofxnota-desc');
+  if(descEl) descEl.textContent = desc;
+  var textEl = document.getElementById('ofxnota-text');
+  if(textEl) textEl.value = NOTAS_OFX[fitId] || '';
+  document.getElementById('ofxnota-modal').style.display = 'flex';
+}
+function closeOfxNota(){
+  document.getElementById('ofxnota-modal').style.display = 'none';
+  ofxNotaFitId = null;
+}
+function salvarOfxNota(){
+  if(!ofxNotaFitId) return;
+  var texto = (document.getElementById('ofxnota-text').value||'').trim();
+  if(texto) NOTAS_OFX[ofxNotaFitId] = texto;
+  else delete NOTAS_OFX[ofxNotaFitId];
+  saveNotasOFX();
+  closeOfxNota();
+  renderExtrato();
+  toast('📝 Nota salva');
 }
 
 function renderDocs(){
