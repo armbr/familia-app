@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260624-195928</title>
+<title>Fluxo v20260701-134803</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2009,6 +2009,11 @@ function txValida(t){
   var isFromAgenda = t.fromAgenda === true || t.fromAgenda === 'true';
   // Rejeitar lançamentos automáticos da recorrência antiga (têm recurId sem fromAgenda)
   if(t.recurId && String(t.recurId) !== '' && !isFromAgenda) return false;
+  // Rejeitar TXS de fatura cujos gastos originais foram todos excluídos
+  if(t.cgastoIds && t.cgastoIds.length > 0){
+    var todosExcluidos = t.cgastoIds.every(function(gid){ return isTombstoned('cgastos', gid); });
+    if(todosExcluidos) return false;
+  }
   return true;
 }
 function balOf(list){
@@ -3035,7 +3040,14 @@ function filteredTxs(){
     if(!txValida(t)) return false;                        // só lançamentos reais
     var tDate  = ymds(t.date);
     var tMonth = tDate.substring(0,7);
-    if(tMonth !== selMonth) return false;                 // só mês selecionado
+    // TXS de fechamento de fatura: usar o mês da COMPRA (fatMesOrigem)
+    // para exibição — assim aparece no mês correto, não no mês do pagamento.
+    // Exemplo: compra em junho fechada em julho → aparece em junho.
+    if(t.fatMesOrigem){
+      if(t.fatMesOrigem !== selMonth) return false;
+    } else {
+      if(tMonth !== selMonth) return false;               // só mês selecionado
+    }
     if(selMonth > curMonth) return false;                 // mês futuro: nada
     if(selMonth === curMonth && tDate > today) return false; // mês atual: só até hoje
     return true;
@@ -3596,7 +3608,13 @@ function addTask(){
   }
   apiCall('addTask',task,function(err){
     if(err){TASKS=TASKS.filter(function(t){return t.id!==tmp;});renderTasks();toast('❌ Erro ao criar','err');}
-    else{syncAll();toast('📌 Compromisso criado!');}
+    else{
+      // Não chamar syncAll aqui: processRecur geraria uma 2ª task
+      // para o mês atual (duplicata). A task já foi criada acima.
+      // Processar apenas meses futuros (flag para processRecur ignorar mês atual).
+      renderTasks();
+      toast('📌 Compromisso criado!');
+    }
     btn.disabled=false;
   });
   document.getElementById('t-desc').value='';
@@ -5300,10 +5318,34 @@ function addGastoCartao(){
   renderCC(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
 }
 function delGasto(id){
+  // Encontrar o gasto antes de remover para saber sua fatura
+  var gasto = CGASTOS.find(function(g){ return String(g.id)===String(id); });
+
   addTombstone('cgastos', id);
-  CGASTOS=CGASTOS.filter(function(g){return String(g.id)!==String(id);});
+  CGASTOS = CGASTOS.filter(function(g){ return String(g.id)!==String(id); });
   saveCGastos();
   apiCall('deletarItemSheet', {aba:'GastosCartao', id:id}, function(){});
+
+  // Remover do TXS qualquer lançamento de fatura que contenha este gasto
+  var antes = TXS.length;
+  TXS = TXS.filter(function(t){
+    if(!t.cgastoIds) return true;
+    // Remover o TX se continha SOMENTE este gasto
+    var ids = t.cgastoIds.map(String);
+    if(ids.length === 1 && ids[0] === String(id)) return false;
+    // Se o TX tinha múltiplos gastos: recriar sem este gasto
+    if(ids.indexOf(String(id)) > -1){
+      // Recalcular o valor deste TX subtraindo o gasto excluído
+      if(gasto) t.value = Math.max(0, parseFloat(t.value||0) - parseFloat(gasto.val||0));
+      t.cgastoIds = ids.filter(function(x){ return x !== String(id); });
+      if(t.value <= 0) return false; // remover se zerou
+    }
+    return true;
+  });
+  if(TXS.length !== antes){
+    localStorage.setItem('ff_txs', JSON.stringify(TXS));
+  }
+
   renderCC();
   renderBal();
   renderHist();
@@ -5325,11 +5367,14 @@ function fecharFaturaInterno(cartaoId, mesAno){
   var mesLabel = MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
   var nomeCartao = cartao ? cartao.nome : 'Cartão';
 
-  // Agrupar por categoria real do gasto
+  // Agrupar por categoria real do gasto — guardando IDs dos CGASTOs
+  // fonte de cada TX para poder rastrear e remover se o gasto for excluído
   var porCat = {};
+  var gastosPorCat = {};
   gastos.forEach(function(g){
     var c = g.cat || '📦 Outros';
     porCat[c] = (porCat[c]||0) + g.val;
+    (gastosPorCat[c] = gastosPorCat[c] || []).push(String(g.id));
   });
 
   Object.keys(porCat).forEach(function(cat){
@@ -5339,7 +5384,9 @@ function fecharFaturaInterno(cartaoId, mesAno){
       value: porCat[cat],
       cat: cat,
       date: ymd(new Date()),
-      fromAgenda: true
+      fromAgenda: true,
+      cgastoIds: gastosPorCat[cat] || [],   // ← vínculo com os gastos originais
+      fatMesOrigem: mesAno                   // ← mês da compra (não do pagamento)
     };
     var tmp = Date.now() + Math.random();
     TXS.unshift(Object.assign({id:tmp}, tx));
