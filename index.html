@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260701-184407</title>
+<title>Fluxo v20260701-193125</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2035,6 +2035,7 @@ var EXTRATOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_
 var NOTAS_OFX    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_notas_ofx')  || '{}') || {}; }catch(e){ localStorage.removeItem('ff_notas_ofx');   return {}; } })();
 var curBankContaId = null;   // conta bancária selecionada atualmente
 var curExtrato     = [];     // transações do extrato em exibição
+var curExtratoSel  = 'todos'; // 'todos' ou índice do extrato selecionado
 var ofxNotaFitId   = null;  // fitId da transação sendo anotada
 var DIVIDAS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_dividas') || '[]') || []; }catch(e){ console.warn('localStorage ff_dividas corrompido, resetando'); localStorage.removeItem('ff_dividas'); return []; } })();
 var COLLAPSED_PASTAS = (function(){ try{ return JSON.parse(localStorage.getItem('ff_collapsed') || '[]') || []; }catch(e){ console.warn('localStorage ff_collapsed corrompido, resetando'); localStorage.removeItem('ff_collapsed'); return []; } })();
@@ -6390,14 +6391,8 @@ function delContaBanco(id){
 
 function selecionarConta(id){
   curBankContaId = id;
-  curExtrato = [];
-  var extratos = EXTRATOS[String(id)] || [];
-  // Combina todas as transações de todos os extratos importados para essa conta
-  var txMap = {};
-  extratos.forEach(function(ex){
-    (ex.txs||[]).forEach(function(tx){ txMap[tx.fitId] = tx; });
-  });
-  curExtrato = Object.values(txMap).sort(function(a,b){ return a.data < b.data ? 1 : -1; });
+  curExtratoSel  = 'todos';
+  _carregarExtrato();
 
   var area = document.getElementById('bank-extrato-area');
   area.style.display = 'block';
@@ -6407,7 +6402,7 @@ function selecionarConta(id){
   if(c && hdr){
     hdr.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg3);border-radius:10px;border-left:4px solid '+c.cor+'">'+
       '<div><div style="font-weight:800;font-size:15px">'+esc(c.nome)+'</div>'+
-      '<div style="font-size:11px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+''+
+      '<div style="font-size:11px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+
       (c.agencia?' · Ag: '+esc(c.agencia):'')+(c.conta?' · Cc: '+esc(c.conta):'')+
       '</div></div>'+
       '<div style="margin-left:auto;text-align:right">'+
@@ -6419,7 +6414,29 @@ function selecionarConta(id){
 
   renderHistExtratosImportados();
   renderExtrato();
-  renderContasBanco(); // atualiza seleção visual
+  renderContasBanco();
+}
+
+// Carrega curExtrato com base em curExtratoSel
+function _carregarExtrato(){
+  var extratos = EXTRATOS[String(curBankContaId)] || [];
+  var txMap = {};
+  if(curExtratoSel === 'todos'){
+    extratos.forEach(function(ex){
+      (ex.txs||[]).forEach(function(tx){ txMap[tx.fitId] = tx; });
+    });
+  } else {
+    var ex = extratos[curExtratoSel];
+    if(ex) (ex.txs||[]).forEach(function(tx){ txMap[tx.fitId] = tx; });
+  }
+  curExtrato = Object.values(txMap).sort(function(a,b){ return a.data < b.data ? 1 : -1; });
+}
+
+function selecionarPeriodo(sel){
+  curExtratoSel = sel === 'todos' ? 'todos' : parseInt(sel);
+  _carregarExtrato();
+  renderHistExtratosImportados();
+  renderExtrato();
 }
 
 function renderContasBanco(){
@@ -6545,25 +6562,84 @@ function renderHistExtratosImportados(){
   var el = document.getElementById('bank-extratos-hist');
   if(!el) return;
   var lista = EXTRATOS[String(curBankContaId)] || [];
-  if(!lista.length){ el.innerHTML = ''; return; }
-  el.innerHTML = '<div class="slbl" style="margin-bottom:6px">Extratos importados ('+lista.length+')</div>'+
-    lista.slice().reverse().map(function(ex, i){
-      var idx = lista.length - 1 - i;
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--bg3);border-radius:8px;margin-bottom:4px;font-size:12px">'+
+  if(!lista.length){ el.innerHTML=''; return; }
+
+  // Agrupar extratos por mês (YYYY-MM) para facilitar navegação
+  var grupos = {}; // { 'YYYY-MM': [{idx, ex}] }
+  lista.forEach(function(ex, idx){
+    var mes = (ex.dataIni||'').substring(0,7) || (ex.dataFim||'').substring(0,7) || 'sem-data';
+    if(!grupos[mes]) grupos[mes] = [];
+    grupos[mes].push({idx:idx, ex:ex});
+  });
+  var meses = Object.keys(grupos).sort().reverse(); // mais recente primeiro
+
+  var html = '<div style="margin-bottom:10px">';
+  html += '<div class="slbl" style="margin-bottom:8px">📅 Período do extrato</div>';
+
+  // Botão "Todos"
+  var todosAtivo = curExtratoSel === 'todos';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">';
+  html += '<button onclick="selecionarPeriodo(\'todos\')" style="padding:7px 12px;border-radius:20px;border:2px solid '+(todosAtivo?'var(--blue)':'var(--border)')+';background:'+(todosAtivo?'rgba(93,130,240,.15)':'transparent')+';color:'+(todosAtivo?'var(--blue)':'var(--t2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Todos</button>';
+
+  // Botões por mês (se só 1 extrato no mês, mostra ele; se vários, agrupa)
+  meses.forEach(function(mes){
+    var itens = grupos[mes];
+    if(itens.length === 1){
+      // Um único extrato nesse mês — exibe como chip de período
+      var ex  = itens[0].ex;
+      var idx = itens[0].idx;
+      var ativo = curExtratoSel === idx;
+      var label = mes !== 'sem-data'
+        ? MESES_BR[parseInt(mes.split('-')[1])-1]+'/'+mes.split('-')[0]
+        : esc(ex.arquivo);
+      html += '<button onclick="selecionarPeriodo('+idx+')" style="padding:7px 12px;border-radius:20px;border:2px solid '+(ativo?'var(--blue)':'var(--border)')+';background:'+(ativo?'rgba(93,130,240,.15)':'transparent')+';color:'+(ativo?'var(--blue)':'var(--t2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';
+    } else {
+      // Vários extratos no mesmo mês — exibe cada um com data mais específica
+      itens.forEach(function(item){
+        var ativo = curExtratoSel === item.idx;
+        var ini = item.ex.dataIni ? fmtDate(item.ex.dataIni) : '';
+        var fim = item.ex.dataFim ? fmtDate(item.ex.dataFim) : '';
+        var label = ini && fim ? ini+' – '+fim : esc(item.ex.arquivo);
+        html += '<button onclick="selecionarPeriodo('+item.idx+')" style="padding:7px 12px;border-radius:20px;border:2px solid '+(ativo?'var(--blue)':'var(--border)')+';background:'+(ativo?'rgba(93,130,240,.15)':'transparent')+';color:'+(ativo?'var(--blue)':'var(--t2)')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+label+'</button>';
+      });
+    }
+  });
+  html += '</div>';
+
+  // Detalhes do extrato selecionado
+  if(curExtratoSel !== 'todos'){
+    var exSel = lista[curExtratoSel];
+    if(exSel){
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:12px">'+
         '<div>'+
-          '<div style="font-weight:700">'+esc(ex.arquivo)+'</div>'+
-          '<div style="color:var(--t3)">'+fmtDate(ex.dataIni)+' → '+fmtDate(ex.dataFim)+' · '+(ex.txs||[]).length+' transações</div>'+
+          '<div style="font-weight:700">'+esc(exSel.arquivo)+'</div>'+
+          '<div style="color:var(--t3)">'+
+            fmtDate(exSel.dataIni)+' → '+fmtDate(exSel.dataFim)+
+            ' · '+(exSel.txs||[]).length+' transações'+
+            (exSel.saldoFim?' · Saldo final: '+fmtBRL(exSel.saldoFim):'')+
+          '</div>'+
         '</div>'+
-        '<button data-delextrato="'+idx+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer">🗑️</button>'+
+        '<button data-delextrato="'+curExtratoSel+'" style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:4px" title="Remover este extrato">🗑️</button>'+
       '</div>';
-    }).join('');
+    }
+  } else {
+    // Resumo geral quando "Todos" está selecionado
+    var totalTxs = lista.reduce(function(s,ex){ return s+(ex.txs||[]).length; },0);
+    html += '<div style="padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--t3)">'+
+      lista.length+' extrato'+(lista.length!==1?'s':'')+' importado'+(lista.length!==1?'s':'')+' · '+totalTxs+' transações no total</div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function delExtrato(idx){
+  if(!confirm('Remover este extrato e suas '+((EXTRATOS[String(curBankContaId)]||[])[idx]||{txs:[]}).txs.length+' transações?')) return;
   var cid = String(curBankContaId);
   if(!EXTRATOS[cid]) return;
   EXTRATOS[cid].splice(idx, 1);
   saveExtratos();
+  curExtratoSel = 'todos';
   selecionarConta(curBankContaId);
   toast('🗑️ Extrato removido');
 }
