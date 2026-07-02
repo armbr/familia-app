@@ -84,9 +84,10 @@ function doGetInternal(action, body) {
     case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
     case 'salvarContaBanco':  return salvarItemSheet('ContasBanco', body);
     case 'getContasBanco':    return getItemsSheet('ContasBanco');
-    case 'salvarExtrato':     return salvarExtratoSheet(body);
-    case 'getExtratos':       return getExtratosSheet(body.contaId);
-    case 'deletarExtrato':    return deletarExtratoSheet(body.contaId, body.extratoId);
+    case 'salvarExtrato':       return salvarExtratoSheet(body);
+    case 'adicionarTxsExtrato': return adicionarTxsExtrato(body);
+    case 'getExtratos':         return getExtratosSheet(body.contaId);
+    case 'deletarExtrato':      return deletarExtratoSheet(body.contaId, body.extratoId);
     case 'salvarDivida':      return salvarDividaEstruturada(body);
     case 'getDividas':        return getDividasEstruturadas();
     case 'calcularSaldoDivida': return calcularSaldoDivida(body);
@@ -563,7 +564,7 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-var EMAIL_DESTINO  = 'armbr258@gmail.com';
+var EMAIL_DESTINO  = '@gmail.com';
 var EMAILS_DESTINO = [EMAIL_DESTINO]; // Para adicionar mais: ['email1@gmail.com', 'email2@gmail.com']
 
 
@@ -1701,14 +1702,15 @@ function garantirAbaExtratos() {
 function salvarExtratoSheet(body) {
   var sheet = garantirAbaExtratos();
   var contaId   = String(body.contaId || '');
-  // Aceitar tanto body.extratoId quanto body.id (o objeto extrato usa 'id')
   var extratoId = String(body.extratoId || body.id || '');
   var arquivo   = String(body.arquivo   || '');
 
   if(!contaId || !extratoId){
-    Logger.log('salvarExtratoSheet: contaId ou extratoId ausente');
     return { ok: false, error: 'contaId ou extratoId ausente' };
   }
+
+  // Guardar as txs que vieram no body (podem não vir em uploads chunked)
+  var txsNovas = body.txs || [];
 
   var dados = JSON.stringify({
     id:          extratoId,
@@ -1719,18 +1721,54 @@ function salvarExtratoSheet(body) {
     dataFim:     body.dataFim  || '',
     saldoFim:    body.saldoFim || 0,
     importadoEm: body.importadoEm || new Date().toISOString(),
-    txs:         body.txs || []
+    txs:         txsNovas
   });
 
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === contaId && String(rows[i][1]) === extratoId) {
+      // Atualizar — preservar txs existentes se novas não vieram
+      if(!txsNovas.length){
+        try{
+          var existente = JSON.parse(String(rows[i][3]));
+          var dadosAtualizado = JSON.parse(dados);
+          dadosAtualizado.txs = existente.txs || [];
+          dados = JSON.stringify(dadosAtualizado);
+        } catch(e){}
+      }
       sheet.getRange(i+1, 4).setValue(dados);
       return { ok: true, updated: true };
     }
   }
   sheet.appendRow([contaId, extratoId, arquivo, dados]);
   return { ok: true, created: true };
+}
+
+// Adiciona um lote de transações a um extrato já salvo (upload em chunks)
+function adicionarTxsExtrato(body) {
+  var sheet = garantirAbaExtratos();
+  var contaId   = String(body.contaId   || '');
+  var extratoId = String(body.extratoId || '');
+  var txsNovas  = body.txs || [];
+
+  if(!contaId || !extratoId || !txsNovas.length) return { ok: false, error: 'Parâmetros inválidos' };
+
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === contaId && String(rows[i][1]) === extratoId) {
+      try{
+        var obj = JSON.parse(String(rows[i][3]));
+        // Deduplicar por fitId ao acumular
+        var fitMap = {};
+        (obj.txs || []).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+        txsNovas.forEach(function(tx){ fitMap[tx.fitId] = tx; });
+        obj.txs = Object.values(fitMap);
+        sheet.getRange(i+1, 4).setValue(JSON.stringify(obj));
+        return { ok: true, total: obj.txs.length };
+      } catch(e){ return { ok: false, error: e.message }; }
+    }
+  }
+  return { ok: false, error: 'Extrato não encontrado — envie salvarExtrato primeiro' };
 }
 
 function getExtratosSheet(contaId) {
