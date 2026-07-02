@@ -1125,12 +1125,15 @@ function garantirEstruturaDividas() {
   var sh = sp.getSheetByName('Dívidas');
   var headers = ['id','tipo','pagadorId','pagador','descricao','valorOriginal','dataOriginal',
                  'metodoJuros','taxaMensal','indexador','valorPrincipalAtual','dataBaseAtual',
-                 'diasEmAtraso','saldoDevedorEstimado','status','criadoEm','atualizadoEm'];
+                 'diasEmAtraso','saldoDevedorEstimado','status','criadoEm','atualizadoEm',
+                 'sistemaAmortizacao','numParcelas','parcelasPagas','extrasJSON',
+                 'tipoTaxa','historicoTaxasJSON'];
+  var eraNova = !sh;
   if (!sh) sh = sp.insertSheet('Dívidas');
   var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
-  var headersOk = headers.every(function(h,i){ return atuais[i]===h; });
-  if (!headersOk) {
-    sh.clear();
+
+  if (eraNova) {
+    // Planilha nova — criar do zero com formatação completa
     sh.getRange(1,1,1,headers.length).setValues([headers]);
     sh.setFrozenRows(1);
     sh.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground('#6D28D9').setFontColor('#FFF');
@@ -1146,9 +1149,19 @@ function garantirEstruturaDividas() {
       SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('parcial').setBackground('#FEF6E0').setFontColor('#B7791F').setRanges([sh.getRange('O2:O2000')]).build(),
       SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('pago').setBackground('#E3FCEF').setFontColor('#1E7E45').setRanges([sh.getRange('O2:O2000')]).build(),
       SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('devo').setBackground('#FFF4E5').setFontColor('#C2680C').setRanges([sh.getRange('B2:B2000')]).build(),
-      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('recebo').setBackground('#E5F3FF').setFontColor('#1565C0').setRanges([sh.getRange('B2:B2000')]).build()
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('recebo').setBackground('#E5F3FF').setFontColor('#1565C0').setRanges([sh.getRange('B2:B2000')]).build(),
+      SpreadsheetApp.newConditionalFormatRule().whenTextEqualTo('financiamento').setBackground('#EFE5FF').setFontColor('#6D28D9').setRanges([sh.getRange('B2:B2000')]).build()
     ];
     sh.setConditionalFormatRules(rules);
+  } else {
+    // Planilha já existia — MIGRAÇÃO NÃO-DESTRUTIVA: só adiciona no
+    // final as colunas que ainda não existem, nunca apaga dados.
+    var faltantes = headers.filter(function(h){ return atuais.indexOf(h) === -1; });
+    if (faltantes.length) {
+      var startCol = sh.getLastColumn() + 1;
+      sh.getRange(1, startCol, 1, faltantes.length).setValues([faltantes]);
+      sh.getRange(1, startCol, 1, faltantes.length).setFontWeight('bold').setBackground('#6D28D9').setFontColor('#FFF');
+    }
   }
 
   // ── Aba "Movimentos_Dividas" — extrato cronológico ────
@@ -1289,6 +1302,27 @@ function recalcularLedgerDivida(body) {
   };
 }
 
+// Escreve uma linha usando o NOME das colunas (não a posição fixa) —
+// robusto à migração que pode ter adicionado colunas novas em posições
+// variáveis dependendo do estado anterior da planilha de cada usuário.
+function _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader){
+  var headerRow = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0];
+  var rowData = headerRow.map(function(h){
+    return valuesByHeader.hasOwnProperty(h) ? valuesByHeader[h] : '';
+  });
+  if (rowIdx > -1) {
+    sh.getRange(rowIdx, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sh.appendRow(rowData);
+  }
+}
+
+function _lerLinhaPorHeader(headerRow, row){
+  var obj = {};
+  headerRow.forEach(function(h, i){ obj[h] = row[i]; });
+  return obj;
+}
+
 function salvarDividaEstruturada(body) {
   var sheets = garantirEstruturaDividas();
   var sh = sheets.dividas;
@@ -1300,8 +1334,40 @@ function salvarDividaEstruturada(body) {
 
   var now = new Date();
   var hoje = Utilities.formatDate(now, 'America/Sao_Paulo', 'yyyy-MM-dd');
-  var movimentos = body.movimentos || [];
 
+  // ── FINANCIAMENTO — modelo próprio (sem ledger de movimentos) ──
+  if (body.tipo === 'financiamento') {
+    var valuesByHeader = {
+      id:                    String(body.id),
+      tipo:                  'financiamento',
+      pagadorId:             String(body.pagadorId || ''),
+      pagador:               body.pagadorNome || '',
+      descricao:             body.desc || '',
+      valorOriginal:         parseFloat(body.valorOriginal) || 0,
+      dataOriginal:          body.dataOriginal ? new Date(body.dataOriginal + 'T12:00:00') : '',
+      metodoJuros:           body.sistemaAmortizacao || '',
+      taxaMensal:            parseFloat(body.taxaMensal) || 0,
+      indexador:             '',
+      valorPrincipalAtual:   parseFloat(body.saldoAtual) || 0,
+      dataBaseAtual:         hoje ? new Date(hoje + 'T12:00:00') : '',
+      diasEmAtraso:          0,
+      saldoDevedorEstimado:  parseFloat(body.saldoAtual) || 0,
+      status:                body.status || 'pendente',
+      criadoEm:              body.criadoEm ? new Date(body.criadoEm) : now,
+      atualizadoEm:          now,
+      sistemaAmortizacao:    body.sistemaAmortizacao || '',
+      numParcelas:           parseInt(body.numParcelas) || 0,
+      parcelasPagas:         parseInt(body.parcelasPagas) || 0,
+      extrasJSON:            JSON.stringify(body.extras || []),
+      tipoTaxa:              body.tipoTaxa || 'fixa',
+      historicoTaxasJSON:    JSON.stringify(body.historicoTaxas || [])
+    };
+    _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader);
+    return { ok: true, status: valuesByHeader.status, saldoAtual: valuesByHeader.valorPrincipalAtual };
+  }
+
+  // ── DEVO / RECEBO — modelo de ledger cronológico (já existente) ──
+  var movimentos = body.movimentos || [];
   var ledger = recalcularLedgerDivida({
     movimentos: movimentos, metodoJuros: body.metodoJuros,
     taxaMensal: body.taxaMensal, indexador: body.indexador, hoje: hoje
@@ -1314,7 +1380,6 @@ function salvarDividaEstruturada(body) {
   var saldoAposUltimo   = ledger.ok ? ledger.saldoAposUltimoMovimento : saldoAtual;
   var diasEmAtraso      = (ledger.ok && ledger.ultimaData) ? Math.round((new Date(hoje+'T12:00:00') - new Date(ledger.ultimaData+'T12:00:00'))/(1000*60*60*24)) : 0;
 
-  // Determinar status automaticamente
   var status = body.status || 'pendente';
   if (ledger.ok) {
     if (saldoAtual <= 0.01) status = 'pago';
@@ -1322,33 +1387,31 @@ function salvarDividaEstruturada(body) {
     else status = 'pendente';
   }
 
-  var rowData = [
-    String(body.id),
-    body.tipo || 'devo',
-    String(body.pagadorId || ''),
-    body.pagadorNome || '',
-    body.desc || '',
-    valorOriginal,
-    dataOriginalDate,
-    body.metodoJuros || '',
-    parseFloat(body.taxaMensal) || 0,
-    body.indexador || '',
-    saldoAposUltimo,
-    dataBaseDate,
-    diasEmAtraso,
-    saldoAtual,
-    status,
-    body.criadoEm ? new Date(body.criadoEm) : now,
-    now
-  ];
+  var valuesByHeader2 = {
+    id:                   String(body.id),
+    tipo:                 body.tipo || 'devo',
+    pagadorId:            String(body.pagadorId || ''),
+    pagador:              body.pagadorNome || '',
+    descricao:            body.desc || '',
+    valorOriginal:        valorOriginal,
+    dataOriginal:         dataOriginalDate,
+    metodoJuros:          body.metodoJuros || '',
+    taxaMensal:           parseFloat(body.taxaMensal) || 0,
+    indexador:            body.indexador || '',
+    valorPrincipalAtual:  saldoAposUltimo,
+    dataBaseAtual:        dataBaseDate,
+    diasEmAtraso:         diasEmAtraso,
+    saldoDevedorEstimado: saldoAtual,
+    status:               status,
+    criadoEm:             body.criadoEm ? new Date(body.criadoEm) : now,
+    atualizadoEm:         now,
+    sistemaAmortizacao:   '',
+    numParcelas:          '',
+    parcelasPagas:        '',
+    extrasJSON:           ''
+  };
+  _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader2);
 
-  if (rowIdx > -1) {
-    sh.getRange(rowIdx, 1, 1, rowData.length).setValues([rowData]);
-  } else {
-    sh.appendRow(rowData);
-  }
-
-  // Sincronizar movimentos (substitui tudo pelo array atual enviado)
   if (body.movimentos) {
     var linhasPorId = {};
     if (ledger.ok) {
@@ -1377,6 +1440,8 @@ function getDividasEstruturadas() {
   var sheets = garantirEstruturaDividas();
   var dDados = sheets.dividas.getDataRange().getValues();
   var mDados = sheets.movimentos.getDataRange().getValues();
+  if (!dDados.length) return { ok: true, data: [] };
+  var headerRow = dDados[0];
 
   var movPorDivida = {};
   for (var i = 1; i < mDados.length; i++) {
@@ -1390,27 +1455,41 @@ function getDividasEstruturadas() {
   var result = [];
   for (var k = 1; k < dDados.length; k++) {
     var row = dDados[k]; if (!row[0]) continue;
-    var id = String(row[0]);
+    var obj = _lerLinhaPorHeader(headerRow, row);
+    var id = String(obj.id);
     var movs = (movPorDivida[id] || []).sort(function(a,b){ return a.data < b.data ? -1 : 1; });
-    result.push({
+
+    var item = {
       id: id,
-      tipo: row[1] || 'devo',
-      pagadorId: String(row[2] || ''),
-      pagadorNome: row[3] || '',
-      desc: row[4] || '',
-      valorOriginal: parseFloat(row[5]) || 0,
-      dataOriginal: fmtDate(row[6]),
-      metodoJuros: row[7] || '',
-      taxaMensal: parseFloat(row[8]) || 0,
-      indexador: row[9] || '',
-      valorPrincipalAtual: parseFloat(row[10]) || 0,
-      dataBaseAtual: fmtDate(row[11]),
-      diasEmAtraso: row[12],
-      saldoDevedorEstimado: (typeof row[13] === 'number') ? row[13] : null,
-      status: row[14] || 'pendente',
-      criadoEm: row[15] instanceof Date ? row[15].toISOString() : String(row[15] || ''),
+      tipo: obj.tipo || 'devo',
+      pagadorId: String(obj.pagadorId || ''),
+      pagadorNome: obj.pagador || '',
+      desc: obj.descricao || '',
+      valorOriginal: parseFloat(obj.valorOriginal) || 0,
+      dataOriginal: fmtDate(obj.dataOriginal),
+      metodoJuros: obj.metodoJuros || '',
+      taxaMensal: parseFloat(obj.taxaMensal) || 0,
+      indexador: obj.indexador || '',
+      valorPrincipalAtual: parseFloat(obj.valorPrincipalAtual) || 0,
+      dataBaseAtual: fmtDate(obj.dataBaseAtual),
+      diasEmAtraso: obj.diasEmAtraso,
+      saldoDevedorEstimado: (typeof obj.saldoDevedorEstimado === 'number') ? obj.saldoDevedorEstimado : null,
+      status: obj.status || 'pendente',
+      criadoEm: obj.criadoEm instanceof Date ? obj.criadoEm.toISOString() : String(obj.criadoEm || ''),
       movimentos: movs
-    });
+    };
+
+    // Campos extras de Financiamento
+    if (obj.tipo === 'financiamento') {
+      item.sistemaAmortizacao = obj.sistemaAmortizacao || '';
+      item.numParcelas        = parseInt(obj.numParcelas) || 0;
+      item.parcelasPagas      = parseInt(obj.parcelasPagas) || 0;
+      try { item.extras = JSON.parse(obj.extrasJSON || '[]'); } catch(e) { item.extras = []; }
+      item.tipoTaxa = obj.tipoTaxa || 'fixa';
+      try { item.historicoTaxas = JSON.parse(obj.historicoTaxasJSON || '[]'); } catch(e2) { item.historicoTaxas = []; }
+    }
+
+    result.push(item);
   }
   return { ok: true, data: result };
 }
@@ -1516,6 +1595,10 @@ function paginaDivida(e) {
     );
   }
 
+  if (d.tipo === 'financiamento') {
+    return paginaFinanciamento(d);
+  }
+
   var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
   var ledger = recalcularLedgerDivida({
     movimentos: d.movimentos, metodoJuros: d.metodoJuros,
@@ -1608,6 +1691,183 @@ function paginaDivida(e) {
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Extrato — ' + d.desc)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ════════════════════════════════════════════════════════════
+//  FINANCIAMENTOS — motor de amortização (SAC/Price) e ficha
+//  pública com a tabela completa. Espelha a lógica do cliente
+//  (index.html) para gerar a mesma tabela de forma independente
+//  no servidor, usada pelo link compartilhável.
+// ════════════════════════════════════════════════════════════
+function calcularParcelaPriceServer(pv, iPct, n){
+  var i = iPct/100;
+  if (i === 0) return pv/n;
+  return pv * (i*Math.pow(1+i,n)) / (Math.pow(1+i,n)-1);
+}
+
+function addMesesServer(dataIso, meses){
+  var d = new Date(dataIso+'T12:00:00');
+  d.setMonth(d.getMonth()+meses);
+  return Utilities.formatDate(d, 'America/Sao_Paulo', 'yyyy-MM-dd');
+}
+
+// Retorna a taxa mensal (%) vigente para uma determinada data, consultando
+// o histórico de taxas registrado manualmente (financiamentos indexados
+// à Selic/CDI, onde a taxa muda ao longo do tempo por aviso do banco).
+function taxaAplicavelNaDataServer(historico, dataAlvo, fallback){
+  if (!historico || !historico.length) return fallback;
+  var aplicaveis = historico.filter(function(h){ return h.data <= dataAlvo; })
+                             .sort(function(a,b){ return a.data < b.data ? -1 : 1; });
+  if (!aplicaveis.length) {
+    // Data anterior a qualquer registro — usar o primeiro conhecido
+    var ordenado = historico.slice().sort(function(a,b){ return a.data < b.data ? -1 : 1; });
+    return ordenado[0].taxaMensal;
+  }
+  return aplicaveis[aplicaveis.length-1].taxaMensal;
+}
+
+function gerarTabelaAmortizacaoServer(fin){
+  var pv        = parseFloat(fin.valorOriginal)||0;
+  var iPctBase  = parseFloat(fin.taxaMensal)||0;
+  var n         = parseInt(fin.numParcelas)||0;
+  var sistema   = fin.sistemaAmortizacao || 'PRICE';
+  var dataIni   = fin.dataOriginal;
+  var isIndexada = fin.tipoTaxa === 'indexada';
+  var historico = isIndexada ? (fin.historicoTaxas||[]) : [];
+  var extras    = (fin.extras||[]).slice().sort(function(a,b){ return a.aposParcela - b.aposParcela; });
+
+  var linhas = [];
+  var saldo = pv;
+  var amortConstante = n>0 ? pv/n : 0;
+  var taxaAnterior = isIndexada ? taxaAplicavelNaDataServer(historico, dataIni, iPctBase) : iPctBase;
+  var parcelaFixa = n>0 ? calcularParcelaPriceServer(pv, taxaAnterior, n) : 0;
+
+  for (var k=1; k<=n && saldo>0.005; k++){
+    var dataParcela = addMesesServer(dataIni, k-1);
+    var iPct = isIndexada ? taxaAplicavelNaDataServer(historico, dataParcela, iPctBase) : iPctBase;
+    var i = iPct/100;
+
+    // Se a taxa mudou desde a última parcela E o sistema é Price, recalcular
+    // a parcela fixa para o saldo/prazo restantes (recast, como os bancos fazem)
+    if (isIndexada && sistema === 'PRICE' && iPct !== taxaAnterior) {
+      var parcelasRestantes = n - k + 1;
+      parcelaFixa = calcularParcelaPriceServer(saldo, iPct, parcelasRestantes);
+    }
+    taxaAnterior = iPct;
+
+    var juros, amort, valorParcela;
+    if (sistema === 'SAC'){
+      // No SAC a amortização é sempre constante (independe da taxa) —
+      // só o valor de juros (e, portanto, da parcela) varia com a taxa.
+      juros = saldo * i;
+      amort = Math.min(amortConstante, saldo);
+      valorParcela = amort + juros;
+    } else {
+      juros = saldo * i;
+      amort = Math.min(parcelaFixa - juros, saldo);
+      valorParcela = amort + juros;
+    }
+    saldo = Math.max(0, saldo - amort);
+
+    var linha = { parcela:k, data:dataParcela, taxaAplicada:iPct, juros:juros, amortizacao:amort, valorParcela:valorParcela, saldoDevedor:saldo };
+    linhas.push(linha);
+
+    var extra = extras.filter(function(e){ return e.aposParcela === k; })[0];
+    if (extra && saldo > 0.005){
+      var valorExtra = Math.min(parseFloat(extra.valor)||0, saldo);
+      saldo = Math.max(0, saldo - valorExtra);
+      linha.extra = valorExtra;
+      linha.saldoDevedor = saldo;
+      if (saldo > 0.005 && extra.modo === 'parcela'){
+        var parcelasRestantesExtra = n - k;
+        if (sistema === 'SAC') amortConstante = saldo / parcelasRestantesExtra;
+        else parcelaFixa = calcularParcelaPriceServer(saldo, iPct, parcelasRestantesExtra);
+      }
+    }
+  }
+  return linhas;
+}
+
+function paginaFinanciamento(d){
+  function brl(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function brDate(iso){ return iso ? String(iso).split('-').reverse().join('/') : '—'; }
+
+  var tabela = gerarTabelaAmortizacaoServer(d);
+  var pagas = parseInt(d.parcelasPagas)||0;
+  var saldoAtual = pagas>0 && tabela[pagas-1] ? tabela[pagas-1].saldoDevedor : d.valorOriginal;
+  var quitado = pagas >= tabela.length || saldoAtual <= 0.01;
+  var pctPago = tabela.length>0 ? Math.round((pagas/tabela.length)*100) : 0;
+  var sistemaLabel = d.sistemaAmortizacao === 'SAC' ? 'SAC' : 'Price';
+  var statusLabel = quitado ? 'QUITADO' : (pagas>0 ? 'EM ANDAMENTO' : 'INICIADO');
+  var statusCor = quitado ? '#2ECC9A' : '#5CA8E0';
+  var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+
+  var isIndexada = d.tipoTaxa === 'indexada';
+  var linhasTabela = tabela.map(function(l){
+    var paga = l.parcela <= pagas;
+    return '<tr style="'+(paga?'opacity:.5':'')+'">'+
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px">'+l.parcela+(paga?' ✅':'')+'</td>'+
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px">'+brDate(l.data)+'</td>'+
+      (isIndexada ? '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px;text-align:right;color:#B794F6">'+(l.taxaAplicada||0).toFixed(2)+'%</td>' : '') +
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;text-align:right;font-weight:700">'+brl(l.valorParcela)+'</td>'+
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px;text-align:right;color:#8FA8C4">'+brl(l.juros)+'</td>'+
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;text-align:right">'+brl(l.saldoDevedor)+'</td>'+
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px;text-align:right;color:#6D28D9">'+(l.extra?'⚡'+brl(l.extra):'')+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Financiamento — ' + d.desc + '</title>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:Arial,Helvetica,sans-serif;background:#0F1923;display:flex;justify-content:center;padding:20px;min-height:100vh}' +
+    '.card{background:#1A2A3A;border-radius:16px;overflow:hidden;width:100%;max-width:640px;border:1px solid rgba(255,255,255,.08)}' +
+    '.hdr{background:#0d1117;padding:22px 20px;border-bottom:2px solid #6D28D9}' +
+    '.hdr h1{color:#fff;font-size:18px;font-weight:900}' +
+    '.hdr .sub{color:#B794F6;font-size:12px;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}' +
+    '.body{padding:20px}' +
+    '.row{padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between;align-items:baseline}' +
+    '.lbl{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#526680}' +
+    '.val{font-size:14px;font-weight:600;color:#EDF2F7}' +
+    '.saldo-box{background:#241A38;border-radius:12px;padding:20px;text-align:center;margin:16px 0}' +
+    '.saldo-box .lbl{color:#B794F6}' +
+    '.saldo-box .amt{font-size:32px;font-weight:900;color:#fff;margin-top:6px}' +
+    '.progress-track{height:8px;background:rgba(255,255,255,.08);border-radius:4px;margin-top:14px;overflow:hidden}' +
+    '.progress-fill{height:8px;background:#6D28D9;border-radius:4px}' +
+    '.progress-lbl{font-size:11px;color:#8FA8C4;margin-top:6px;text-align:center}' +
+    'table{width:100%;border-collapse:collapse;margin-top:8px}' +
+    'th{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#526680;text-align:left;padding:8px 6px;border-bottom:2px solid rgba(255,255,255,.1);position:sticky;top:0;background:#1A2A3A}' +
+    '.tablewrap{max-height:420px;overflow-y:auto}' +
+    '.footer{padding:14px 20px;text-align:center;color:#526680;font-size:11px;border-top:1px solid rgba(255,255,255,.06)}' +
+    '@media print{body{background:#fff}.card{border:1px solid #ddd;background:#fff}}' +
+    '</style></head><body>' +
+    '<div class="card">' +
+      '<div class="hdr"><h1>🏦 ' + d.desc + '</h1><div class="sub">' + statusLabel + ' · ' + sistemaLabel + (isIndexada?' · Taxa Indexada':' · Taxa Fixa') + '</div></div>' +
+      '<div class="body">' +
+        '<div class="row"><span class="lbl">Valor financiado</span><span class="val">' + brl(d.valorOriginal) + '</span></div>' +
+        '<div class="row"><span class="lbl">Taxa mensal</span><span class="val">' + (d.taxaMensal||0) + '%</span></div>' +
+        '<div class="row"><span class="lbl">Parcelas</span><span class="val">' + pagas + ' de ' + tabela.length + '</span></div>' +
+        '<div class="row"><span class="lbl">1ª parcela</span><span class="val">' + brDate(d.dataOriginal) + '</span></div>' +
+
+        '<div class="saldo-box">' +
+          '<div class="lbl">Saldo devedor atual</div>' +
+          '<div class="amt">' + brl(saldoAtual) + '</div>' +
+          '<div class="progress-track"><div class="progress-fill" style="width:' + pctPago + '%"></div></div>' +
+          '<div class="progress-lbl">' + pctPago + '% quitado</div>' +
+        '</div>' +
+
+        '<div class="tablewrap"><table>' +
+          '<thead><tr><th>#</th><th>Data</th>' + (isIndexada?'<th style="text-align:right">Taxa</th>':'') + '<th style="text-align:right">Parcela</th><th style="text-align:right">Juros</th><th style="text-align:right">Saldo</th><th style="text-align:right">Extra</th></tr></thead>' +
+          '<tbody>' + linhasTabela + '</tbody>' +
+        '</table></div>' +
+      '</div>' +
+      '<div class="footer">Gerado em ' + brDate(hoje) + ' · via Fluxo App</div>' +
+    '</div>' +
+    '</body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Financiamento — ' + d.desc)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
