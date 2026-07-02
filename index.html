@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-001033</title>
+<title>Fluxo v20260702-124856</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1814,13 +1814,7 @@ select option{background:#1A2A3A}
     <!-- Cabeçalho da conta selecionada -->
     <div id="bank-extrato-header" style="margin-bottom:12px"></div>
 
-    <!-- Import OFX -->
-    <label id="bank-ofx-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:2px dashed var(--border);border-radius:12px;cursor:pointer;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--t2)">
-      📂 Importar extrato OFX
-      <input type="file" id="bank-ofx-input" accept=".ofx,.OFX" style="display:none" onchange="importarOFX(this)">
-    </label>
-
-    <!-- Card unificado: Período + Filtros + Arquivos (colapsável) -->
+    <!-- Card unificado: Importar + Período + Filtros + Arquivos (colapsável) -->
     <div class="card" style="margin-bottom:12px">
       <div class="coll-hdr" onclick="toggleColl('bank-filtros-body','bank-filtros-arrow')" style="margin-bottom:0;cursor:pointer">
         <span style="font-weight:800;font-size:14px">📅 Período e Filtros</span>
@@ -1831,6 +1825,12 @@ select option{background:#1A2A3A}
       </div>
 
       <div id="bank-filtros-body" style="margin-top:12px">
+
+        <!-- Botão importar OFX (movido para dentro do card) -->
+        <label id="bank-ofx-btn" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--t2)">
+          📂 Importar extrato OFX
+          <input type="file" id="bank-ofx-input" accept=".ofx,.OFX" style="display:none" onchange="importarOFX(this)">
+        </label>
 
         <!-- Seletor de período -->
         <div id="bank-extratos-hist" style="margin-bottom:12px"></div>
@@ -1863,7 +1863,7 @@ select option{background:#1A2A3A}
             <span style="font-size:12px;font-weight:700;color:var(--t2)">📁 Arquivos importados</span>
             <span class="coll-arrow" id="bank-arquivos-arrow" style="transform:rotate(-90deg);font-size:13px">▾</span>
           </div>
-          <div id="bank-arquivos-body" style="display:none;margin-top:8px" id="bank-arquivos-list"></div>
+          <div id="bank-arquivos-body" style="display:none;margin-top:8px"></div>
         </div>
 
       </div>
@@ -6455,38 +6455,46 @@ function sincronizarContasBanco(cb){
 }
 
 // ── Sincronização de Extratos OFX ────────────────────────
+function _extratoJaExiste(lista, ex){
+  // Deduplicar por ID OU por arquivo+período (evita duplicata quando sync
+  // traz do servidor um extrato já importado localmente com ID diferente)
+  return lista.some(function(e){
+    if(String(e.id) === String(ex.id)) return true;
+    if(e.arquivo && ex.arquivo && e.arquivo === ex.arquivo &&
+       e.dataIni === ex.dataIni && e.dataFim === ex.dataFim) return true;
+    return false;
+  });
+}
+
 function sincronizarExtratos(cb){
   if(!CONTAS_BANCO.length){ if(cb) cb(); return; }
-
   var contas  = CONTAS_BANCO.slice();
   var pending = contas.length;
 
   contas.forEach(function(conta){
-    var cid      = String(conta.id);
-    var locais   = EXTRATOS[cid] || [];
-    var localIds = {};
-    locais.forEach(function(ex){ localIds[String(ex.id)] = true; });
+    var cid    = String(conta.id);
+    var locais = EXTRATOS[cid] || [];
 
     apiCall('getExtratos', {contaId: cid}, function(err, d){
       var serverList = (!err && d && d.ok && d.data) ? d.data : [];
-      var serverIds  = {};
-      serverList.forEach(function(ex){ serverIds[String(ex.id)] = true; });
 
-      // Enviar extratos locais que o servidor não tem
+      // Enviar ao servidor extratos locais que ainda não estão lá
       locais.forEach(function(ex){
-        if(!serverIds[String(ex.id)]){
+        if(!_extratoJaExiste(serverList, ex)){
           apiCall('salvarExtrato', Object.assign({contaId: cid}, ex), function(){});
         }
       });
 
-      // Trazer extratos do servidor que não estão no local
+      // Trazer do servidor extratos que não existem localmente
+      var mudou = false;
       serverList.forEach(function(ex){
-        if(!localIds[String(ex.id)]){
+        if(!_extratoJaExiste(locais, ex)){
           if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
           EXTRATOS[cid].push(ex);
+          mudou = true;
         }
       });
-      saveExtratos();
+      if(mudou) saveExtratos();
 
       pending--;
       if(pending === 0 && cb) cb();
@@ -6567,9 +6575,9 @@ function _atualizarLabelFiltros(){
   var partes = [];
   if(curExtratoSel !== 'todos'){
     var ex = (EXTRATOS[String(curBankContaId)]||[])[curExtratoSel];
-    if(ex) partes.push(fmtDate(ex.dataIni)+'→'+fmtDate(ex.dataFim));
+    if(ex) partes.push(_mesLabel(ex));
   } else {
-    partes.push('Todos os períodos');
+    partes.push('Todos');
   }
   if(tipo==='D') partes.push('Débitos');
   if(tipo==='C') partes.push('Créditos');
@@ -6628,6 +6636,12 @@ function importarOFX(input){
 
       var cid = String(curBankContaId);
       if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
+
+      // Verificar se este extrato já foi importado (mesmo arquivo + mesmo período)
+      if(_extratoJaExiste(EXTRATOS[cid], {arquivo:file.name, dataIni:parsed.dataIni, dataFim:parsed.dataFim})){
+        toast('⚠️ Este extrato já foi importado anteriormente','err');
+        input.value = ''; return;
+      }
       EXTRATOS[cid].push(extrato);
       saveExtratos();
 
@@ -6708,15 +6722,24 @@ function renderHistExtratosImportados(){
   _atualizarLabelFiltros();
 }
 
+function _mesLabel(ex){
+  // Retorna "Junho/2026" baseado no mês/ano do extrato
+  var mes = (ex.dataIni||ex.dataFim||'').substring(0,7); // YYYY-MM
+  if(!mes) return esc(ex.arquivo||'').substring(0,14);
+  var partes = mes.split('-');
+  return MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+}
+
 function _renderSeletorPeriodo(){
   var el = document.getElementById('bank-extratos-hist');
   if(!el) return;
   var lista = EXTRATOS[String(curBankContaId)] || [];
   if(!lista.length){ el.innerHTML=''; return; }
 
+  // Agrupar por YYYY-MM (sem duplicar chips do mesmo mês)
   var grupos = {};
   lista.forEach(function(ex, idx){
-    var mes = (ex.dataIni||'').substring(0,7) || (ex.dataFim||'').substring(0,7) || 'sem-data';
+    var mes = (ex.dataIni||ex.dataFim||'').substring(0,7) || 'sem-data';
     if(!grupos[mes]) grupos[mes] = [];
     grupos[mes].push({idx:idx, ex:ex});
   });
@@ -6731,23 +6754,17 @@ function _renderSeletorPeriodo(){
   meses.forEach(function(mes){
     var itens = grupos[mes];
     if(itens.length === 1){
-      var ex  = itens[0].ex;
-      var idx = itens[0].idx;
-      var ativo = curExtratoSel === idx;
-      var label = mes !== 'sem-data'
-        ? MESES_BR[parseInt(mes.split('-')[1])-1]+'/'+mes.split('-')[0]
-        : esc(ex.arquivo).substring(0,10);
-      html += _chipBtn(idx, label, ativo);
+      var ativo = curExtratoSel === itens[0].idx;
+      html += _chipBtn(itens[0].idx, _mesLabel(itens[0].ex), ativo);
     } else {
-      itens.forEach(function(item){
+      // Múltiplos extratos no mesmo mês — numerar para distinguir
+      itens.forEach(function(item, i){
         var ativo = curExtratoSel === item.idx;
-        var ini = item.ex.dataIni ? fmtDate(item.ex.dataIni) : '';
-        var fim = item.ex.dataFim ? fmtDate(item.ex.dataFim) : '';
-        var label = ini && fim ? ini+'→'+fim : esc(item.ex.arquivo).substring(0,12);
-        html += _chipBtn(item.idx, label, ativo);
+        html += _chipBtn(item.idx, _mesLabel(item.ex)+(i>0?' ('+(i+1)+')':''), ativo);
       });
     }
   });
+
   html += '</div>';
   el.innerHTML = html;
 }
