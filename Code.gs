@@ -1070,6 +1070,18 @@ function deletarItemSheet(nomeAba, id) {
   return { ok: true };
 }
 
+function getItemsSheet(nomeAba) {
+  var sheet = ss().getSheetByName(nomeAba);
+  if (!sheet) return { ok: true, data: [] };
+  var dados = sheet.getDataRange().getValues();
+  var result = [];
+  for (var i = 1; i < dados.length; i++) {
+    if (!dados[i][1]) continue;
+    try { result.push(JSON.parse(String(dados[i][1]))); } catch(e) {}
+  }
+  return { ok: true, data: result };
+}
+
 // ════════════════════════════════════════════════════════════
 //  DÍVIDAS — EXTRATO CRONOLÓGICO de empréstimos e dívidas
 //  Cria automaticamente uma planilha Google SEPARADA com:
