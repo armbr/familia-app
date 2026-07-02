@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-144442</title>
+<title>Fluxo v20260702-170601</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -6552,6 +6552,17 @@ function _extratoJaExiste(lista, ex){
   });
 }
 
+function _chaveExtrato(ex){
+  return (ex.arquivo||'')+'|'+(ex.dataIni||'')+'|'+(ex.dataFim||'');
+}
+
+function _mesclarTxs(txsA, txsB){
+  var fitMap = {};
+  (txsA||[]).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+  (txsB||[]).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+  return Object.keys(fitMap).map(function(k){ return fitMap[k]; });
+}
+
 function sincronizarExtratos(cb){
   if(!CONTAS_BANCO.length){ if(cb) cb(); return; }
   var contas  = CONTAS_BANCO.slice();
@@ -6562,40 +6573,57 @@ function sincronizarExtratos(cb){
     var locais = EXTRATOS[cid] || [];
 
     apiCall('getExtratos', {contaId: cid}, function(err, d){
+      // Servidor já vem deduplicado por chave (getExtratosSheet mescla
+      // linhas duplicadas automaticamente) — é a fonte de verdade.
       var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      var serverMap  = {};
+      serverList.forEach(function(ex){ serverMap[_chaveExtrato(ex)] = ex; });
 
-      // Enviar ao servidor extratos locais que ainda não estão lá
+      // Reconstruir localMap a partir do array local — automaticamente
+      // elimina qualquer duplicata local pré-existente (mesma chave).
+      var localMap = {};
       locais.forEach(function(ex){
-        if(!_extratoJaExiste(serverList, ex)){
-          salvarExtratoChunked(cid, ex, function(err){
-            if(err) console.warn('Erro ao sincronizar extrato:', err);
-          });
+        var key = _chaveExtrato(ex);
+        if(!localMap[key]) localMap[key] = ex;
+        else localMap[key].txs = _mesclarTxs(localMap[key].txs, ex.txs); // mescla se já havia dupe local
+      });
+
+      // Resultado final: para cada chave, mesclar local+servidor (união das txs)
+      var todasChaves = {};
+      Object.keys(localMap).forEach(function(k){ todasChaves[k]=true; });
+      Object.keys(serverMap).forEach(function(k){ todasChaves[k]=true; });
+
+      var resultado = [];
+      var novosParaEnviar = [];
+
+      Object.keys(todasChaves).forEach(function(key){
+        if(isTombstoned('extratos', key)) return; // excluído — não trazer de volta nem reenviar
+        var l = localMap[key];
+        var s = serverMap[key];
+        if(l && s){
+          // Existe nos dois — mesclar transações, preferir metadados do servidor
+          var merged = Object.assign({}, s, { txs: _mesclarTxs(l.txs, s.txs) });
+          resultado.push(merged);
+        } else if(l && !s){
+          // Só existe localmente — precisa subir para o servidor
+          resultado.push(l);
+          novosParaEnviar.push(l);
+        } else if(s && !l){
+          // Só existe no servidor — trazer para local
+          resultado.push(s);
         }
       });
 
-      // Trazer do servidor extratos que não existem localmente
-      serverList.forEach(function(ex){
-        if(!_extratoJaExiste(locais, ex)){
-          if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
-          EXTRATOS[cid].push(ex);
-        }
-      });
-
-      // ── PROPAGAÇÃO DE EXCLUSÕES ──────────────────────────
-      // Remover localmente extratos que foram excluídos em outro dispositivo
-      // (estavam no local mas não estão mais no servidor)
-      if(serverList.length > 0 || locais.length > 0){
-        var antes = (EXTRATOS[cid]||[]).length;
-        EXTRATOS[cid] = (EXTRATOS[cid]||[]).filter(function(ex){
-          return _extratoJaExiste(serverList, ex);
-        });
-        if(EXTRATOS[cid].length !== antes){
-          // Resetar seleção se o extrato selecionado foi removido
-          if(curBankContaId === conta.id) curExtratoSel = 'todos';
-        }
-      }
-
+      EXTRATOS[cid] = resultado;
       saveExtratos();
+
+      // Enviar ao servidor o que só existia localmente
+      novosParaEnviar.forEach(function(ex){
+        salvarExtratoChunked(cid, ex, function(err2){
+          if(err2) console.warn('Erro ao sincronizar extrato:', err2);
+        });
+      });
+
       pending--;
       if(pending === 0 && cb) cb();
     });
@@ -6722,8 +6750,7 @@ function _renderSeletorPeriodo(){
   meses.forEach(function(mes){
     var p = mes.split('-');
     var label = MESES_BR[parseInt(p[1])-1]+'/'+p[0];
-    var count = todasTxs.filter(function(tx){ return tx.data && tx.data.substring(0,7)===mes; }).length;
-    html += _chipBtn(mes, label+' <span style="font-size:9px;opacity:.7">('+count+')</span>', curExtratoSel === mes);
+    html += _chipBtn(mes, label, curExtratoSel === mes);
   });
 
   html += '</div>';
@@ -6853,13 +6880,22 @@ function delExtrato(idx){
   var extrato = lista[idx];
   if(!extrato) return;
   if(!confirm('Remover este extrato e suas '+(extrato.txs||[]).length+' transações?')) return;
+
+  var key = _chaveExtrato(extrato);
+  addTombstone('extratos', key); // impede que volte em uma próxima sincronização
+
   lista.splice(idx, 1);
   if(lista.length === 0) delete EXTRATOS[cid];
   saveExtratos();
-  // Apagar no servidor — usa GET pois só envia IDs (pequeno)
-  apiCall('deletarExtrato', {contaId: cid, extratoId: String(extrato.id)}, function(err){
+
+  // Remove TODAS as linhas do servidor com essa mesma chave — importante
+  // porque pode haver duplicatas físicas na planilha de versões antigas
+  apiCall('deletarExtratoPorChave', {
+    contaId: cid, arquivo: extrato.arquivo, dataIni: extrato.dataIni, dataFim: extrato.dataFim
+  }, function(err){
     if(err) console.warn('Erro ao deletar extrato no servidor:', err);
   });
+
   curExtratoSel = 'todos';
   selecionarConta(curBankContaId);
   toast('🗑️ Extrato removido');
