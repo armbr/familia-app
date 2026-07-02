@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-135530</title>
+<title>Fluxo v20260702-141922</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -6432,6 +6432,34 @@ function saveContasBanco(){ localStorage.setItem('ff_contas_banco', JSON.stringi
 function saveExtratos()   { localStorage.setItem('ff_extratos',     JSON.stringify(EXTRATOS));     }
 function saveNotasOFX()   { localStorage.setItem('ff_notas_ofx',    JSON.stringify(NOTAS_OFX));    }
 
+// Upload de extrato em chunks pequenos via GET (evita limite de URL e
+// problemas com CORS/POST no Google Apps Script)
+var CHUNK_SIZE = 30; // transações por requisição
+
+function salvarExtratoChunked(cid, extrato, cb){
+  var txs = extrato.txs || [];
+  // 1. Salva metadata + primeiras txs (sem exceder URL limit)
+  var meta = Object.assign({}, extrato, {contaId: cid, txs: []});
+  apiCall('salvarExtrato', meta, function(err){
+    if(err){ if(cb) cb(err); return; }
+    if(!txs.length){ if(cb) cb(null); return; }
+    // 2. Envia txs em lotes de CHUNK_SIZE
+    var chunks = [];
+    for(var i=0; i<txs.length; i+=CHUNK_SIZE) chunks.push(txs.slice(i,i+CHUNK_SIZE));
+    var idx=0;
+    function enviarProximo(){
+      if(idx>=chunks.length){ if(cb) cb(null); return; }
+      apiCall('adicionarTxsExtrato',{
+        contaId: cid, extratoId: String(extrato.id), txs: chunks[idx++]
+      }, function(err2){
+        if(err2){ if(cb) cb(err2); return; }
+        enviarProximo();
+      });
+    }
+    enviarProximo();
+  });
+}
+
 var TIPO_BANCO_LABEL = {
   corrente: 'Conta Corrente', poupanca: 'Poupança',
   pj: 'Conta PJ', investimento: 'Investimento', digital: 'Carteira Digital'
@@ -6517,7 +6545,9 @@ function sincronizarExtratos(cb){
       // Enviar ao servidor extratos locais que ainda não estão lá
       locais.forEach(function(ex){
         if(!_extratoJaExiste(serverList, ex)){
-          apiPostRaw('salvarExtrato', Object.assign({contaId: cid}, ex), function(){});
+          salvarExtratoChunked(cid, ex, function(err){
+            if(err) console.warn('Erro ao sincronizar extrato:', err);
+          });
         }
       });
 
@@ -6691,15 +6721,108 @@ function _renderListaArquivos(){
   el.innerHTML = lista.slice().reverse().map(function(ex, i){
     var idx = lista.length - 1 - i;
     var txCount = (ex.txs||[]).length;
-    var sel = curExtratoSel === idx;
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:'+(sel?'rgba(93,130,240,.08)':'var(--bg3)')+';border-radius:8px;margin-bottom:4px;gap:8px;border-left:3px solid '+(sel?'var(--blue)':'transparent')+'">' +
-      '<div style="min-width:0;cursor:pointer;flex:1" onclick="selecionarPeriodo('+idx+')">'+
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg3);border-radius:8px;margin-bottom:4px;gap:8px">' +
+      '<div style="min-width:0;flex:1">'+
         '<div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ex.arquivo)+'</div>'+
-        '<div style="font-size:10px;color:var(--t3)">'+fmtDate(ex.dataIni)+' → '+fmtDate(ex.dataFim)+' · '+txCount+' tx'+(ex.saldoFim?' · saldo: '+fmtBRL(ex.saldoFim):'')+' · importado '+new Date(ex.importadoEm).toLocaleDateString('pt-BR')+'</div>'+
+        '<div style="font-size:10px;color:var(--t3)">'+fmtDate(ex.dataIni)+' → '+fmtDate(ex.dataFim)+' · '+txCount+' transações'+(ex.saldoFim?' · saldo: '+fmtBRL(ex.saldoFim):'')+' · imp. '+new Date(ex.importadoEm).toLocaleDateString('pt-BR')+'</div>'+
       '</div>'+
       '<button data-delextrato="'+idx+'" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;flex-shrink:0;padding:2px" title="Remover extrato">🗑️</button>'+
     '</div>';
   }).join('');
+}
+
+// ── Importação OFX ────────────────────────────────────────
+function importarOFX(input){
+  if(!curBankContaId){ toast('⚠️ Selecione uma conta antes de importar','err'); input.value=''; return; }
+  var file = input.files[0];
+  if(!file) return;
+  toast('📂 Lendo arquivo...');
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var parsed = parseOFX(e.target.result);
+      if(!parsed.txs.length){ toast('⚠️ Nenhuma transação encontrada no arquivo','err'); input.value=''; return; }
+
+      var cid = String(curBankContaId);
+      if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
+
+      // Verificar duplicata por nome+período
+      if(_extratoJaExiste(EXTRATOS[cid], {arquivo:file.name, dataIni:parsed.dataIni, dataFim:parsed.dataFim})){
+        // Mas ainda assim atualizar as txs (pode ter mais transações na versão nova)
+        var existente = EXTRATOS[cid].find(function(ex){ return ex.arquivo===file.name && ex.dataIni===parsed.dataIni; });
+        if(existente){
+          var fitMap = {};
+          (existente.txs||[]).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+          parsed.txs.forEach(function(tx){ fitMap[tx.fitId] = tx; });
+          existente.txs = Object.values(fitMap);
+          saveExtratos();
+          if(API) salvarExtratoChunked(cid, existente, function(){});
+          selecionarConta(curBankContaId);
+          toast('🔄 '+Object.values(fitMap).length+' transações atualizadas (arquivo já existia)');
+          input.value=''; return;
+        }
+      }
+
+      var extrato = {
+        id:          Date.now(),
+        arquivo:     file.name,
+        banco:       parsed.banco,
+        conta:       parsed.contaNum,
+        dataIni:     parsed.dataIni,
+        dataFim:     parsed.dataFim,
+        saldoFim:    parsed.saldoFim,
+        importadoEm: new Date().toISOString(),
+        txs:         parsed.txs
+      };
+
+      EXTRATOS[cid].push(extrato);
+      saveExtratos();
+
+      if(API){
+        toast('☁️ Enviando para nuvem... ('+parsed.txs.length+' transações)');
+        salvarExtratoChunked(cid, extrato, function(err){
+          if(err) toast('⚠️ Salvo localmente mas erro na nuvem: '+err,'err');
+          else toast('✅ '+parsed.txs.length+' transações importadas e sincronizadas!');
+        });
+      } else {
+        toast('✅ '+parsed.txs.length+' transações importadas!');
+      }
+
+      selecionarConta(curBankContaId);
+    } catch(err){
+      console.error('OFX parse error:', err);
+      toast('❌ Erro ao ler o arquivo: '+err.message,'err');
+    }
+    input.value = '';
+  };
+  reader.onerror = function(){ toast('❌ Erro ao ler o arquivo','err'); };
+  reader.readAsText(file, 'ISO-8859-1');
+}
+
+function parseOFX(texto){
+  var t = texto.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  function tag(nome){
+    var re = new RegExp('<'+nome+'>([^<\\n]+)','i');
+    var m = t.match(re); return m ? m[1].trim() : '';
+  }
+  function parseOfxDate(d){
+    if(!d) return '';
+    d = d.replace(/\[.*\]/,'').trim();
+    if(d.length>=8) return d.substring(0,4)+'-'+d.substring(4,6)+'-'+d.substring(6,8);
+    return '';
+  }
+  var blocos = t.split(/<STMTTRN>/i).slice(1);
+  var txs = blocos.map(function(b,idx){
+    var tipo  = (b.match(/<TRNTYPE>([^\n<]+)/i)||[])[1]||'';
+    var data  = parseOfxDate((b.match(/<DTPOSTED>([^\n<]+)/i)||[])[1]||'');
+    var val   = parseFloat((b.match(/<TRNAMT>([^\n<]+)/i)||[])[1]||0);
+    var fitId = (b.match(/<FITID>([^\n<]+)/i)||[])[1]||('tx'+idx);
+    var memo  = (b.match(/<MEMO>([^\n<]+)/i)||[])[1]||'';
+    var name  = (b.match(/<NAME>([^\n<]+)/i)||[])[1]||'';
+    var desc  = (memo||name||'—').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();
+    return { fitId:fitId.trim(), tipo:(tipo.trim().toUpperCase()==='CREDIT'||val>0)?'C':'D', data:data, valor:Math.abs(val), desc:desc };
+  }).filter(function(tx){ return tx.data && tx.valor>0; });
+  return { banco:tag('BANKID')||tag('ORG')||'Banco', contaNum:tag('ACCTID')||'', dataIni:parseOfxDate(tag('DTSTART')), dataFim:parseOfxDate(tag('DTEND')), saldoFim:parseFloat(tag('BALAMT'))||0, txs:txs };
 }
 
 function delExtrato(idx){
