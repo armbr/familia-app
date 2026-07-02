@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-180800</title>
+<title>Fluxo v20260702-202015</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1479,44 +1479,82 @@ select option{background:#1A2A3A}
       <div id="div-form-body" style="display:none;margin-top:12px">
         <div style="margin-bottom:10px">
           <div class="fl">Direção</div>
-          <div style="display:flex;gap:8px">
-            <button type="button" id="dv-tipo-devo" onclick="setDvTipo('devo')" class="vbtn on" style="flex:1;padding:10px;border-radius:10px">😟 Eu devo</button>
-            <button type="button" id="dv-tipo-recebo" onclick="setDvTipo('recebo')" class="vbtn" style="flex:1;padding:10px;border-radius:10px">🤝 Me devem</button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" id="dv-tipo-devo" onclick="setDvTipo('devo')" class="vbtn on" style="flex:1;min-width:90px;padding:10px 6px;border-radius:10px;font-size:12px">😟 Eu devo</button>
+            <button type="button" id="dv-tipo-recebo" onclick="setDvTipo('recebo')" class="vbtn" style="flex:1;min-width:90px;padding:10px 6px;border-radius:10px;font-size:12px">🤝 Me devem</button>
+            <button type="button" id="dv-tipo-financiamento" onclick="setDvTipo('financiamento')" class="vbtn" style="flex:1;min-width:90px;padding:10px 6px;border-radius:10px;font-size:12px">🏦 Financiamento</button>
           </div>
           <input type="hidden" id="dv-tipo" value="devo">
         </div>
-        <div style="margin-bottom:10px">
+
+        <div id="dv-pag-wrap" style="margin-bottom:10px">
           <div class="fl">Pessoa</div>
           <select id="dv-pag"><option value="">— selecione uma pessoa —</option></select>
         </div>
-        <div style="margin-bottom:10px"><div class="fl">Descrição</div>
+
+        <div style="margin-bottom:10px"><div class="fl" id="dv-desc-label">Descrição</div>
           <input id="dv-desc" type="text" placeholder="Ex: Empréstimo, parcela atrasada, acordo" maxlength="120">
         </div>
-        <div class="row2" style="margin-bottom:10px">
-          <div><div class="fl">Valor original (R$)</div><div class="r-wrap"><input id="dv-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
-          <div><div class="fl">Data de início</div><input id="dv-data" type="date"></div>
-        </div>
-        <div style="margin-bottom:10px">
-          <div class="fl">Método de cálculo de juros</div>
-          <select id="dv-metodo" onchange="toggleCamposJuros()">
-            <option value="fixo_simples">Taxa fixa mensal — juros simples</option>
-            <option value="fixo_composto">Taxa fixa mensal — juros compostos</option>
-            <option value="indexador">Apenas indexador (IGPM/INPC/CDI/SELIC)</option>
-            <option value="indexador_mais_taxa">Indexador + taxa adicional</option>
-          </select>
-        </div>
-        <div class="row2" style="margin-bottom:10px">
-          <div id="dv-taxa-wrap"><div class="fl">Taxa mensal (%)</div><input id="dv-taxa" type="number" placeholder="Ex: 2" step="0.01" min="0" inputmode="decimal"></div>
-          <div id="dv-idx-wrap" style="display:none"><div class="fl">Indexador</div>
-            <select id="dv-indexador">
-              <option value="IGPM">IGPM</option>
-              <option value="INPC">INPC</option>
-              <option value="CDI">CDI</option>
-              <option value="SELIC">SELIC</option>
+
+        <!-- Campos de DEVO / RECEBO -->
+        <div id="dv-campos-livre">
+          <div class="row2" style="margin-bottom:10px">
+            <div><div class="fl">Valor original (R$)</div><div class="r-wrap"><input id="dv-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+            <div><div class="fl">Data de início</div><input id="dv-data" type="date"></div>
+          </div>
+          <div style="margin-bottom:10px">
+            <div class="fl">Método de cálculo de juros</div>
+            <select id="dv-metodo" onchange="toggleCamposJuros()">
+              <option value="fixo_simples">Taxa fixa mensal — juros simples</option>
+              <option value="fixo_composto">Taxa fixa mensal — juros compostos</option>
+              <option value="indexador">Apenas indexador (IGPM/INPC/CDI/SELIC)</option>
+              <option value="indexador_mais_taxa">Indexador + taxa adicional</option>
             </select>
           </div>
+          <div class="row2" style="margin-bottom:10px">
+            <div id="dv-taxa-wrap"><div class="fl">Taxa mensal (%)</div><input id="dv-taxa" type="number" placeholder="Ex: 2" step="0.01" min="0" inputmode="decimal"></div>
+            <div id="dv-idx-wrap" style="display:none"><div class="fl">Indexador</div>
+              <select id="dv-indexador">
+                <option value="IGPM">IGPM</option>
+                <option value="INPC">INPC</option>
+                <option value="CDI">CDI</option>
+                <option value="SELIC">SELIC</option>
+              </select>
+            </div>
+          </div>
         </div>
-        <button class="btn" onclick="addDivida()">+ Registrar</button>
+
+        <!-- Campos de FINANCIAMENTO -->
+        <div id="dv-campos-financiamento" style="display:none">
+          <div class="row2" style="margin-bottom:10px">
+            <div><div class="fl">Valor financiado (R$)</div><div class="r-wrap"><input id="dv-fin-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+            <div><div class="fl">Data da 1ª parcela</div><input id="dv-fin-data" type="date"></div>
+          </div>
+          <div class="row2" style="margin-bottom:10px">
+            <div><div class="fl">Sistema de amortização</div>
+              <select id="dv-fin-sistema">
+                <option value="PRICE">Price (parcelas fixas)</option>
+                <option value="SAC">SAC (parcelas decrescentes)</option>
+              </select>
+            </div>
+            <div><div class="fl">Número total de parcelas</div><input id="dv-fin-parcelas" type="number" placeholder="Ex: 48" step="1" min="1" inputmode="numeric"></div>
+          </div>
+          <div style="margin-bottom:10px">
+            <div class="fl">Tipo de taxa</div>
+            <div style="display:flex;gap:6px">
+              <button type="button" id="dv-fin-taxatipo-fixa" onclick="setFinTaxaTipo('fixa')" class="vbtn on" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📌 Fixa</button>
+              <button type="button" id="dv-fin-taxatipo-indexada" onclick="setFinTaxaTipo('indexada')" class="vbtn" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📊 Indexada (Selic/CDI)</button>
+            </div>
+            <input type="hidden" id="dv-fin-taxatipo" value="fixa">
+          </div>
+          <div class="row2" style="margin-bottom:10px">
+            <div><div class="fl" id="dv-fin-taxa-label">Taxa de juros mensal (%)</div><input id="dv-fin-taxa" type="number" placeholder="Ex: 1,5" step="0.01" min="0" inputmode="decimal"></div>
+            <div><div class="fl">Parcelas já pagas <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-fin-pagas" type="number" placeholder="0" step="1" min="0" inputmode="numeric" value="0"></div>
+          </div>
+          <div id="dv-fin-taxa-hint" style="display:none;font-size:11px;color:var(--t3);margin:-6px 0 10px;line-height:1.4">📊 A taxa muda ao longo do tempo. Depois de cadastrar, use o botão "🔄 Taxa" no card sempre que o banco avisar uma mudança.</div>
+        </div>
+
+        <button class="btn" id="dv-btn-registrar" onclick="addDivida()">+ Registrar</button>
       </div><!-- /div-form-body -->
     </div>
 
@@ -1539,6 +1577,20 @@ select option{background:#1A2A3A}
       <button onclick="closeDivHistModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
     </div>
     <div id="divhist-body"></div>
+  </div>
+</div>
+
+<!-- Modal: Amortização Extraordinária (Financiamento) -->
+<div id="amortextra-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800">⚡ Amortização Extra</div>
+      <button onclick="closeAmortExtra()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="margin-bottom:12px"><div class="fl">Valor a amortizar (R$)</div>
+      <div class="r-wrap"><input id="amortextra-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal" oninput="previewAmortExtra()"></div>
+    </div>
+    <div id="amortextra-preview"></div>
   </div>
 </div>
 
@@ -3294,12 +3346,28 @@ function renderBal(){
 
 function renderHist(){
   try{
-    // chips de mês removidos — usar seletor do topo
     var txs=filteredTxs();
+
+    // Mesclar compras no cartão do mês selecionado — cada parcela
+    // aparece como um card próprio, igual a uma despesa normal, com
+    // ícone indicando que é do cartão e é parcelada. Independe de a
+    // fatura já ter sido fechada (fechar fatura não duplica o valor).
+    var jaEmTx = _cgastoIdsJaEmTx();
+    var cgastosDoMes = CGASTOS.filter(function(g){ return g.fatMes===selMonth && !jaEmTx[String(g.id)]; })
+      .map(function(g){
+        return {
+          id: 'cg-'+g.id, type:'exp', desc:g.desc, value:g.val, cat:g.cat, date:g.data,
+          __cgasto:true, __cgastoRealId:g.id, cartaoNome:g.cartao,
+          parcelaAtual:g.parcelaAtual||1, parcelaTotal:g.parcelaTotal||1, valorCompraTotal:g.valorCompraTotal||g.val
+        };
+      });
+
+    var todos = txs.concat(cgastosDoMes).sort(function(a,b){ return ymds(b.date) < ymds(a.date) ? -1 : 1; });
+
     var el=document.getElementById('tx-list');
     if(!el) return;
-    el.innerHTML=txs.length
-      ? txs.map(txCard).join('')
+    el.innerHTML=todos.length
+      ? todos.map(txCard).join('')
       : emptyHTML('📭','Nenhum lançamento','Nenhum registro neste período');
   }catch(e){ console.error('renderHist',e); }
 }
@@ -3316,8 +3384,24 @@ function selMon(m){
 // Soma os gastos de cartão AINDA NÃO PAGOS de um mês — usado tanto no
 // saldo do mês quanto no gráfico de categorias, para que os dois sempre
 // coincidam.
+// Retorna o conjunto de IDs de CGASTOS que já foram convertidos em TXS
+// por faturas fechadas ANTES desta atualização (versões antigas criavam
+// um TX por categoria ao fechar fatura). Usado para não contar esses
+// gastos duas vezes agora que os CGASTOS aparecem diretamente.
+function _cgastoIdsJaEmTx(){
+  var set = {};
+  TXS.forEach(function(t){
+    if(t.cgastoIds) t.cgastoIds.forEach(function(gid){ set[String(gid)] = true; });
+  });
+  return set;
+}
+
+// Soma TODOS os gastos de cartão de um mês (pagos ou não) — a categoria
+// já reflete a compra desde o momento em que ela foi feita, independente
+// de a fatura já ter sido fechada/paga (fechar fatura não duplica valor).
 function totalCGastosAbertos(moStr){
-  return CGASTOS.filter(function(g){ return g.fatMes===moStr && !g.pago; })
+  var jaEmTx = _cgastoIdsJaEmTx();
+  return CGASTOS.filter(function(g){ return g.fatMes===moStr && !jaEmTx[String(g.id)]; })
     .reduce(function(s,g){ return s+parseFloat(g.val||0); }, 0);
 }
 
@@ -3340,13 +3424,17 @@ function renderCat(){
       addItem(t.cat||'📦 Outros', {desc:t.desc, value:parseFloat(t.value||0), date:t.date});
     });
 
-  // 2. Gastos do cartão do mês AINDA NÃO PAGOS (fatura aberta) —
-  //    mostrados pela categoria real (alimentação, saúde etc.) no
-  //    mês da COMPRA. Quando a fatura for fechada/paga, o valor migra
-  //    automaticamente para os TXS (passo 1) no mês do pagamento.
+  // 2. Gastos do cartão do mês — mostrados pela categoria real
+  //    (alimentação, saúde etc.) no mês de CADA PARCELA. Independe de a
+  //    fatura já ter sido fechada/paga: fechar fatura é só um lembrete
+  //    de pagamento, não gera lançamento novo (evita duplicar valor).
+  //    EXCEÇÃO: gastos já convertidos em TXS por faturas fechadas ANTES
+  //    desta atualização (versões antigas criavam um TX por categoria)
+  //    são pulados aqui, pois já estão contados no passo 1 via TXS.
+  var cgastoIdsJaEmTx = _cgastoIdsJaEmTx();
   var moStr = selMonth;
   CGASTOS.filter(function(g){
-    return g.fatMes === moStr && !g.pago;
+    return g.fatMes === moStr && !cgastoIdsJaEmTx[String(g.id)];
   }).forEach(function(g){
     var cat = g.cat || '💳 Cartão de Crédito';
     addItem(cat, {desc:g.desc, value:parseFloat(g.val||0), date:g.data});
@@ -3413,15 +3501,43 @@ function txCard(t){
   var ico=tp==='exp'?'🔴':'🟢';
   var sig='';
   var sid=String(t.id);
-  return '<div class="txi">'+
+
+  if(!t.__cgasto){
+    // Card padrão — EXATAMENTE como antes, sem nenhuma alteração
+    return '<div class="txi">'+
+      '<div class="txi-ico '+tp+'">'+ico+'</div>'+
+      '<div class="txi-info">'+
+        '<div class="txi-desc">'+esc(t.desc)+'</div>'+
+        '<div class="txi-meta"><span class="txi-cat">'+esc(t.cat||'')+'</span><span>'+fmtDate(t.date)+'</span></div>'+
+      '</div>'+
+      '<div class="txi-val '+tp+'">'+sig+fmtBRL(parseFloat(t.value||0))+'</div>'+
+      '<button class="tdel" data-txdel="'+sid+'">🗑️</button>'+
+    '</div>';
+  }
+
+  // Card de compra no cartão parcelada — mesmo visual base, só um
+  // ícone extra indicando cartão/parcelamento, expansível ao clicar.
+  var detailId = 'cgdetail-'+t.__cgastoRealId;
+  return '<div class="txi" data-txcardtoggle="'+detailId+'" style="cursor:pointer">'+
     '<div class="txi-ico '+tp+'">'+ico+'</div>'+
     '<div class="txi-info">'+
-      '<div class="txi-desc">'+esc(t.desc)+'</div>'+
+      '<div class="txi-desc">'+esc(t.desc)+' <span title="Compra no cartão parcelada" style="font-size:11px">💳</span></div>'+
       '<div class="txi-meta"><span class="txi-cat">'+esc(t.cat||'')+'</span><span>'+fmtDate(t.date)+'</span></div>'+
+      '<div id="'+detailId+'" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;font-size:11px;color:var(--t3)">'+
+        '<div>💳 Cartão: <b style="color:var(--t1)">'+esc(t.cartaoNome||'')+'</b></div>'+
+        '<div>📑 Parcela: <b style="color:var(--t1)">'+t.parcelaAtual+'/'+t.parcelaTotal+'</b></div>'+
+        '<div>💰 Valor total da compra: <b style="color:var(--t1)">'+fmtBRL(t.valorCompraTotal||0)+'</b></div>'+
+      '</div>'+
     '</div>'+
     '<div class="txi-val '+tp+'">'+sig+fmtBRL(parseFloat(t.value||0))+'</div>'+
-    '<button class="tdel" data-txdel="'+sid+'">🗑️</button>'+
+    '<button class="tdel" data-cgastodel="'+t.__cgastoRealId+'">🗑️</button>'+
   '</div>';
+}
+
+function toggleTxCardDetail(detailId){
+  var el = document.getElementById(detailId);
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
 }
 
 // ════════════════════════════════════════
@@ -3536,9 +3652,10 @@ function renderFinCC(){
       html += '<div class="slbl" style="margin-bottom:6px">Lançamentos</div>';
       gastos.sort(function(a,b){return ymds(a.data)>ymds(b.data)?1:-1;});
       html += gastos.map(function(g){
+        var parcBadge = (g.parcelaTotal>1) ? ' <span style="font-size:10px;color:var(--blue);font-weight:700">('+g.parcelaAtual+'/'+g.parcelaTotal+')</span>' : '';
         return '<div class="cc-fatura-item">'+
           '<div style="font-size:16px">'+(g.pago?'✅':'🛍️')+'</div>'+
-          '<div class="fi-info"><div class="fi-desc">'+esc(g.desc)+'</div>'+
+          '<div class="fi-info"><div class="fi-desc">'+esc(g.desc)+parcBadge+'</div>'+
           '<div class="fi-meta">'+esc(g.cat)+' · '+fmtDate(g.data)+'</div></div>'+
           '<div class="fi-val" style="color:'+(g.pago?'var(--t3)':'var(--red)')+'">'+fmtBRL(g.val)+'</div>'+
         '</div>';
@@ -4047,7 +4164,7 @@ function chgTaskStatus(id,s){
       var mesAnoFatura = ymds(t.deadline).substring(0,7);
       var totalFechado = fecharFaturaInterno(recurCartao.cartaoId, mesAnoFatura);
       if(totalFechado !== null){
-        toast('✅ Fatura paga — lançada por categoria em Finanças');
+        toast('✅ Fatura paga — valores já contabilizados por categoria');
       } else {
         toast('✅ '+t.desc+' marcado como pago');
       }
@@ -4172,6 +4289,10 @@ function initTaskDelegation(){
     if(del){ delTask(del.getAttribute('data-del')); return; }
     var txdel = e.target.closest('[data-txdel]');
     if(txdel){ delTx(txdel.getAttribute('data-txdel')); return; }
+    var cgastodel = e.target.closest('[data-cgastodel]');
+    if(cgastodel){ delGasto(cgastodel.getAttribute('data-cgastodel')); return; }
+    var txcardtoggle = e.target.closest('[data-txcardtoggle]');
+    if(txcardtoggle){ toggleTxCardDetail(txcardtoggle.getAttribute('data-txcardtoggle')); return; }
     // Recibos
     var delpag = e.target.closest('[data-delpag]');
     if(delpag){ delPagador(delpag.getAttribute('data-delpag')); return; }
@@ -4179,6 +4300,14 @@ function initTaskDelegation(){
     if(editpag){ editarPagador(editpag.getAttribute('data-editpag')); return; }
     var addmov = e.target.closest('[data-addmov]');
     if(addmov){ abrirNovoMovimento(addmov.getAttribute('data-addmov')); return; }
+    var pagarparcela = e.target.closest('[data-pagarparcela]');
+    if(pagarparcela){ pagarProximaParcela(pagarparcela.getAttribute('data-pagarparcela')); return; }
+    var tabelafin = e.target.closest('[data-tabelafin]');
+    if(tabelafin){ abrirTabelaFinanciamento(tabelafin.getAttribute('data-tabelafin')); return; }
+    var amortextra = e.target.closest('[data-amortextra]');
+    if(amortextra){ abrirAmortizacaoExtra(amortextra.getAttribute('data-amortextra')); return; }
+    var atualizartaxa = e.target.closest('[data-atualizartaxa]');
+    if(atualizartaxa){ atualizarTaxaFinanciamento(atualizartaxa.getAttribute('data-atualizartaxa')); return; }
     var catopen = e.target.closest('[data-catopen]');
     if(catopen){ abrirCategoriaModal(catopen.getAttribute('data-catopen')); return; }
     var ridBtn = e.target.closest('[data-rid]');
@@ -4200,6 +4329,8 @@ function initTaskDelegation(){
     if(delconta){ delContaBanco(delconta.getAttribute('data-delconta')); return; }
     var delextrato = e.target.closest('[data-delextrato]');
     if(delextrato){ delExtrato(parseInt(delextrato.getAttribute('data-delextrato'))); return; }
+    var shareextrato = e.target.closest('[data-shareextrato]');
+    if(shareextrato){ compartilharExtrato(parseInt(shareextrato.getAttribute('data-shareextrato'))); return; }
     var ofxnota = e.target.closest('[data-ofxnota]');
     if(ofxnota){ abrirOfxNota(ofxnota.getAttribute('data-ofxnota'), ofxnota.getAttribute('data-ofxdesc')); return; }
     var txdetail = e.target.closest('[data-txdetail]');
@@ -5509,12 +5640,13 @@ function addGastoCartao(){
   if(!val||val<=0){toast('⚠️ Informe o valor','err');return;}
   var valParc=val/parc;
   var baseDate=new Date(data+'T12:00:00');
+  var compraId=Date.now(); // vincula todas as parcelas desta mesma compra
   for(var p=0;p<parc;p++){
     var d=new Date(baseDate.getFullYear(),baseDate.getMonth()+p,baseDate.getDate());
     var fatMes=faturaDoGasto(d,cartao.fech);
-    var g={id:Date.now()+p,cartaoId:String(cartao.id),cartao:cartao.nome,
-      desc:desc+(parc>1?' ('+(p+1)+'/'+parc+')':''),val:valParc,cat:cat,
-      data:ymd(d),fatMes:fatMes,pago:false};
+    var g={id:compraId+p,cartaoId:String(cartao.id),cartao:cartao.nome,
+      desc:desc, val:valParc, cat:cat, data:ymd(d), fatMes:fatMes, pago:false,
+      compraId:compraId, parcelaAtual:p+1, parcelaTotal:parc, valorCompraTotal:val};
     CGASTOS.push(g);
     apiCall('salvarCGasto',g,function(){});
   }
@@ -5533,7 +5665,7 @@ function addGastoCartao(){
   }
   ['cg-desc','cg-val'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var pgEl=document.getElementById('cg-parc'); if(pgEl) pgEl.value='1';
-  renderCC(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
+  renderCC(); renderHist(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
 }
 function delGasto(id){
   // Encontrar o gasto antes de remover para saber sua fatura
@@ -5573,47 +5705,49 @@ function delGasto(id){
 // (não um único lançamento "Cartão de Crédito"), preservando a real
 // distribuição de gastos nos gráficos por categoria.
 function fecharFaturaInterno(cartaoId, mesAno){
-  var cartao = CARTOES.find(function(c){ return String(c.id)===String(cartaoId); });
   var gastos = CGASTOS.filter(function(g){ return String(g.cartaoId)===String(cartaoId) && g.fatMes===mesAno && !g.pago; });
   if(!gastos.length) return null;
 
   var total = gastos.reduce(function(s,g){ return s+g.val; }, 0);
-  CGASTOS.forEach(function(g){ if(String(g.cartaoId)===String(cartaoId) && g.fatMes===mesAno) g.pago=true; });
+  gastos.forEach(function(g){
+    g.pago = true;
+    apiCall('salvarCGasto', g, function(){}); // persistir a mudança de status no servidor
+  });
   saveCGastos();
+  // Nenhum TX é criado aqui — os valores já entraram nas categorias no
+  // momento de cada compra (ver renderCat/renderHist). Fechar a fatura
+  // só marca os gastos como parte de uma fatura fechada; o lembrete de
+  // pagamento (sem valor financeiro) é criado por fecharFatura().
+  return total;
+}
+
+// Cria (ou evita duplicar) um compromisso simples de lembrete para você
+// marcar como pago manualmente no dia do vencimento. Sem valor financeiro
+// associado — assim, marcá-lo como concluído não lança nada em Finanças.
+function criarLembreteFatura(cartao, mesAno, total){
+  var jaExiste = TASKS.some(function(t){
+    return t.cartaoIdFatura===String(cartao.id) && t.fatMesRef===mesAno && t.status!=='done';
+  });
+  if(jaExiste) return;
 
   var partes = mesAno.split('-');
-  var mesLabel = MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
-  var nomeCartao = cartao ? cartao.nome : 'Cartão';
+  var ano = parseInt(partes[0]), mes = parseInt(partes[1]);
+  var ultimoDia = new Date(ano, mes, 0).getDate();
+  var diaVenc = Math.min(parseInt(cartao.venc)||10, ultimoDia);
+  var deadline = mesAno+'-'+String(diaVenc).padStart(2,'0');
+  var mesLabel = MESES_BR[mes-1]+'/'+ano;
 
-  // Agrupar por categoria real do gasto — guardando IDs dos CGASTOs
-  // fonte de cada TX para poder rastrear e remover se o gasto for excluído
-  var porCat = {};
-  var gastosPorCat = {};
-  gastos.forEach(function(g){
-    var c = g.cat || '📦 Outros';
-    porCat[c] = (porCat[c]||0) + g.val;
-    (gastosPorCat[c] = gastosPorCat[c] || []).push(String(g.id));
+  var tmp = Date.now();
+  var task = {
+    id: tmp, desc: '💳 Pagar fatura '+cartao.nome+' — '+mesLabel+' ('+fmtBRL(total)+')',
+    type: 'task', deadline: deadline, status: 'pend',
+    cartaoIdFatura: String(cartao.id), fatMesRef: mesAno // marcadores p/ evitar duplicar
+  };
+  TASKS.unshift(task);
+  localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+  apiCall('addTask', task, function(err){
+    if(err) console.warn('Lembrete de fatura não sincronizado:', err);
   });
-
-  Object.keys(porCat).forEach(function(cat){
-    var tx = {
-      type: 'exp',
-      desc: nomeCartao + ' · ' + mesLabel + ' — ' + cat,
-      value: porCat[cat],
-      cat: cat,
-      date: ymd(new Date()),
-      fromAgenda: true,
-      cgastoIds: gastosPorCat[cat] || [],   // ← vínculo com os gastos originais
-      fatMesOrigem: mesAno                   // ← mês da compra (não do pagamento)
-    };
-    var tmp = Date.now() + Math.random();
-    TXS.unshift(Object.assign({id:tmp}, tx));
-    apiCall('addTransaction', tx, function(err){
-      if(err){ TXS = TXS.filter(function(t){ return t.id!==tmp; }); save(); }
-    });
-  });
-  save();
-  return total;
 }
 
 function fecharFatura(cartaoId,mesAno){
@@ -5624,9 +5758,11 @@ function fecharFatura(cartaoId,mesAno){
   var total=gastos.reduce(function(s,g){return s+g.val;},0);
   var partes=mesAno.split('-');
   var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
-  if(!confirm('Fechar fatura de '+cartao.nome+' — '+mesLabel+'\nTotal: '+fmtBRL(total)+'\n\nOs valores serão lançados em Finanças por categoria real (não como um único item "Cartão de Crédito").\n\nConfirmar?')) return;
+  if(!confirm('Fechar fatura de '+cartao.nome+' — '+mesLabel+'\nTotal: '+fmtBRL(total)+'\n\nOs valores já foram contabilizados por categoria no momento de cada compra — fechar a fatura não lança nada de novo. Será criado apenas um lembrete de pagamento na Agenda.\n\nConfirmar?')) return;
   fecharFaturaInterno(cartaoId, mesAno);
-  renderCC(); renderBal(); renderAll(); toast('✅ Fatura fechada! '+fmtBRL(total));
+  criarLembreteFatura(cartao, mesAno, total);
+  renderCC(); renderBal(); renderAll(); renderTasks();
+  toast('✅ Fatura fechada! Lembrete criado na Agenda para o vencimento.');
 }
 function renderListaCartoes(){
   var el=document.getElementById('cc-list'); if(!el) return;
@@ -5772,6 +5908,14 @@ function setDvTipo(tipo){
   document.getElementById('dv-tipo').value = tipo;
   document.getElementById('dv-tipo-devo').classList.toggle('on', tipo==='devo');
   document.getElementById('dv-tipo-recebo').classList.toggle('on', tipo==='recebo');
+  document.getElementById('dv-tipo-financiamento').classList.toggle('on', tipo==='financiamento');
+
+  var isFin = tipo === 'financiamento';
+  document.getElementById('dv-campos-livre').style.display         = isFin ? 'none' : 'block';
+  document.getElementById('dv-campos-financiamento').style.display = isFin ? 'block' : 'none';
+  // Pessoa é opcional/dispensável em financiamento — a instituição já vai na descrição
+  document.getElementById('dv-pag-wrap').style.display = isFin ? 'none' : 'block';
+  document.getElementById('dv-desc-label').textContent = isFin ? 'Instituição / Descrição' : 'Descrição';
 }
 
 function abrirPlanilhaDividas(){
@@ -5832,8 +5976,135 @@ function calcLedgerDivida(d, cb){
   });
 }
 
+// ════════════════════════════════════════════════════════════
+//  MOTOR DE AMORTIZAÇÃO — SAC e Price, com suporte a
+//  amortização extraordinária (reduzir prazo ou reduzir parcela)
+// ════════════════════════════════════════════════════════════
+
+// Calcula o valor da parcela fixa no sistema Price
+function calcularParcelaPrice(pv, iPct, n){
+  var i = iPct/100;
+  if(i===0) return pv/n;
+  return pv * (i*Math.pow(1+i,n)) / (Math.pow(1+i,n)-1);
+}
+
+// Retorna a taxa mensal (%) vigente para uma data, consultando o
+// histórico de taxas (financiamentos indexados à Selic/CDI, onde
+// a taxa muda ao longo do tempo por aviso do banco).
+function taxaAplicavelNaData(historico, dataAlvo, fallback){
+  if(!historico || !historico.length) return fallback;
+  var aplicaveis = historico.filter(function(h){ return h.data <= dataAlvo; })
+                             .sort(function(a,b){ return a.data<b.data?-1:1; });
+  if(!aplicaveis.length){
+    var ordenado = historico.slice().sort(function(a,b){ return a.data<b.data?-1:1; });
+    return ordenado[0].taxaMensal;
+  }
+  return aplicaveis[aplicaveis.length-1].taxaMensal;
+}
+
+// Gera a tabela de amortização completa de um financiamento,
+// aplicando as amortizações extraordinárias registradas (extras[])
+// e, se for taxa indexada, o histórico de mudanças de taxa.
+function gerarTabelaAmortizacao(fin){
+  var pv         = parseFloat(fin.valorOriginal)||0;
+  var iPctBase   = parseFloat(fin.taxaMensal)||0;
+  var n          = parseInt(fin.numParcelas)||0;
+  var sistema    = fin.sistemaAmortizacao || 'PRICE';
+  var dataIni    = fin.dataOriginal;
+  var isIndexada = fin.tipoTaxa === 'indexada';
+  var historico  = isIndexada ? (fin.historicoTaxas||[]) : [];
+  var extras     = (fin.extras||[]).slice().sort(function(a,b){ return a.aposParcela - b.aposParcela; });
+
+  var linhas = [];
+  var saldo = pv;
+  var amortConstante = pv/n; // usada pelo SAC — independe da taxa
+  var taxaAnterior = isIndexada ? taxaAplicavelNaData(historico, dataIni, iPctBase) : iPctBase;
+  var parcelaFixa = calcularParcelaPrice(pv, taxaAnterior, n); // usada pelo Price
+
+  for(var k=1; k<=n && saldo>0.005; k++){
+    var dataParcela = _addMeses(dataIni, k-1);
+    var iPct = isIndexada ? taxaAplicavelNaData(historico, dataParcela, iPctBase) : iPctBase;
+    var i = iPct/100;
+
+    // Taxa mudou desde a última parcela e é Price? Recast: recalcula a
+    // parcela fixa sobre o saldo/prazo restantes (como os bancos fazem).
+    if(isIndexada && sistema==='PRICE' && iPct !== taxaAnterior){
+      var parcelasRestantes = n - k + 1;
+      parcelaFixa = calcularParcelaPrice(saldo, iPct, parcelasRestantes);
+    }
+    taxaAnterior = iPct;
+
+    var juros, amort, valorParcela;
+    if(sistema === 'SAC'){
+      juros = saldo * i;
+      amort = Math.min(amortConstante, saldo);
+      valorParcela = amort + juros;
+    } else { // PRICE
+      juros = saldo * i;
+      amort = Math.min(parcelaFixa - juros, saldo);
+      valorParcela = amort + juros;
+    }
+    saldo = Math.max(0, saldo - amort);
+
+    linhas.push({
+      parcela: k, data: dataParcela, taxaAplicada: iPct, juros: juros, amortizacao: amort,
+      valorParcela: valorParcela, saldoDevedor: saldo
+    });
+
+    // Aplicar amortização extraordinária, se houver, registrada para esta parcela
+    var extra = extras.find(function(e){ return e.aposParcela === k; });
+    if(extra && saldo > 0.005){
+      var valorExtra = Math.min(parseFloat(extra.valor)||0, saldo);
+      saldo = Math.max(0, saldo - valorExtra);
+      linhas[linhas.length-1].extra = valorExtra;
+      linhas[linhas.length-1].saldoDevedor = saldo;
+
+      if(saldo > 0.005 && extra.modo !== 'prazo'){
+        // 'parcela' — mantém o número de parcelas restantes, recalcula o valor
+        var parcRestExtra = n - k;
+        if(sistema === 'SAC'){
+          amortConstante = saldo / parcRestExtra;
+        } else {
+          parcelaFixa = calcularParcelaPrice(saldo, iPct, parcRestExtra);
+        }
+      }
+    }
+  }
+  return linhas;
+}
+
+function _addMeses(dataIso, meses){
+  var d = new Date(dataIso+'T12:00:00');
+  d.setMonth(d.getMonth()+meses);
+  return ymd(d);
+}
+
+// Retorna um resumo rápido do estado atual do financiamento
+// (saldo devedor, próxima parcela, parcela atual) sem precisar
+// abrir a tabela completa.
+function resumoFinanciamento(fin){
+  var tabela = gerarTabelaAmortizacao(fin);
+  var pagas = parseInt(fin.parcelasPagas)||0;
+  var linhaAtual = tabela[pagas]; // próxima parcela a pagar (0-indexed)
+  var saldoAtual = pagas>0 ? (tabela[pagas-1] ? tabela[pagas-1].saldoDevedor : fin.valorOriginal) : fin.valorOriginal;
+  return {
+    tabela: tabela,
+    parcelasPagas: pagas,
+    numParcelas: tabela.length,
+    proximaParcela: linhaAtual || null,
+    saldoAtual: saldoAtual,
+    quitado: pagas >= tabela.length || saldoAtual <= 0.01
+  };
+}
+
 function addDivida(){
-  var tipo    = document.getElementById('dv-tipo').value || 'devo';
+  var tipo = document.getElementById('dv-tipo').value || 'devo';
+
+  if(tipo === 'financiamento'){
+    addFinanciamento();
+    return;
+  }
+
   var pagId   = document.getElementById('dv-pag').value;
   var desc    = (document.getElementById('dv-desc').value||'').trim();
   var val     = parseFloat(document.getElementById('dv-val').value||0);
@@ -5864,7 +6135,59 @@ function addDivida(){
   toast('✅ Registrado!');
 }
 
+function setFinTaxaTipo(tipo){
+  document.getElementById('dv-fin-taxatipo').value = tipo;
+  document.getElementById('dv-fin-taxatipo-fixa').classList.toggle('on', tipo==='fixa');
+  document.getElementById('dv-fin-taxatipo-indexada').classList.toggle('on', tipo==='indexada');
+  document.getElementById('dv-fin-taxa-label').textContent = tipo==='indexada' ? 'Taxa inicial mensal (%)' : 'Taxa de juros mensal (%)';
+  document.getElementById('dv-fin-taxa-hint').style.display = tipo==='indexada' ? 'block' : 'none';
+}
+
+function addFinanciamento(){
+  var desc      = (document.getElementById('dv-desc').value||'').trim();
+  var val       = parseFloat(document.getElementById('dv-fin-val').value||0);
+  var data      = document.getElementById('dv-fin-data').value;
+  var sistema   = document.getElementById('dv-fin-sistema').value;
+  var taxa      = parseFloat(document.getElementById('dv-fin-taxa').value||0);
+  var parcelas  = parseInt(document.getElementById('dv-fin-parcelas').value||0);
+  var pagas     = parseInt(document.getElementById('dv-fin-pagas').value||0);
+
+  if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
+  if(!val || val<=0){ toast('⚠️ Informe o valor financiado','err'); return; }
+  if(!data){ toast('⚠️ Informe a data da 1ª parcela','err'); return; }
+  if(!parcelas || parcelas<=0){ toast('⚠️ Informe o número de parcelas','err'); return; }
+  if(pagas > parcelas){ toast('⚠️ Parcelas pagas não pode ser maior que o total','err'); return; }
+  if(taxa < 0){ toast('⚠️ Taxa inválida','err'); return; }
+
+  var tipoTaxa = document.getElementById('dv-fin-taxatipo').value || 'fixa';
+
+  var fin = {
+    id: Date.now(), tipo: 'financiamento', pagadorId:'', pagadorNome:'',
+    desc: desc, valorOriginal: val, dataOriginal: data,
+    sistemaAmortizacao: sistema, taxaMensal: taxa, numParcelas: parcelas,
+    parcelasPagas: pagas, extras: [], status: 'pendente',
+    tipoTaxa: tipoTaxa,
+    historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
+    criadoEm: new Date().toISOString()
+  };
+
+  var resumo = resumoFinanciamento(fin);
+  fin.saldoAtual = resumo.saldoAtual;
+  fin.status = resumo.quitado ? 'pago' : (pagas>0 ? 'parcial' : 'pendente');
+
+  DIVIDAS.unshift(fin); saveDividas();
+  apiCall('salvarDivida', fin, function(){});
+
+  ['dv-desc','dv-fin-val','dv-fin-parcelas','dv-fin-taxa'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('dv-fin-pagas').value = '0';
+  setFinTaxaTipo('fixa');
+  renderDividas();
+  toast('✅ Financiamento cadastrado! '+parcelas+' parcelas geradas.');
+}
+
 function dividaCardHTML(d){
+  if(d.tipo === 'financiamento') return financiamentoCardHTML(d);
+
   var pag = PAGADORES.find(function(p){ return String(p.id)===String(d.pagadorId); });
   var nomePag = pag ? pag.nome : (d.pagadorNome||'—');
   var metodoLabels = {
@@ -5910,6 +6233,56 @@ function dividaCardHTML(d){
   '</div>';
 }
 
+function financiamentoCardHTML(d){
+  var resumo = resumoFinanciamento(d);
+  var pctPago = resumo.numParcelas>0 ? Math.round((resumo.parcelasPagas/resumo.numParcelas)*100) : 0;
+  var statusLabel = resumo.quitado ? 'QUITADO' : (resumo.parcelasPagas>0 ? 'EM ANDAMENTO' : 'INICIADO');
+  var statusColor = resumo.quitado ? 'var(--green)' : 'var(--blue)';
+  var sistemaLabel = d.sistemaAmortizacao==='SAC' ? 'SAC' : 'Price';
+  var isIndexada = d.tipoTaxa === 'indexada';
+  var taxaAtualExibida = isIndexada
+    ? taxaAplicavelNaData(d.historicoTaxas, ymd(new Date()), d.taxaMensal)
+    : d.taxaMensal;
+
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid #6D28D9">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
+      '<div style="min-width:0">'+
+        '<div style="font-size:10px;font-weight:800;color:#6D28D9;letter-spacing:.5px;margin-bottom:2px">🏦 FINANCIAMENTO'+(isIndexada?' · 📊 INDEXADA':'')+'</div>'+
+        '<div style="font-weight:800;font-size:14px">'+esc(d.desc)+'</div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+sistemaLabel+' · '+(taxaAtualExibida||0).toFixed(2)+'%/mês'+(isIndexada?' (atual)':'')+' · '+resumo.numParcelas+'x</div>'+
+      '</div>'+
+      '<span style="flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+statusColor+';color:'+statusColor+'">'+statusLabel+'</span>'+
+    '</div>'+
+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin:10px 0;padding:10px;background:var(--bg3);border-radius:8px">'+
+      '<div style="font-size:11px;color:var(--t3)">Saldo devedor</div>'+
+      '<div style="font-size:19px;font-weight:900;color:'+(resumo.quitado?'var(--green)':'var(--red)')+'">'+fmtBRL(resumo.saldoAtual)+'</div>'+
+    '</div>'+
+
+    '<div style="margin-bottom:10px">'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:4px">'+
+        '<span>Parcela '+resumo.parcelasPagas+' de '+resumo.numParcelas+'</span><span>'+pctPago+'%</span>'+
+      '</div>'+
+      '<div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">'+
+        '<div style="height:100%;width:'+pctPago+'%;background:#6D28D9;border-radius:3px"></div>'+
+      '</div>'+
+    '</div>'+
+
+    (resumo.proximaParcela ?
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Próxima parcela ('+resumo.proximaParcela.parcela+'): '+fmtBRL(resumo.proximaParcela.valorParcela)+' em '+fmtDate(resumo.proximaParcela.data)+'</div>'
+      : '<div style="font-size:11px;color:var(--green);margin-bottom:10px">✅ Todas as parcelas quitadas</div>') +
+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      (resumo.quitado ? '' : '<button data-pagarparcela="'+d.id+'" style="flex:1;min-width:100px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">✅ Pagar parcela</button>')+
+      '<button data-tabelafin="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📊 Tabela</button>'+
+      (resumo.quitado ? '' : '<button data-amortextra="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:#6D28D9;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">⚡ Extra</button>')+
+      (isIndexada && !resumo.quitado ? '<button data-atualizartaxa="'+d.id+'" style="flex:1;min-width:80px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:#B794F6;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Taxa</button>' : '')+
+      '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
+      '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '</div>'+
+  '</div>';
+}
+
 function renderDividas(){
   var pagSel = document.getElementById('dv-pag');
   if(pagSel){
@@ -5932,9 +6305,25 @@ function renderDividas(){
 
   el.innerHTML = abertas.map(dividaCardHTML).join('');
 
-  var pending = abertas.length;
+  var comLedger = abertas.filter(function(d){ return d.tipo !== 'financiamento'; });
+  var financiamentos = abertas.filter(function(d){ return d.tipo === 'financiamento'; });
+
   var totalGeral = 0;
-  abertas.forEach(function(d){
+  // Financiamentos: cálculo síncrono, soma direto
+  financiamentos.forEach(function(d){
+    var resumo = resumoFinanciamento(d);
+    totalGeral += resumo.saldoAtual;
+    var novoStatus = resumo.quitado ? 'pago' : (resumo.parcelasPagas>0 ? 'parcial' : 'pendente');
+    if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
+  });
+
+  var pending = comLedger.length;
+  if(pending === 0){
+    if(totalEl) totalEl.textContent = 'Total: ' + fmtBRL(totalGeral);
+    return;
+  }
+
+  comLedger.forEach(function(d){
     calcLedgerDivida(d, function(err, res){
       var saldoEl = document.getElementById('dvsaldo-'+d.id);
       if(!err && res){
@@ -6024,6 +6413,176 @@ function delMovimentoDivida(dividaId, movId){
   verHistoricoDivida(dividaId); // re-renderiza o modal já aberto
   renderDividas();
   toast('🗑️ Movimento removido');
+}
+
+// ── Ações de Financiamento ─────────────────────────────────
+function _syncFinanciamento(d){
+  var resumo = resumoFinanciamento(d);
+  d.saldoAtual = resumo.saldoAtual;
+  d.status = resumo.quitado ? 'pago' : (resumo.parcelasPagas>0 ? 'parcial' : 'pendente');
+  saveDividas();
+  apiCall('salvarDivida', d, function(){});
+}
+
+function pagarProximaParcela(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d || d.tipo!=='financiamento') return;
+  var resumo = resumoFinanciamento(d);
+  if(resumo.quitado){ toast('✅ Financiamento já quitado'); return; }
+  d.parcelasPagas = (parseInt(d.parcelasPagas)||0) + 1;
+  _syncFinanciamento(d);
+  renderDividas();
+  toast('✅ Parcela '+d.parcelasPagas+' de '+resumo.numParcelas+' paga!');
+}
+
+function abrirTabelaFinanciamento(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  var resumo = resumoFinanciamento(d);
+  var isIndexada = d.tipoTaxa === 'indexada';
+
+  document.getElementById('divhist-title').textContent = '📊 Tabela — '+d.desc;
+
+  var html = '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:12px">'+
+    '<span style="font-size:11px;color:var(--t3)">Saldo devedor atual</span>'+
+    '<span style="font-weight:800;font-size:15px">'+fmtBRL(resumo.saldoAtual)+'</span>'+
+  '</div>';
+
+  html += '<button data-linkdiv="'+d.id+'" style="width:100%;margin-bottom:14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Abrir/compartilhar tabela completa</button>';
+
+  if(isIndexada && (d.historicoTaxas||[]).length){
+    html += '<div class="slbl" style="margin-bottom:6px">📊 Histórico de taxas</div>';
+    d.historicoTaxas.slice().sort(function(a,b){return a.data<b.data?-1:1;}).forEach(function(h){
+      html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">'+
+        '<span style="color:var(--t3)">'+fmtDate(h.data)+'</span><span style="font-weight:700;color:#B794F6">'+h.taxaMensal.toFixed(2)+'%/mês</span>'+
+      '</div>';
+    });
+  }
+
+  html += '<div class="slbl" style="margin:14px 0 6px">Tabela de amortização</div>';
+  html += '<div style="max-height:400px;overflow-y:auto">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<tr style="color:var(--t3);text-align:left;position:sticky;top:0;background:var(--bg2)">'+
+      '<th style="padding:5px 4px">#</th><th style="padding:5px 4px">Data</th>'+
+      (isIndexada ? '<th style="padding:5px 4px;text-align:right">Taxa</th>' : '') +
+      '<th style="padding:5px 4px;text-align:right">Parcela</th><th style="padding:5px 4px;text-align:right">Saldo após</th><th></th>'+
+    '</tr>';
+
+  resumo.tabela.forEach(function(linha){
+    var paga = linha.parcela <= resumo.parcelasPagas;
+    html += '<tr style="border-top:1px solid var(--border);'+(paga?'opacity:.5':'')+'">'+
+      '<td style="padding:5px 4px">'+linha.parcela+(paga?' ✅':'')+'</td>'+
+      '<td style="padding:5px 4px">'+fmtDate(linha.data)+'</td>'+
+      (isIndexada ? '<td style="padding:5px 4px;text-align:right;color:#B794F6">'+(linha.taxaAplicada||0).toFixed(2)+'%</td>' : '') +
+      '<td style="padding:5px 4px;text-align:right;font-weight:700">'+fmtBRL(linha.valorParcela)+'</td>'+
+      '<td style="padding:5px 4px;text-align:right">'+fmtBRL(linha.saldoDevedor)+'</td>'+
+      '<td style="padding:5px 4px;text-align:right">'+(linha.extra?'<span style="color:#6D28D9;font-weight:700" title="Amortização extra">⚡'+fmtBRL(linha.extra)+'</span>':'')+'</td>'+
+    '</tr>';
+  });
+  html += '</table></div>';
+
+  document.getElementById('divhist-body').innerHTML = html;
+  document.getElementById('divhist-modal').style.display = 'flex';
+}
+
+function atualizarTaxaFinanciamento(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d || d.tipo!=='financiamento' || d.tipoTaxa!=='indexada') return;
+
+  var atual = taxaAplicavelNaData(d.historicoTaxas, ymd(new Date()), d.taxaMensal);
+  var novaTaxaStr = prompt('Taxa atual: '+atual.toFixed(2)+'%/mês\n\nNova taxa mensal informada pelo banco (%):', String(atual).replace('.',','));
+  if(novaTaxaStr === null) return;
+  var novaTaxa = parseFloat(String(novaTaxaStr).replace(',','.'));
+  if(isNaN(novaTaxa) || novaTaxa < 0){ toast('⚠️ Taxa inválida','err'); return; }
+
+  var dataVigStr = prompt('A partir de que data essa taxa vale?\n(formato AAAA-MM-DD, ex: 2026-08-01)', ymd(new Date()));
+  if(dataVigStr === null) return;
+  var dataVig = (dataVigStr||'').trim() || ymd(new Date());
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dataVig)){ toast('⚠️ Data inválida — use AAAA-MM-DD','err'); return; }
+
+  d.historicoTaxas = (d.historicoTaxas||[]).concat([{data: dataVig, taxaMensal: novaTaxa}]);
+  d.taxaMensal = novaTaxa; // mantém "taxa atual" sincronizada para exibição rápida
+  _syncFinanciamento(d);
+  renderDividas();
+  toast('🔄 Taxa atualizada para '+novaTaxa.toFixed(2)+'%/mês a partir de '+fmtDate(dataVig));
+}
+
+// ── Modal: Amortização Extraordinária ─────────────────────
+var amortExtraFinId = null;
+
+function abrirAmortizacaoExtra(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  amortExtraFinId = id;
+  document.getElementById('amortextra-valor').value = '';
+  document.getElementById('amortextra-preview').innerHTML = '';
+  document.getElementById('amortextra-modal').style.display = 'flex';
+}
+
+function closeAmortExtra(){
+  document.getElementById('amortextra-modal').style.display = 'none';
+  amortExtraFinId = null;
+}
+
+function _simularAmortExtra(modo){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(amortExtraFinId); });
+  if(!d) return null;
+  var valor = parseFloat(document.getElementById('amortextra-valor').value||0);
+  if(!valor || valor<=0) return null;
+
+  var resumo = resumoFinanciamento(d);
+  var dSimulado = Object.assign({}, d, {
+    extras: (d.extras||[]).concat([{ aposParcela: resumo.parcelasPagas, valor: valor, modo: modo }])
+  });
+  var tabelaNova = gerarTabelaAmortizacao(dSimulado);
+  var jurosOriginal = resumo.tabela.slice(resumo.parcelasPagas).reduce(function(s,l){return s+l.juros;},0);
+  var jurosNovo = tabelaNova.slice(resumo.parcelasPagas).reduce(function(s,l){return s+l.juros;},0);
+  return {
+    parcelasRestantesAntes: resumo.tabela.length - resumo.parcelasPagas,
+    parcelasRestantesDepois: tabelaNova.length - resumo.parcelasPagas,
+    economiaJuros: Math.max(0, jurosOriginal - jurosNovo),
+    novaParcela: tabelaNova[resumo.parcelasPagas] ? tabelaNova[resumo.parcelasPagas].valorParcela : 0
+  };
+}
+
+function previewAmortExtra(){
+  var simPrazo  = _simularAmortExtra('prazo');
+  var simParcela = _simularAmortExtra('parcela');
+  var el = document.getElementById('amortextra-preview');
+  if(!simPrazo || !simParcela){ el.innerHTML = ''; return; }
+
+  el.innerHTML =
+    '<div style="display:flex;gap:8px;margin-top:12px">'+
+      '<div style="flex:1;padding:10px;background:var(--bg3);border-radius:8px;border:2px solid transparent;cursor:pointer" onclick="confirmarAmortExtra(\'prazo\')">'+
+        '<div style="font-size:11px;font-weight:800;color:var(--t1);margin-bottom:6px">⏱️ Reduzir prazo</div>'+
+        '<div style="font-size:10px;color:var(--t3)">Parcela continua igual</div>'+
+        '<div style="font-size:13px;font-weight:700;margin-top:4px">'+simPrazo.parcelasRestantesDepois+' parcelas restantes</div>'+
+        '<div style="font-size:11px;color:var(--green);margin-top:2px">Economia: '+fmtBRL(simPrazo.economiaJuros)+'</div>'+
+      '</div>'+
+      '<div style="flex:1;padding:10px;background:var(--bg3);border-radius:8px;border:2px solid transparent;cursor:pointer" onclick="confirmarAmortExtra(\'parcela\')">'+
+        '<div style="font-size:11px;font-weight:800;color:var(--t1);margin-bottom:6px">💵 Reduzir parcela</div>'+
+        '<div style="font-size:10px;color:var(--t3)">Prazo continua igual</div>'+
+        '<div style="font-size:13px;font-weight:700;margin-top:4px">Nova parcela: '+fmtBRL(simParcela.novaParcela)+'</div>'+
+        '<div style="font-size:11px;color:var(--green);margin-top:2px">Economia: '+fmtBRL(simParcela.economiaJuros)+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="font-size:10px;color:var(--t3);text-align:center;margin-top:8px">Toque em uma opção para confirmar</div>';
+}
+
+function confirmarAmortExtra(modo){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(amortExtraFinId); });
+  if(!d) return;
+  var valor = parseFloat(document.getElementById('amortextra-valor').value||0);
+  if(!valor || valor<=0){ toast('⚠️ Informe o valor','err'); return; }
+
+  var resumo = resumoFinanciamento(d);
+  d.extras = (d.extras||[]).concat([{
+    id: Date.now(), aposParcela: resumo.parcelasPagas, valor: valor, modo: modo, data: ymd(new Date())
+  }]);
+  _syncFinanciamento(d);
+  closeAmortExtra();
+  renderDividas();
+  toast('⚡ Amortização extra de '+fmtBRL(valor)+' aplicada!');
 }
 
 function verHistoricoDivida(id){
@@ -6787,9 +7346,66 @@ function _renderListaArquivos(){
         '<div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ex.arquivo)+'</div>'+
         '<div style="font-size:10px;color:var(--t3)">'+fmtDate(ex.dataIni)+' → '+fmtDate(ex.dataFim)+' · '+txCount+' transações'+(ex.saldoFim?' · saldo: '+fmtBRL(ex.saldoFim):'')+' · imp. '+new Date(ex.importadoEm).toLocaleDateString('pt-BR')+'</div>'+
       '</div>'+
+      '<button data-shareextrato="'+idx+'" style="background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;flex-shrink:0;padding:2px" title="Compartilhar extrato">📤</button>'+
       '<button data-delextrato="'+idx+'" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer;flex-shrink:0;padding:2px" title="Remover extrato">🗑️</button>'+
     '</div>';
   }).join('');
+}
+
+// ── Compartilhar arquivo de extrato ──────────────────────
+function gerarCSVExtrato(ex){
+  var linhas = ['Data;Tipo;Descrição;Valor'];
+  (ex.txs||[]).slice().sort(function(a,b){ return a.data<b.data?-1:1; }).forEach(function(tx){
+    var descEsc = '"'+String(tx.desc||'').replace(/"/g,'""')+'"';
+    var valorFmt = tx.valor.toFixed(2).replace('.',',');
+    linhas.push([fmtDate(tx.data), tx.tipo==='C'?'Crédito':'Débito', descEsc, valorFmt].join(';'));
+  });
+  return linhas.join('\n');
+}
+
+function compartilharExtrato(idx){
+  var cid = String(curBankContaId);
+  var lista = EXTRATOS[cid] || [];
+  var ex = lista[idx];
+  if(!ex){ toast('⚠️ Extrato não encontrado','err'); return; }
+
+  var csv = gerarCSVExtrato(ex);
+  var filename = (ex.arquivo||'extrato').replace(/\.[^/.]+$/, '') + '.csv';
+  var blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'}); // BOM para acentos no Excel
+
+  // 1) Tentar compartilhar o ARQUIVO diretamente (Android/Chrome — abre a folha de compartilhamento nativa)
+  if(navigator.canShare && typeof File !== 'undefined'){
+    try{
+      var file = new File([blob], filename, {type:'text/csv'});
+      if(navigator.canShare({files:[file]})){
+        navigator.share({
+          files: [file],
+          title: 'Extrato — '+(ex.arquivo||''),
+          text:  fmtDate(ex.dataIni)+' a '+fmtDate(ex.dataFim)+' · '+(ex.txs||[]).length+' transações'
+        }).catch(function(err){
+          if(err && err.name !== 'AbortError') console.warn('Erro ao compartilhar:', err);
+        });
+        return;
+      }
+    }catch(e){ console.warn('Share de arquivo não suportado, tentando fallback', e); }
+  }
+
+  // 2) Fallback: compartilhar só um resumo em texto (iOS Safari, navegadores sem suporte a arquivo)
+  if(navigator.share){
+    navigator.share({
+      title: 'Extrato — '+(ex.arquivo||''),
+      text:  'Extrato bancário: '+fmtDate(ex.dataIni)+' a '+fmtDate(ex.dataFim)+' · '+(ex.txs||[]).length+' transações · saldo: '+fmtBRL(ex.saldoFim||0)
+    }).catch(function(){});
+    return;
+  }
+
+  // 3) Fallback final: baixar o arquivo (desktop/navegadores sem Web Share API)
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+  toast('📥 Arquivo baixado — envie pelo seu app de mensagens');
 }
 
 // ── Importação OFX ────────────────────────────────────────
