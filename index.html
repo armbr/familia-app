@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260701-194424</title>
+<title>Fluxo v20260701-220547</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2394,7 +2394,7 @@ function syncAll(){
 
   function tick(){
     done++;
-    if(done===11){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
+    if(done===13){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
   apiCall('getRecur',null,function(err,d){
@@ -2411,6 +2411,8 @@ function syncAll(){
 
   sincronizarRecibos(function(){ tick(); });
   sincronizarDividas(function(){ tick(); });
+  sincronizarContasBanco(function(){ tick(); });
+  sincronizarExtratos(function(){ if(curSection==='bank') renderContasBanco(); tick(); });
 
   sincronizarCartoes(function(){ renderFinCC(); tick(); });
 
@@ -2585,7 +2587,10 @@ function setSection(s){
     if(API) sincronizarRecibos(function(){ renderRecibos(); });
   }
   if(s==='docs') { try{ renderDocs(); }catch(e){}; try{ if(online) syncDocs(); }catch(e){} }
-  if(s==='bank') { try{ renderContasBanco(); }catch(e){ console.error('bank',e); } }
+  if(s==='bank'){
+    try{ renderContasBanco(); }catch(e){ console.error('bank',e); }
+    if(API){ sincronizarContasBanco(function(){ renderContasBanco(); }); }
+  }
 }
 
 function ftab(t){
@@ -6392,6 +6397,7 @@ function addContaBanco(){
   var c = {id: Date.now(), nome: nome, tipo: tipo, agencia: ag, conta: conta, cor: cor, saldo: saldo};
   CONTAS_BANCO.push(c);
   saveContasBanco();
+  apiCall('salvarContaBanco', c, function(){});
   ['bk-nome','bk-agencia','bk-conta','bk-saldo'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   renderContasBanco();
   toast('✅ Conta cadastrada!');
@@ -6402,12 +6408,74 @@ function delContaBanco(id){
   CONTAS_BANCO = CONTAS_BANCO.filter(function(c){ return String(c.id)!==String(id); });
   delete EXTRATOS[String(id)];
   saveContasBanco(); saveExtratos();
+  apiCall('deletarItemSheet', {aba:'ContasBanco', id:id}, function(){});
+  // Extratos da conta já serão ignorados (sem a conta, não aparecem)
   if(String(curBankContaId)===String(id)){
     curBankContaId = null; curExtrato = [];
     document.getElementById('bank-extrato-area').style.display = 'none';
   }
   renderContasBanco();
   toast('🗑️ Conta removida');
+}
+
+// ── Sincronização de Contas Bancárias ────────────────────
+function sincronizarContasBanco(cb){
+  apiCall('getContasBanco', null, function(err, d){
+    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    var serverMap  = {};
+    serverList.forEach(function(c){ serverMap[String(c.id)] = true; });
+
+    // Enviar contas locais que o servidor não tem
+    var pendentes = CONTAS_BANCO.filter(function(c){ return !serverMap[String(c.id)]; });
+    pendentes.forEach(function(c){ apiCall('salvarContaBanco', c, function(){}); });
+
+    // Mesclar servidor → local (não sobrescrever locais mais recentes)
+    var localMap = {};
+    CONTAS_BANCO.forEach(function(c){ localMap[String(c.id)] = true; });
+    serverList.forEach(function(c){ if(!localMap[String(c.id)]) CONTAS_BANCO.push(c); });
+    saveContasBanco();
+    if(cb) cb();
+  });
+}
+
+// ── Sincronização de Extratos OFX ────────────────────────
+function sincronizarExtratos(cb){
+  if(!CONTAS_BANCO.length){ if(cb) cb(); return; }
+
+  var contas  = CONTAS_BANCO.slice();
+  var pending = contas.length;
+
+  contas.forEach(function(conta){
+    var cid      = String(conta.id);
+    var locais   = EXTRATOS[cid] || [];
+    var localIds = {};
+    locais.forEach(function(ex){ localIds[String(ex.id)] = true; });
+
+    apiCall('getExtratos', {contaId: cid}, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      var serverIds  = {};
+      serverList.forEach(function(ex){ serverIds[String(ex.id)] = true; });
+
+      // Enviar extratos locais que o servidor não tem
+      locais.forEach(function(ex){
+        if(!serverIds[String(ex.id)]){
+          apiCall('salvarExtrato', Object.assign({contaId: cid}, ex), function(){});
+        }
+      });
+
+      // Trazer extratos do servidor que não estão no local
+      serverList.forEach(function(ex){
+        if(!localIds[String(ex.id)]){
+          if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
+          EXTRATOS[cid].push(ex);
+        }
+      });
+      saveExtratos();
+
+      pending--;
+      if(pending === 0 && cb) cb();
+    });
+  });
 }
 
 function selecionarConta(id){
@@ -6531,21 +6599,26 @@ function importarOFX(input){
       if(!parsed.txs.length){ toast('⚠️ Nenhuma transação encontrada no arquivo','err'); return; }
 
       var extrato = {
-        id:        Date.now(),
-        arquivo:   file.name,
-        banco:     parsed.banco,
-        conta:     parsed.contaNum,
-        dataIni:   parsed.dataIni,
-        dataFim:   parsed.dataFim,
-        saldoFim:  parsed.saldoFim,
+        id:          Date.now(),
+        arquivo:     file.name,
+        banco:       parsed.banco,
+        conta:       parsed.contaNum,
+        dataIni:     parsed.dataIni,
+        dataFim:     parsed.dataFim,
+        saldoFim:    parsed.saldoFim,
         importadoEm: new Date().toISOString(),
-        txs:       parsed.txs
+        txs:         parsed.txs
       };
 
       var cid = String(curBankContaId);
       if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
       EXTRATOS[cid].push(extrato);
       saveExtratos();
+
+      // Salvar no servidor para sincronizar entre dispositivos
+      apiCall('salvarExtrato', Object.assign({contaId: cid}, extrato), function(err){
+        if(err) console.warn('Extrato não sincronizado ainda:', err);
+      });
 
       // Recarregar extrato combinado
       selecionarConta(curBankContaId);
@@ -6688,10 +6761,13 @@ function _renderListaArquivos(){
 }
 
 function delExtrato(idx){
-  if(!confirm('Remover este extrato e suas '+((EXTRATOS[String(curBankContaId)]||[])[idx]||{txs:[]}).txs.length+' transações?')) return;
   var cid = String(curBankContaId);
-  if(!EXTRATOS[cid]) return;
-  EXTRATOS[cid].splice(idx, 1);
+  var lista = EXTRATOS[cid] || [];
+  var extrato = lista[idx];
+  if(!extrato) return;
+  if(!confirm('Remover este extrato e suas '+(extrato.txs||[]).length+' transações?')) return;
+  apiCall('deletarExtrato', {contaId: cid, extratoId: String(extrato.id)}, function(){});
+  lista.splice(idx, 1);
   saveExtratos();
   curExtratoSel = 'todos';
   selecionarConta(curBankContaId);
