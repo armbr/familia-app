@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-170601</title>
+<title>Fluxo v20260702-174132</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1891,6 +1891,16 @@ select option{background:#1A2A3A}
       <button onclick="closeOfxNota()" style="flex:1;padding:11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>
       <button onclick="salvarOfxNota()" style="flex:1;padding:11px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal: Detalhe completo da transação bancária -->
+<div id="txdetail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+      <button onclick="closeTxDetail()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div id="txdetail-body"></div>
   </div>
 </div>
 
@@ -4192,6 +4202,8 @@ function initTaskDelegation(){
     if(delextrato){ delExtrato(parseInt(delextrato.getAttribute('data-delextrato'))); return; }
     var ofxnota = e.target.closest('[data-ofxnota]');
     if(ofxnota){ abrirOfxNota(ofxnota.getAttribute('data-ofxnota'), ofxnota.getAttribute('data-ofxdesc')); return; }
+    var txdetail = e.target.closest('[data-txdetail]');
+    if(txdetail){ abrirDetalheTx(txdetail.getAttribute('data-txdetail')); return; }
     var deldiv = e.target.closest('[data-deldiv]');
     if(deldiv){ delDivida(deldiv.getAttribute('data-deldiv')); return; }
     var delrec = e.target.closest('[data-delrec]');
@@ -6976,7 +6988,7 @@ function renderExtrato(){
     var kNorm = tx.desc.toLowerCase().replace(/\s+/g,' ').trim();
     var isRecorr = recorr[kNorm];
 
-    return '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+    return '<div data-txdetail="'+esc(tx.fitId)+'" style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
         '<div style="min-width:0;flex:1">'+
           '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
@@ -6994,6 +7006,50 @@ function renderExtrato(){
       '</div>'+
     '</div>';
   }).join('');
+}
+
+function abrirDetalheTx(fitId){
+  var tx = curExtrato.find(function(t){ return String(t.fitId)===String(fitId); });
+  if(!tx) return;
+  var isCredito = tx.tipo === 'C';
+  var cor = isCredito ? 'var(--green)' : 'var(--red)';
+  var sinal = isCredito ? '+' : '-';
+  var nota = NOTAS_OFX[tx.fitId] || '';
+  var conta = CONTAS_BANCO.find(function(c){ return String(c.id)===String(curBankContaId); });
+
+  var html =
+    '<div style="text-align:center;padding:16px 0;margin-bottom:6px;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:11px;font-weight:700;color:'+(isCredito?'var(--green)':'var(--red)')+';text-transform:uppercase;letter-spacing:.5px">'+(isCredito?'Crédito':'Débito')+'</div>'+
+      '<div style="font-size:26px;font-weight:900;color:'+cor+';margin-top:4px">'+sinal+' '+fmtBRL(tx.valor)+'</div>'+
+    '</div>'+
+    '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Descrição completa</div>'+
+      '<div style="font-size:14px;font-weight:600;word-break:break-word;line-height:1.4">'+esc(tx.desc)+'</div>'+
+    '</div>'+
+    '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">'+
+      '<span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase">Data</span>'+
+      '<span style="font-size:13px;font-weight:600">'+fmtDate(tx.data)+'</span>'+
+    '</div>'+
+    (conta?'<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">'+
+      '<span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase">Conta</span>'+
+      '<span style="font-size:13px;font-weight:600">'+esc(conta.nome)+'</span>'+
+    '</div>':'')+
+    '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">'+
+      '<span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;flex-shrink:0">ID da transação</span>'+
+      '<span style="font-size:11px;font-weight:500;color:var(--t3);word-break:break-all;text-align:right">'+esc(tx.fitId)+'</span>'+
+    '</div>'+
+    (nota?'<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">📝 Sua nota</div>'+
+      '<div style="font-size:13px;color:var(--blue);font-style:italic;word-break:break-word">'+esc(nota)+'</div>'+
+    '</div>':'')+
+    '<button data-ofxnota="'+esc(tx.fitId)+'" data-ofxdesc="'+esc(tx.desc)+'" onclick="closeTxDetail()" style="width:100%;margin-top:14px;padding:11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">'+(nota?'✏️ Editar nota':'📝 Adicionar nota')+'</button>';
+
+  document.getElementById('txdetail-body').innerHTML = html;
+  document.getElementById('txdetail-modal').style.display = 'flex';
+}
+
+function closeTxDetail(){
+  document.getElementById('txdetail-modal').style.display = 'none';
 }
 
 function limparFiltrosBanco(){
