@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-202015</title>
+<title>Fluxo v20260702-204233</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -4239,6 +4239,7 @@ function delTask(id){
 
 function setTaskView(v){
   curTaskView=v;
+  if(v==='week') twStart = weekStart(new Date()); // sempre abrir na semana atual
   ['list','day','week','month','plan'].forEach(function(x){
     document.getElementById('tvw-'+x).style.display=x===v?'block':'none';
     document.getElementById('tv-'+x).classList.toggle('on',x===v);
@@ -4472,9 +4473,10 @@ function renderTL(){
   var tod=ymd(new Date());
   var open=TASKS.filter(function(t){return t.status!=='done';});
   var done=TASKS.filter(function(t){return t.status==='done';});
-  var ov=open.filter(function(t){return t.deadline&&ymds(t.deadline)<tod;});
+  var byDate=function(a,b){ return ymds(a.deadline) < ymds(b.deadline) ? -1 : 1; };
+  var ov=open.filter(function(t){return t.deadline&&ymds(t.deadline)<tod;}).sort(byDate);
   var tdy=open.filter(function(t){return ymds(t.deadline)===tod;});
-  var soon=open.filter(function(t){return t.deadline&&ymds(t.deadline)>tod;});
+  var soon=open.filter(function(t){return t.deadline&&ymds(t.deadline)>tod;}).sort(byDate);
   var nd=open.filter(function(t){return !t.deadline;});
   var h='';
   if(ov.length)   h+='<div class="glbl g-overdue">⚠️ Atrasadas <span class="gbadge">'+ov.length+'</span></div>'+ov.map(function(t){return taskCard(t);}).join('');
