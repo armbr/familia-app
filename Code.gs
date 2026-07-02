@@ -82,6 +82,11 @@ function doGetInternal(action, body) {
     case 'salvarCartao':      return salvarItemSheet('Cartoes', body);
     case 'getCartoes':        return getItemsSheet('Cartoes');
     case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
+    case 'salvarContaBanco':  return salvarItemSheet('ContasBanco', body);
+    case 'getContasBanco':    return getItemsSheet('ContasBanco');
+    case 'salvarExtrato':     return salvarExtratoSheet(body);
+    case 'getExtratos':       return getExtratosSheet(body.contaId);
+    case 'deletarExtrato':    return deletarExtratoSheet(body.contaId, body.extratoId);
     case 'salvarDivida':      return salvarDividaEstruturada(body);
     case 'getDividas':        return getDividasEstruturadas();
     case 'calcularSaldoDivida': return calcularSaldoDivida(body);
@@ -1660,6 +1665,81 @@ function buscarIndexadorAcumulado(tipo, dataInicioISO, dataFimISO) {
 function isoToBr(isoDate) {
   var p = isoDate.split('-');
   return p[2] + '/' + p[1] + '/' + p[0];
+}
+
+// ════════════════════════════════════════════════════════════
+//  BANCOS — Contas e Extratos OFX
+//  ContasBanco: usa salvarItemSheet/getItemsSheet (padrão)
+//  Extratos:    aba própria com uma linha por extrato (JSON)
+//               — pode ter centenas de transações por extrato
+// ════════════════════════════════════════════════════════════
+
+function garantirAbaExtratos() {
+  var sheet = ss().getSheetByName('Extratos');
+  if (!sheet) {
+    sheet = ss().insertSheet('Extratos');
+    sheet.getRange(1,1,1,4).setValues([['contaId','extratoId','arquivo','dados']]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1,1,1,4).setFontWeight('bold').setBackground('#0F9D58').setFontColor('#FFF');
+    sheet.setColumnWidth(4, 400);
+  }
+  return sheet;
+}
+
+function salvarExtratoSheet(body) {
+  var sheet = garantirAbaExtratos();
+  var contaId   = String(body.contaId   || '');
+  var extratoId = String(body.extratoId || '');
+  var arquivo   = String(body.arquivo   || '');
+  // Serializar as transações como JSON (sem as txs para economizar espaço,
+  // só metadados — as txs ficam num campo separado comprimido)
+  var dados = JSON.stringify({
+    id:          extratoId,
+    arquivo:     arquivo,
+    banco:       body.banco    || '',
+    conta:       body.conta    || '',
+    dataIni:     body.dataIni  || '',
+    dataFim:     body.dataFim  || '',
+    saldoFim:    body.saldoFim || 0,
+    importadoEm: body.importadoEm || new Date().toISOString(),
+    txs:         body.txs || []
+  });
+
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === contaId && String(rows[i][1]) === extratoId) {
+      sheet.getRange(i+1, 4).setValue(dados);
+      return { ok: true };
+    }
+  }
+  sheet.appendRow([contaId, extratoId, arquivo, dados]);
+  return { ok: true };
+}
+
+function getExtratosSheet(contaId) {
+  var sheet = garantirAbaExtratos();
+  var rows = sheet.getDataRange().getValues();
+  var result = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) !== String(contaId)) continue;
+    try {
+      var obj = JSON.parse(String(rows[i][3]));
+      result.push(obj);
+    } catch(e) {}
+  }
+  return { ok: true, data: result };
+}
+
+function deletarExtratoSheet(contaId, extratoId) {
+  var sheet = garantirAbaExtratos();
+  var rows = sheet.getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]) === String(contaId) && String(rows[i][1]) === String(extratoId)) {
+      sheet.deleteRow(i+1);
+      return { ok: true };
+    }
+  }
+  return { ok: true };
 }
 
 
