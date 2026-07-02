@@ -1700,11 +1700,16 @@ function garantirAbaExtratos() {
 
 function salvarExtratoSheet(body) {
   var sheet = garantirAbaExtratos();
-  var contaId   = String(body.contaId   || '');
-  var extratoId = String(body.extratoId || '');
+  var contaId   = String(body.contaId || '');
+  // Aceitar tanto body.extratoId quanto body.id (o objeto extrato usa 'id')
+  var extratoId = String(body.extratoId || body.id || '');
   var arquivo   = String(body.arquivo   || '');
-  // Serializar as transações como JSON (sem as txs para economizar espaço,
-  // só metadados — as txs ficam num campo separado comprimido)
+
+  if(!contaId || !extratoId){
+    Logger.log('salvarExtratoSheet: contaId ou extratoId ausente');
+    return { ok: false, error: 'contaId ou extratoId ausente' };
+  }
+
   var dados = JSON.stringify({
     id:          extratoId,
     arquivo:     arquivo,
@@ -1721,11 +1726,11 @@ function salvarExtratoSheet(body) {
   for (var i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === contaId && String(rows[i][1]) === extratoId) {
       sheet.getRange(i+1, 4).setValue(dados);
-      return { ok: true };
+      return { ok: true, updated: true };
     }
   }
   sheet.appendRow([contaId, extratoId, arquivo, dados]);
-  return { ok: true };
+  return { ok: true, created: true };
 }
 
 function getExtratosSheet(contaId) {
