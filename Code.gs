@@ -88,6 +88,7 @@ function doGetInternal(action, body) {
     case 'adicionarTxsExtrato': return adicionarTxsExtrato(body);
     case 'getExtratos':         return getExtratosSheet(body.contaId);
     case 'deletarExtrato':      return deletarExtratoSheet(body.contaId, body.extratoId);
+    case 'deletarExtratoPorChave': return deletarExtratoPorChave(body.contaId, body.arquivo, body.dataIni, body.dataFim);
     case 'salvarDivida':      return salvarDividaEstruturada(body);
     case 'getDividas':        return getDividasEstruturadas();
     case 'calcularSaldoDivida': return calcularSaldoDivida(body);
@@ -564,7 +565,7 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-var EMAIL_DESTINO  = '@gmail.com';
+var EMAIL_DESTINO  = 'armbr258@gmail.com';
 var EMAILS_DESTINO = [EMAIL_DESTINO]; // Para adicionar mais: ['email1@gmail.com', 'email2@gmail.com']
 
 
@@ -1774,14 +1775,29 @@ function adicionarTxsExtrato(body) {
 function getExtratosSheet(contaId) {
   var sheet = garantirAbaExtratos();
   var rows = sheet.getDataRange().getValues();
-  var result = [];
+  // Mesclar por chave (arquivo+dataIni+dataFim) — protege contra linhas
+  // duplicadas na planilha (ex: resíduos de versões anteriores com bugs
+  // de import). Sempre retorna 1 registro por extrato real, com as
+  // transações unificadas por FITID.
+  var map = {};
   for (var i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) !== String(contaId)) continue;
     try {
       var obj = JSON.parse(String(rows[i][3]));
-      result.push(obj);
+      var key = (obj.arquivo||'') + '|' + (obj.dataIni||'') + '|' + (obj.dataFim||'');
+      if (!map[key]) {
+        map[key] = obj;
+      } else {
+        var fitMap = {};
+        (map[key].txs||[]).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+        (obj.txs||[]).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+        map[key].txs = Object.keys(fitMap).map(function(k){ return fitMap[k]; });
+        if (obj.saldoFim) map[key].saldoFim = obj.saldoFim;
+      }
     } catch(e) {}
   }
+  var result = [];
+  for (var k in map) result.push(map[k]);
   return { ok: true, data: result };
 }
 
@@ -1795,6 +1811,69 @@ function deletarExtratoSheet(contaId, extratoId) {
     }
   }
   return { ok: true };
+}
+
+// Remove TODAS as linhas que casam com a mesma chave (arquivo+período),
+// não só um extratoId específico. Usado ao excluir pela UI para garantir
+// que duplicatas antigas da mesma planilha sejam eliminadas de uma vez.
+function deletarExtratoPorChave(contaId, arquivo, dataIni, dataFim) {
+  var sheet = garantirAbaExtratos();
+  var rows = sheet.getDataRange().getValues();
+  var removidos = 0;
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]) !== String(contaId)) continue;
+    try {
+      var obj = JSON.parse(String(rows[i][3]));
+      if (obj.arquivo === arquivo && obj.dataIni === dataIni && obj.dataFim === dataFim) {
+        sheet.deleteRow(i+1);
+        removidos++;
+      }
+    } catch(e) {}
+  }
+  return { ok: true, removidos: removidos };
+}
+
+// Faxina manual — execute esta função UMA VEZ no editor do Apps Script
+// para físicamente mesclar/remover linhas duplicadas da aba Extratos,
+// deixando a planilha limpa (opcional — getExtratosSheet já mescla em
+// tempo real, mas isso reduz o tamanho da planilha).
+function compactarExtratosDuplicados() {
+  var sheet = garantirAbaExtratos();
+  var rows = sheet.getDataRange().getValues();
+  var map = {}; // key -> {obj, rowIndexes: []}
+  for (var i = 1; i < rows.length; i++) {
+    var contaId = String(rows[i][0]);
+    if (!contaId) continue;
+    try {
+      var obj = JSON.parse(String(rows[i][3]));
+      var key = contaId + '|' + (obj.arquivo||'') + '|' + (obj.dataIni||'') + '|' + (obj.dataFim||'');
+      if (!map[key]) map[key] = { obj: obj, contaId: contaId, rows: [i+1] };
+      else {
+        var fitMap = {};
+        (map[key].obj.txs||[]).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+        (obj.txs||[]).forEach(function(tx){ fitMap[tx.fitId] = tx; });
+        map[key].obj.txs = Object.keys(fitMap).map(function(k){ return fitMap[k]; });
+        if (obj.saldoFim) map[key].obj.saldoFim = obj.saldoFim;
+        map[key].rows.push(i+1);
+      }
+    } catch(e) {}
+  }
+
+  var totalRemovidas = 0;
+  var chaves = Object.keys(map);
+  chaves.forEach(function(key){
+    var item = map[key];
+    if (item.rows.length <= 1) return; // sem duplicata
+    // Manter a primeira linha, atualizar com dados mesclados, remover as demais
+    var manter = item.rows[0];
+    sheet.getRange(manter, 4).setValue(JSON.stringify(item.obj));
+    // Remover as linhas extras (de trás para frente para não desalinhar índices)
+    var remover = item.rows.slice(1).sort(function(a,b){ return b-a; });
+    remover.forEach(function(r){ sheet.deleteRow(r); totalRemovidas++; });
+  });
+
+  Logger.log('✅ Compactação concluída — ' + totalRemovidas + ' linha(s) duplicada(s) removida(s).');
+  return totalRemovidas;
 }
 
 
