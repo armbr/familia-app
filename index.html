@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-141922</title>
+<title>Fluxo v20260702-144442</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -6465,6 +6465,28 @@ var TIPO_BANCO_LABEL = {
   pj: 'Conta PJ', investimento: 'Investimento', digital: 'Carteira Digital'
 };
 
+function renderContasBanco(){
+  var el = document.getElementById('bank-contas-list');
+  if(!el) return;
+  if(!CONTAS_BANCO.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhuma conta cadastrada ainda.<br>Adicione uma conta acima para começar.</div>';
+    return;
+  }
+  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">'+
+    CONTAS_BANCO.map(function(c){
+      var sel = String(c.id)===String(curBankContaId);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:2px solid '+(sel?c.cor:'var(--border)')+';background:'+(sel?'rgba(0,0,0,.08)':'transparent')+';cursor:pointer;min-width:140px;flex:1" onclick="selecionarConta(\''+c.id+'\')">'+
+        '<div style="width:12px;height:12px;border-radius:50%;background:'+c.cor+';flex-shrink:0"></div>'+
+        '<div style="min-width:0">'+
+          '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.nome)+'</div>'+
+          '<div style="font-size:10px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+'</div>'+
+        '</div>'+
+        '<button data-delconta="'+c.id+'" style="margin-left:auto;background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir conta">🗑️</button>'+
+      '</div>';
+    }).join('')+
+  '</div>';
+}
+
 // ── Cadastro de contas ────────────────────────────────────
 function addContaBanco(){
   var nome   = (document.getElementById('bk-nome').value||'').trim();
@@ -6844,6 +6866,12 @@ function delExtrato(idx){
 }
 
 // ── Detecção de recorrências ─────────────────────────────
+function renderHistExtratosImportados(){
+  _renderSeletorPeriodo();
+  _renderListaArquivos();
+  _atualizarLabelFiltros();
+}
+
 function detectarRecorrencias(txs){
   // Agrupa por descrição normalizada e conta ocorrências
   var freq = {};
