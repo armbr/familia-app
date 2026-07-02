@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-130936</title>
+<title>Fluxo v20260702-135530</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2056,7 +2056,7 @@ var EXTRATOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_
 var NOTAS_OFX    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_notas_ofx')  || '{}') || {}; }catch(e){ localStorage.removeItem('ff_notas_ofx');   return {}; } })();
 var curBankContaId = null;   // conta bancária selecionada atualmente
 var curExtrato     = [];     // transações do extrato em exibição
-var curExtratoSel  = 'todos'; // 'todos' ou índice do extrato selecionado
+var curExtratoSel  = 'todos'; // 'todos' ou 'YYYY-MM' (mês calendário)
 var ofxNotaFitId   = null;  // fitId da transação sendo anotada
 var DIVIDAS    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_dividas') || '[]') || []; }catch(e){ console.warn('localStorage ff_dividas corrompido, resetando'); localStorage.removeItem('ff_dividas'); return []; } })();
 var COLLAPSED_PASTAS = (function(){ try{ return JSON.parse(localStorage.getItem('ff_collapsed') || '[]') || []; }catch(e){ console.warn('localStorage ff_collapsed corrompido, resetando'); localStorage.removeItem('ff_collapsed'); return []; } })();
@@ -6522,16 +6522,28 @@ function sincronizarExtratos(cb){
       });
 
       // Trazer do servidor extratos que não existem localmente
-      var mudou = false;
       serverList.forEach(function(ex){
         if(!_extratoJaExiste(locais, ex)){
           if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
           EXTRATOS[cid].push(ex);
-          mudou = true;
         }
       });
-      if(mudou) saveExtratos();
 
+      // ── PROPAGAÇÃO DE EXCLUSÕES ──────────────────────────
+      // Remover localmente extratos que foram excluídos em outro dispositivo
+      // (estavam no local mas não estão mais no servidor)
+      if(serverList.length > 0 || locais.length > 0){
+        var antes = (EXTRATOS[cid]||[]).length;
+        EXTRATOS[cid] = (EXTRATOS[cid]||[]).filter(function(ex){
+          return _extratoJaExiste(serverList, ex);
+        });
+        if(EXTRATOS[cid].length !== antes){
+          // Resetar seleção se o extrato selecionado foi removido
+          if(curBankContaId === conta.id) curExtratoSel = 'todos';
+        }
+      }
+
+      saveExtratos();
       pending--;
       if(pending === 0 && cb) cb();
     });
@@ -6567,33 +6579,48 @@ function selecionarConta(id){
 }
 
 // Carrega curExtrato com base em curExtratoSel
-function _carregarExtrato(){
-  var extratos = EXTRATOS[String(curBankContaId)] || [];
+function _todasTxsDeduplicadas(cid){
+  var extratos = EXTRATOS[String(cid)] || [];
   var txMap = {};
-  if(curExtratoSel === 'todos'){
-    extratos.forEach(function(ex){
-      (ex.txs||[]).forEach(function(tx){ txMap[tx.fitId] = tx; });
-    });
-  } else {
-    var ex = extratos[curExtratoSel];
-    if(ex) (ex.txs||[]).forEach(function(tx){ txMap[tx.fitId] = tx; });
-  }
-  curExtrato = Object.values(txMap).sort(function(a,b){ return a.data < b.data ? 1 : -1; });
+  extratos.forEach(function(ex){
+    (ex.txs||[]).forEach(function(tx){ txMap[tx.fitId] = tx; });
+  });
+  return Object.values(txMap).sort(function(a,b){ return a.data<b.data?1:-1; });
 }
 
-function selecionarPeriodo(sel){
-  curExtratoSel = sel === 'todos' ? 'todos' : parseInt(sel);
+function _mesesDisponiveis(txs){
+  var mesesSet = {};
+  txs.forEach(function(tx){ if(tx.data) mesesSet[tx.data.substring(0,7)] = true; });
+  return Object.keys(mesesSet).sort().reverse();
+}
+
+function _carregarExtrato(){
+  var todasTxs = _todasTxsDeduplicadas(curBankContaId);
+  if(curExtratoSel === 'todos'){
+    curExtrato = todasTxs;
+  } else {
+    curExtrato = todasTxs.filter(function(tx){
+      return tx.data && tx.data.substring(0,7) === curExtratoSel;
+    });
+  }
+}
+
+function selecionarPeriodo(mes){
+  curExtratoSel = mes; // 'todos' ou 'YYYY-MM'
   _carregarExtrato();
 
-  // Preencher automaticamente os campos de data com o período do extrato
+  // Preencher automaticamente De/Até com o mês selecionado
   var deEl  = document.getElementById('bk-de');
   var ateEl = document.getElementById('bk-ate');
   if(deEl && ateEl){
-    if(curExtratoSel === 'todos'){
+    if(mes === 'todos'){
       deEl.value = ''; ateEl.value = '';
     } else {
-      var ex = (EXTRATOS[String(curBankContaId)]||[])[curExtratoSel];
-      if(ex){ deEl.value = ex.dataIni || ''; ateEl.value = ex.dataFim || ''; }
+      var partes = mes.split('-');
+      var ano = parseInt(partes[0]), m = parseInt(partes[1]);
+      var ultimoDia = new Date(ano, m, 0).getDate();
+      deEl.value  = mes + '-01';
+      ateEl.value = mes + '-' + String(ultimoDia).padStart(2,'0');
     }
   }
 
@@ -6610,195 +6637,41 @@ function _atualizarLabelFiltros(){
   var vmin  = parseFloat((document.getElementById('bk-vmin')||{}).value||0)||0;
   var partes = [];
   if(curExtratoSel !== 'todos'){
-    var ex = (EXTRATOS[String(curBankContaId)]||[])[curExtratoSel];
-    if(ex) partes.push(_mesLabel(ex));
+    var p = curExtratoSel.split('-');
+    partes.push(MESES_BR[parseInt(p[1])-1]+'/'+p[0]);
   } else {
     partes.push('Todos');
   }
   if(tipo==='D') partes.push('Débitos');
   if(tipo==='C') partes.push('Créditos');
   if(busca) partes.push('"'+busca+'"');
-  if(vmin>0) partes.push('≥ '+fmtBRL(vmin));
+  if(vmin>0) partes.push('\u2265 '+fmtBRL(vmin));
   el.textContent = partes.join(' · ');
 }
 
-function renderContasBanco(){
-  var el = document.getElementById('bank-contas-list');
-  if(!el) return;
-  if(!CONTAS_BANCO.length){
-    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:16px;font-size:13px">Nenhuma conta cadastrada ainda.<br>Adicione uma conta acima para começar.</div>';
-    return;
-  }
-  el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">'+
-    CONTAS_BANCO.map(function(c){
-      var sel = String(c.id)===String(curBankContaId);
-      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:2px solid '+(sel?c.cor:'var(--border)')+';background:'+(sel?'rgba(0,0,0,.08)':'transparent')+';cursor:pointer;min-width:140px;flex:1" onclick="selecionarConta(\''+c.id+'\')">'+
-        '<div style="width:12px;height:12px;border-radius:50%;background:'+c.cor+';flex-shrink:0"></div>'+
-        '<div style="min-width:0">'+
-          '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.nome)+'</div>'+
-          '<div style="font-size:10px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+'</div>'+
-        '</div>'+
-        '<button data-delconta="'+c.id+'" style="margin-left:auto;background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir conta">🗑️</button>'+
-      '</div>';
-    }).join('')+
-  '</div>';
-}
-
-// ── Parser OFX ───────────────────────────────────────────
-function importarOFX(input){
-  if(!curBankContaId){ toast('⚠️ Selecione uma conta antes de importar','err'); input.value=''; return; }
-  var file = input.files[0];
-  if(!file){ return; }
-  toast('📂 Lendo arquivo...');
-  var reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      var texto = e.target.result;
-      // Detectar encoding (alguns OFX vêm em ISO-8859-1)
-      var parsed = parseOFX(texto);
-      if(!parsed.txs.length){ toast('⚠️ Nenhuma transação encontrada no arquivo','err'); return; }
-
-      var extrato = {
-        id:          Date.now(),
-        arquivo:     file.name,
-        banco:       parsed.banco,
-        conta:       parsed.contaNum,
-        dataIni:     parsed.dataIni,
-        dataFim:     parsed.dataFim,
-        saldoFim:    parsed.saldoFim,
-        importadoEm: new Date().toISOString(),
-        txs:         parsed.txs
-      };
-
-      var cid = String(curBankContaId);
-      if(!EXTRATOS[cid]) EXTRATOS[cid] = [];
-
-      // Verificar se este extrato já foi importado (mesmo arquivo + mesmo período)
-      if(_extratoJaExiste(EXTRATOS[cid], {arquivo:file.name, dataIni:parsed.dataIni, dataFim:parsed.dataFim})){
-        toast('⚠️ Este extrato já foi importado anteriormente','err');
-        input.value = ''; return;
-      }
-      EXTRATOS[cid].push(extrato);
-      saveExtratos();
-
-      // Salvar no servidor para sincronizar entre dispositivos
-      apiPostRaw('salvarExtrato', Object.assign({contaId: cid}, extrato), function(err){
-        if(err) console.warn('Extrato não sincronizado ainda:', err);
-      });
-
-      // Recarregar extrato combinado
-      selecionarConta(curBankContaId);
-      toast('✅ '+parsed.txs.length+' transações importadas!');
-    } catch(err){
-      console.error('OFX parse error:', err);
-      toast('❌ Erro ao ler o arquivo: '+err.message,'err');
-    }
-    input.value = '';
-  };
-  reader.onerror = function(){ toast('❌ Erro ao ler o arquivo','err'); };
-  reader.readAsText(file, 'ISO-8859-1');
-}
-
-function parseOFX(texto){
-  // Normalizar quebras de linha
-  var t = texto.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
-
-  function tag(nome){ // extrai valor de uma tag OFX
-    var re = new RegExp('<'+nome+'>([^<\\n]+)','i');
-    var m  = t.match(re);
-    return m ? m[1].trim() : '';
-  }
-  function tagAll(nome){ // extrai todos os valores de uma tag repetida
-    var re = new RegExp('<'+nome+'>([^<\\n]+)','gi');
-    var out=[]; var m;
-    while((m=re.exec(t))!==null) out.push(m[1].trim());
-    return out;
-  }
-
-  function parseOfxDate(d){
-    // Formato OFX: YYYYMMDDHHMMSS ou YYYYMMDD
-    if(!d) return '';
-    d = d.replace(/\[.*\]/,'').trim(); // remover timezone
-    if(d.length>=8) return d.substring(0,4)+'-'+d.substring(4,6)+'-'+d.substring(6,8);
-    return '';
-  }
-
-  // Separar blocos de transação
-  var blocos = t.split(/<STMTTRN>/i).slice(1);
-  var txs = blocos.map(function(b, idx){
-    var tipo = (b.match(/<TRNTYPE>([^\n<]+)/i)||[])[1]||'';
-    var data = parseOfxDate((b.match(/<DTPOSTED>([^\n<]+)/i)||[])[1]||'');
-    var val  = parseFloat((b.match(/<TRNAMT>([^\n<]+)/i)||[])[1]||0);
-    var fitId= (b.match(/<FITID>([^\n<]+)/i)||[])[1]||('tx'+idx);
-    var memo = (b.match(/<MEMO>([^\n<]+)/i)||[])[1]||'';
-    var name = (b.match(/<NAME>([^\n<]+)/i)||[])[1]||'';
-    var desc = (memo||name||'—').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();
-    return {
-      fitId: fitId.trim(),
-      tipo:  (tipo.trim().toUpperCase() === 'CREDIT' || val > 0) ? 'C' : 'D',
-      data:  data,
-      valor: Math.abs(val),
-      desc:  desc
-    };
-  }).filter(function(tx){ return tx.data && tx.valor > 0; });
-
-  return {
-    banco:    tag('BANKID') || tag('ORG') || 'Banco',
-    contaNum: tag('ACCTID') || '',
-    dataIni:  parseOfxDate(tag('DTSTART')),
-    dataFim:  parseOfxDate(tag('DTEND')),
-    saldoFim: parseFloat(tag('BALAMT')) || 0,
-    txs:      txs
-  };
-}
-
-function renderHistExtratosImportados(){
-  _renderSeletorPeriodo();
-  _renderListaArquivos();
-  _atualizarLabelFiltros();
-}
-
 function _mesLabel(ex){
-  // Retorna "Junho/2026" baseado no mês/ano do extrato
-  var mes = (ex.dataIni||ex.dataFim||'').substring(0,7); // YYYY-MM
+  var mes = (ex.dataIni||ex.dataFim||'').substring(0,7);
   if(!mes) return esc(ex.arquivo||'').substring(0,14);
-  var partes = mes.split('-');
-  return MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+  var p = mes.split('-');
+  return MESES_BR[parseInt(p[1])-1]+'/'+p[0];
 }
 
 function _renderSeletorPeriodo(){
   var el = document.getElementById('bank-extratos-hist');
   if(!el) return;
-  var lista = EXTRATOS[String(curBankContaId)] || [];
-  if(!lista.length){ el.innerHTML=''; return; }
-
-  // Agrupar por YYYY-MM (sem duplicar chips do mesmo mês)
-  var grupos = {};
-  lista.forEach(function(ex, idx){
-    var mes = (ex.dataIni||ex.dataFim||'').substring(0,7) || 'sem-data';
-    if(!grupos[mes]) grupos[mes] = [];
-    grupos[mes].push({idx:idx, ex:ex});
-  });
-  var meses = Object.keys(grupos).sort().reverse();
+  var todasTxs = _todasTxsDeduplicadas(curBankContaId);
+  var meses = _mesesDisponiveis(todasTxs);
+  if(!meses.length){ el.innerHTML=''; return; }
 
   var html = '<div class="slbl" style="margin-bottom:6px;font-size:11px">Período</div>';
   html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">';
-
-  var todosAtivo = curExtratoSel === 'todos';
-  html += _chipBtn('todos', '📋 Todos', todosAtivo);
+  html += _chipBtn('todos', '\uD83D\uDCCB Todos', curExtratoSel === 'todos');
 
   meses.forEach(function(mes){
-    var itens = grupos[mes];
-    if(itens.length === 1){
-      var ativo = curExtratoSel === itens[0].idx;
-      html += _chipBtn(itens[0].idx, _mesLabel(itens[0].ex), ativo);
-    } else {
-      // Múltiplos extratos no mesmo mês — numerar para distinguir
-      itens.forEach(function(item, i){
-        var ativo = curExtratoSel === item.idx;
-        html += _chipBtn(item.idx, _mesLabel(item.ex)+(i>0?' ('+(i+1)+')':''), ativo);
-      });
-    }
+    var p = mes.split('-');
+    var label = MESES_BR[parseInt(p[1])-1]+'/'+p[0];
+    var count = todasTxs.filter(function(tx){ return tx.data && tx.data.substring(0,7)===mes; }).length;
+    html += _chipBtn(mes, label+' <span style="font-size:9px;opacity:.7">('+count+')</span>', curExtratoSel === mes);
   });
 
   html += '</div>';
