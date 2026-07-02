@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260701-220547</title>
+<title>Fluxo v20260702-001033</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2411,8 +2411,16 @@ function syncAll(){
 
   sincronizarRecibos(function(){ tick(); });
   sincronizarDividas(function(){ tick(); });
-  sincronizarContasBanco(function(){ tick(); });
-  sincronizarExtratos(function(){ if(curSection==='bank') renderContasBanco(); tick(); });
+  // Bancos: OBRIGATÓRIO sincronizar contas antes de extratos —
+  // no dispositivo novo CONTAS_BANCO começa vazio e sincronizarExtratos
+  // retornaria imediatamente sem buscar nada do servidor.
+  sincronizarContasBanco(function(){
+    tick();
+    sincronizarExtratos(function(){
+      if(curSection==='bank') renderContasBanco();
+      tick();
+    });
+  });
 
   sincronizarCartoes(function(){ renderFinCC(); tick(); });
 
@@ -2589,7 +2597,15 @@ function setSection(s){
   if(s==='docs') { try{ renderDocs(); }catch(e){}; try{ if(online) syncDocs(); }catch(e){} }
   if(s==='bank'){
     try{ renderContasBanco(); }catch(e){ console.error('bank',e); }
-    if(API){ sincronizarContasBanco(function(){ renderContasBanco(); }); }
+    if(API){
+      sincronizarContasBanco(function(){
+        renderContasBanco();
+        sincronizarExtratos(function(){
+          if(curBankContaId) selecionarConta(curBankContaId);
+          else renderContasBanco();
+        });
+      });
+    }
   }
 }
 
