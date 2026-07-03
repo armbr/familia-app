@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-010536</title>
+<title>Fluxo v20260703-015605</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -7808,19 +7808,21 @@ function verificarSincronizacao(){
   ];
 
   var resultados = [];
-  var pendentes = checks.length;
+  var idx = 0;
 
-  checks.forEach(function(chk){
+  function proximo(){
+    if(idx >= checks.length){ mostrarResultadoSincronizacao(resultados); return; }
+    var chk = checks[idx++];
     apiCall(chk.action, null, function(err, d){
       var serverList = (!err && d && d.ok) ? chk.extrai(d) : null;
       var localCount  = chk.local.length;
       var serverCount = serverList ? serverList.length : null;
       var status = serverList===null ? 'erro' : (localCount===serverCount ? 'ok' : 'diff');
       resultados.push({nome:chk.nome, local:localCount, servidor:serverCount, status:status});
-      pendentes--;
-      if(pendentes===0) mostrarResultadoSincronizacao(resultados);
+      proximo();
     });
-  });
+  }
+  proximo();
 }
 
 function mostrarResultadoSincronizacao(resultados){
@@ -7858,7 +7860,8 @@ function mostrarResultadoSincronizacao(resultados){
   }
 
   if(comErro.length>0){
-    html += '<div style="margin-top:10px;font-size:11px;color:var(--yellow)">⚠️ Não foi possível verificar: '+comErro.map(function(r){return r.nome;}).join(', ')+'</div>';
+    html += '<div style="margin-top:10px;padding:10px;background:rgba(230,180,60,.1);border-radius:8px;font-size:11px;color:var(--yellow)">⚠️ Não foi possível verificar agora: '+comErro.map(function(r){return r.nome;}).join(', ')+
+      '. Pode ser uma falha temporária de conexão — tente verificar de novo em alguns segundos.</div>';
   }
 
   document.getElementById('divhist-title').textContent = '🔍 Verificação de Sincronização';
