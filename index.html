@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-171015</title>
+<title>Fluxo v20260703-200219</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1542,30 +1542,65 @@ select option{background:#1A2A3A}
 
         <!-- Campos de FINANCIAMENTO -->
         <div id="dv-campos-financiamento" style="display:none">
-          <div class="row2" style="margin-bottom:10px">
-            <div><div class="fl">Valor financiado (R$)</div><div class="r-wrap"><input id="dv-fin-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
-            <div><div class="fl">Data da 1ª parcela</div><input id="dv-fin-data" type="date"></div>
-          </div>
-          <div class="row2" style="margin-bottom:10px">
-            <div><div class="fl">Sistema de amortização</div>
-              <select id="dv-fin-sistema">
-                <option value="PRICE">Price (parcelas fixas)</option>
-                <option value="SAC">SAC (parcelas decrescentes)</option>
-              </select>
+
+          <div style="margin-bottom:10px">
+            <div class="fl">Sistema de amortização</div>
+
+            <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 4px">📄 Financiamento tradicional</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+              <button type="button" id="dv-fin-sis-price" onclick="setFinSistema('PRICE')" class="vbtn on" style="flex:1;min-width:70px;padding:9px 4px;border-radius:9px;font-size:11px">Price</button>
+              <button type="button" id="dv-fin-sis-sac" onclick="setFinSistema('SAC')" class="vbtn" style="flex:1;min-width:70px;padding:9px 4px;border-radius:9px;font-size:11px">SAC</button>
             </div>
-            <div><div class="fl">Número total de parcelas</div><input id="dv-fin-parcelas" type="number" placeholder="Ex: 48" step="1" min="1" inputmode="numeric"></div>
+
+            <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 4px">💼 Capital de Giro</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" id="dv-fin-sis-bullet" onclick="setFinSistema('BULLET')" class="vbtn" style="flex:1;min-width:100px;padding:9px 4px;border-radius:9px;font-size:11px">💵 Pagamento Único</button>
+              <button type="button" id="dv-fin-sis-rotativo" onclick="setFinSistema('ROTATIVO')" class="vbtn" style="flex:1;min-width:110px;padding:9px 4px;border-radius:9px;font-size:11px">🔄 Rotativo (Conta Garantida)</button>
+            </div>
+
+            <input type="hidden" id="dv-fin-sistema" value="PRICE">
           </div>
+
+          <!-- Campos comuns a Price/SAC -->
+          <div id="dv-fin-campos-parcelado">
+            <div class="row2" style="margin-bottom:10px">
+              <div><div class="fl">Valor emprestado (R$)</div><div class="r-wrap"><input id="dv-fin-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+              <div><div class="fl">Valor liberado (R$) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><div class="r-wrap"><input id="dv-fin-liberado" type="number" placeholder="Se diferente do emprestado" step="0.01" min="0" inputmode="decimal"></div></div>
+            </div>
+            <div class="row2" style="margin-bottom:10px">
+              <div><div class="fl">Data da 1ª parcela</div><input id="dv-fin-data" type="date"></div>
+              <div><div class="fl">Número total de parcelas</div><input id="dv-fin-parcelas" type="number" placeholder="Ex: 48" step="1" min="1" inputmode="numeric"></div>
+            </div>
+            <div style="margin-bottom:10px"><div class="fl">Parcelas já pagas <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-fin-pagas" type="number" placeholder="0" step="1" min="0" inputmode="numeric" value="0"></div>
+            <div style="margin-bottom:10px"><div class="fl">IOF total (R$) <span style="color:var(--t3);font-weight:400">(opcional — valor exato do contrato)</span></div><div class="r-wrap"><input id="dv-fin-ioftotal" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+            <div id="dv-fin-bullet-hint" style="display:none;font-size:11px;color:var(--t3);margin:-4px 0 10px;line-height:1.4">💵 Todo mês você paga só os juros; no mês da última parcela, paga os juros + o valor inteiro do empréstimo de volta. O IOF é cobrado uma única vez, na liberação do crédito.</div>
+          </div>
+
+          <!-- Campos exclusivos do Capital de Giro Rotativo -->
+          <div id="dv-fin-campos-rotativo" style="display:none">
+            <div class="row2" style="margin-bottom:10px">
+              <div><div class="fl">Valor liberado (limite, R$)</div><div class="r-wrap"><input id="dv-rot-liberado" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+              <div><div class="fl">Valor já utilizado (R$)</div><div class="r-wrap"><input id="dv-rot-utilizado" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+            </div>
+            <div style="margin-bottom:10px"><div class="fl">Data de início do contrato</div><input id="dv-rot-data" type="date"></div>
+            <div class="row2" style="margin-bottom:10px">
+              <div><div class="fl">IOF básico (% ao dia) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-rot-iofbasico" type="number" placeholder="PJ: 0,0041" step="0.0001" min="0" inputmode="decimal"></div>
+              <div><div class="fl">IOF adicional (% mensal) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-rot-iofadicional" type="number" placeholder="Padrão: 0,38" step="0.01" min="0" inputmode="decimal"></div>
+            </div>
+            <div style="font-size:11px;color:var(--t3);margin:-4px 0 10px;line-height:1.4">📊 Todo mês você paga só os juros sobre o valor utilizado (o principal só muda com saque/amortização). O <b>IOF básico</b> é a taxa diária sobre o saldo devedor pelos dias decorridos desde o último pagamento; o <b>IOF adicional</b> é uma taxa fixa mensal sobre o saldo — calculados automaticamente a cada pagamento de juros registrado.</div>
+            <div style="font-size:10px;color:var(--t3);margin:-4px 0 10px">💡 Alíquotas padrão PJ: básico 0,0041%/dia · adicional 0,38%/mês. Confira no seu contrato/extrato, pois taxas podem variar.</div>
+          </div>
+
           <div style="margin-bottom:10px">
             <div class="fl">Tipo de taxa</div>
             <div style="display:flex;gap:6px">
-              <button type="button" id="dv-fin-taxatipo-fixa" onclick="setFinTaxaTipo('fixa')" class="vbtn on" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📌 Fixa</button>
-              <button type="button" id="dv-fin-taxatipo-indexada" onclick="setFinTaxaTipo('indexada')" class="vbtn" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📊 Indexada (Selic/CDI)</button>
+              <button type="button" id="dv-fin-taxatipo-fixa" onclick="setFinTaxaTipo('fixa')" class="vbtn on" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📌 Pré-fixada</button>
+              <button type="button" id="dv-fin-taxatipo-indexada" onclick="setFinTaxaTipo('indexada')" class="vbtn" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📊 Pós-fixada (Selic/CDI)</button>
             </div>
             <input type="hidden" id="dv-fin-taxatipo" value="fixa">
           </div>
-          <div class="row2" style="margin-bottom:10px">
-            <div><div class="fl" id="dv-fin-taxa-label">Taxa de juros mensal (%)</div><input id="dv-fin-taxa" type="number" placeholder="Ex: 1,5" step="0.01" min="0" inputmode="decimal"></div>
-            <div><div class="fl">Parcelas já pagas <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-fin-pagas" type="number" placeholder="0" step="1" min="0" inputmode="numeric" value="0"></div>
+          <div style="margin-bottom:10px">
+            <div class="fl" id="dv-fin-taxa-label">Taxa de juros mensal (%)</div><input id="dv-fin-taxa" type="number" placeholder="Ex: 1,5" step="0.01" min="0" inputmode="decimal">
           </div>
           <div id="dv-fin-taxa-hint" style="display:none;font-size:11px;color:var(--t3);margin:-6px 0 10px;line-height:1.4">📊 A taxa muda ao longo do tempo. Depois de cadastrar, use o botão "🔄 Taxa" no card sempre que o banco avisar uma mudança.</div>
         </div>
@@ -1607,6 +1642,47 @@ select option{background:#1A2A3A}
       <div class="r-wrap"><input id="amortextra-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal" oninput="previewAmortExtra()"></div>
     </div>
     <div id="amortextra-preview"></div>
+  </div>
+</div>
+
+<!-- Modal: Novo Movimento (Capital de Giro Rotativo) -->
+<div id="rotmov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800">+ Novo Movimento</div>
+      <button onclick="closeRotMov()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div class="fl" style="margin-bottom:6px">Tipo de movimento</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" id="rotmov-saque" onclick="setRotMovTipo('saque')" class="vbtn on" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:11px">📥 Saque</button>
+        <button type="button" id="rotmov-juros" onclick="setRotMovTipo('jurosrotativo')" class="vbtn" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:11px">💵 Pagto. Juros</button>
+        <button type="button" id="rotmov-amort" onclick="setRotMovTipo('amortizacao')" class="vbtn" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:11px">📤 Amortização</button>
+      </div>
+      <input type="hidden" id="rotmov-tipo" value="saque">
+    </div>
+
+    <div id="rotmov-sugestao" style="display:none;margin-bottom:10px;padding:8px 10px;background:var(--bg3);border-radius:8px;font-size:11px;color:var(--t3)"></div>
+
+    <div style="margin-bottom:10px"><div class="fl">Valor (R$)</div>
+      <div class="r-wrap"><input id="rotmov-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal" oninput="atualizarIofRotativo()"></div>
+    </div>
+    <div id="rotmov-iof-wrap" style="display:none;margin-bottom:10px">
+      <div class="fl">IOF calculado <span style="color:var(--t3);font-weight:400">(sobre o valor dos juros)</span></div>
+      <div id="rotmov-iof-valor" style="padding:10px;background:var(--bg3);border-radius:8px;font-size:14px;font-weight:800;color:var(--blue)">R$ 0,00</div>
+    </div>
+    <div style="margin-bottom:10px"><div class="fl">Data <span style="color:var(--t3);font-weight:400">(pode ser retroativa)</span></div>
+      <input id="rotmov-data" type="date" onchange="atualizarIofRotativo()">
+    </div>
+    <div style="margin-bottom:16px"><div class="fl">Observação (opcional)</div>
+      <input id="rotmov-obs" type="text" placeholder="Ex: saque para capital de giro" maxlength="160">
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button onclick="closeRotMov()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>
+      <button onclick="salvarMovimentoRotativo()" style="flex:1;padding:12px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
+    </div>
   </div>
 </div>
 
@@ -4430,6 +4506,10 @@ function initTaskDelegation(){
     if(addmov){ abrirNovoMovimento(addmov.getAttribute('data-addmov')); return; }
     var pagarparcela = e.target.closest('[data-pagarparcela]');
     if(pagarparcela){ pagarProximaParcela(pagarparcela.getAttribute('data-pagarparcela')); return; }
+    var rotmov = e.target.closest('[data-rotmov]');
+    if(rotmov){ abrirNovoMovimentoRotativo(rotmov.getAttribute('data-rotmov')); return; }
+    var rothist = e.target.closest('[data-rothist]');
+    if(rothist){ abrirExtratoRotativo(rothist.getAttribute('data-rothist')); return; }
     var tabelafin = e.target.closest('[data-tabelafin]');
     if(tabelafin){ abrirTabelaFinanciamento(tabelafin.getAttribute('data-tabelafin')); return; }
     var amortextra = e.target.closest('[data-amortextra]');
@@ -6196,6 +6276,12 @@ function gerarTabelaAmortizacao(fin){
       juros = saldo * i;
       amort = Math.min(amortConstante, saldo);
       valorParcela = amort + juros;
+    } else if(sistema === 'BULLET'){
+      // Pagamento Único — só juros até a penúltima parcela; na última,
+      // juros + o saldo inteiro de volta (IOF é cobrado uma vez só, à parte).
+      juros = saldo * i;
+      amort = (k === n) ? saldo : 0;
+      valorParcela = amort + juros;
     } else { // PRICE
       juros = saldo * i;
       amort = Math.min(parcelaFixa - juros, saldo);
@@ -6292,6 +6378,18 @@ function addDivida(){
   toast('✅ Registrado!');
 }
 
+function setFinSistema(sistema){
+  document.getElementById('dv-fin-sistema').value = sistema;
+  document.getElementById('dv-fin-sis-price').classList.toggle('on', sistema==='PRICE');
+  document.getElementById('dv-fin-sis-sac').classList.toggle('on', sistema==='SAC');
+  document.getElementById('dv-fin-sis-bullet').classList.toggle('on', sistema==='BULLET');
+  document.getElementById('dv-fin-sis-rotativo').classList.toggle('on', sistema==='ROTATIVO');
+  var isRot = sistema==='ROTATIVO';
+  document.getElementById('dv-fin-campos-parcelado').style.display = isRot ? 'none' : 'block';
+  document.getElementById('dv-fin-campos-rotativo').style.display  = isRot ? 'block' : 'none';
+  document.getElementById('dv-fin-bullet-hint').style.display = (sistema==='BULLET') ? 'block' : 'none';
+}
+
 function setFinTaxaTipo(tipo){
   document.getElementById('dv-fin-taxatipo').value = tipo;
   document.getElementById('dv-fin-taxatipo-fixa').classList.toggle('on', tipo==='fixa');
@@ -6301,16 +6399,20 @@ function setFinTaxaTipo(tipo){
 }
 
 function addFinanciamento(){
+  var sistema = document.getElementById('dv-fin-sistema').value;
+  if(sistema === 'ROTATIVO'){ addCapitalGiroRotativo(); return; }
+
   var desc      = (document.getElementById('dv-desc').value||'').trim();
   var val       = parseFloat(document.getElementById('dv-fin-val').value||0);
+  var liberado  = parseFloat(document.getElementById('dv-fin-liberado').value||0);
   var data      = document.getElementById('dv-fin-data').value;
-  var sistema   = document.getElementById('dv-fin-sistema').value;
   var taxa      = parseFloat(document.getElementById('dv-fin-taxa').value||0);
   var parcelas  = parseInt(document.getElementById('dv-fin-parcelas').value||0);
   var pagas     = parseInt(document.getElementById('dv-fin-pagas').value||0);
+  var iofTotal  = parseFloat(document.getElementById('dv-fin-ioftotal').value||0);
 
   if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
-  if(!val || val<=0){ toast('⚠️ Informe o valor financiado','err'); return; }
+  if(!val || val<=0){ toast('⚠️ Informe o valor emprestado','err'); return; }
   if(!data){ toast('⚠️ Informe a data da 1ª parcela','err'); return; }
   if(!parcelas || parcelas<=0){ toast('⚠️ Informe o número de parcelas','err'); return; }
   if(pagas > parcelas){ toast('⚠️ Parcelas pagas não pode ser maior que o total','err'); return; }
@@ -6320,9 +6422,9 @@ function addFinanciamento(){
 
   var fin = {
     id: Date.now(), tipo: 'financiamento', pagadorId:'', pagadorNome:'',
-    desc: desc, valorOriginal: val, dataOriginal: data,
+    desc: desc, valorOriginal: val, valorLiberado: liberado||val, dataOriginal: data,
     sistemaAmortizacao: sistema, taxaMensal: taxa, numParcelas: parcelas,
-    parcelasPagas: pagas, extras: [], status: 'pendente',
+    parcelasPagas: pagas, extras: [], status: 'pendente', iofTotal: iofTotal,
     tipoTaxa: tipoTaxa,
     historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
     criadoEm: new Date().toISOString()
@@ -6331,18 +6433,102 @@ function addFinanciamento(){
   var resumo = resumoFinanciamento(fin);
   fin.saldoAtual = resumo.saldoAtual;
   fin.status = resumo.quitado ? 'pago' : (pagas>0 ? 'parcial' : 'pendente');
+  fin.dataUltimaParcela = resumo.tabela.length ? resumo.tabela[resumo.tabela.length-1].data : '';
 
   DIVIDAS.unshift(fin); saveDividas();
   apiCall('salvarDivida', fin, function(){});
 
-  ['dv-desc','dv-fin-val','dv-fin-parcelas','dv-fin-taxa'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['dv-desc','dv-fin-val','dv-fin-liberado','dv-fin-parcelas','dv-fin-taxa','dv-fin-ioftotal'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('dv-fin-pagas').value = '0';
   setFinTaxaTipo('fixa');
   renderDividas();
   toast('✅ Financiamento cadastrado! '+parcelas+' parcelas geradas.');
 }
 
+function addCapitalGiroRotativo(){
+  var desc      = (document.getElementById('dv-desc').value||'').trim();
+  var liberado  = parseFloat(document.getElementById('dv-rot-liberado').value||0);
+  var utilizado = parseFloat(document.getElementById('dv-rot-utilizado').value||0);
+  var data      = document.getElementById('dv-rot-data').value || ymd(new Date());
+  var taxa      = parseFloat(document.getElementById('dv-fin-taxa').value||0);
+  var iofBasico = parseFloat(document.getElementById('dv-rot-iofbasico').value||0);
+  var iofAdic   = parseFloat(document.getElementById('dv-rot-iofadicional').value||0);
+
+  if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
+  if(!liberado || liberado<=0){ toast('⚠️ Informe o valor liberado','err'); return; }
+  if(utilizado > liberado){ toast('⚠️ Valor utilizado não pode ser maior que o liberado','err'); return; }
+  if(taxa < 0){ toast('⚠️ Taxa inválida','err'); return; }
+
+  var tipoTaxa = document.getElementById('dv-fin-taxatipo').value || 'fixa';
+  var movimentos = [];
+  if(utilizado > 0){
+    movimentos.push({id:Date.now(), tipo:'saque', valor:utilizado, data:data, obs:'Saque inicial'});
+  }
+
+  var fin = {
+    id: Date.now()+1, tipo: 'financiamento', pagadorId:'', pagadorNome:'',
+    desc: desc, valorOriginal: liberado, valorLiberado: liberado, dataOriginal: data,
+    sistemaAmortizacao: 'ROTATIVO', taxaMensal: taxa,
+    valorUtilizado: utilizado, iofBasicoPct: iofBasico, iofAdicionalPct: iofAdic,
+    movimentos: movimentos, extras: [], status: utilizado>0?'parcial':'pendente',
+    tipoTaxa: tipoTaxa,
+    historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
+    criadoEm: new Date().toISOString()
+  };
+
+  DIVIDAS.unshift(fin); saveDividas();
+  apiCall('salvarDivida', fin, function(){});
+
+  ['dv-desc','dv-rot-liberado','dv-rot-utilizado','dv-fin-taxa','dv-rot-iofbasico','dv-rot-iofadicional'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  setFinTaxaTipo('fixa'); setFinSistema('PRICE');
+  renderDividas();
+  toast('✅ Capital de Giro Rotativo cadastrado!');
+}
+
+// Calcula o estado atual do Rotativo a partir do ledger de movimentos
+function _diasEntre(d1, d2){
+  var a = new Date(d1+'T12:00:00'), b = new Date(d2+'T12:00:00');
+  return Math.max(0, Math.round((b-a)/(1000*60*60*24)));
+}
+
+function resumoRotativo(d){
+  var movs = (d.movimentos||[]).slice().sort(function(a,b){ return a.data<b.data?-1:1; });
+  var valorUtilizado = 0;
+  var totalJurosPago = 0, totalIofPago = 0;
+  var dataUltimoEvento = d.dataOriginal || ymd(new Date());
+
+  movs.forEach(function(m){
+    if(m.tipo==='saque'){ valorUtilizado += parseFloat(m.valor)||0; }
+    else if(m.tipo==='amortizacao'){ valorUtilizado = Math.max(0, valorUtilizado-(parseFloat(m.valor)||0)); }
+    else if(m.tipo==='jurosrotativo'){
+      totalJurosPago += parseFloat(m.valor)||0;
+      totalIofPago += parseFloat(m.iof)||0;
+      dataUltimoEvento = m.data; // reinicia contagem de dias para o próximo IOF
+    }
+  });
+
+  var hoje = ymd(new Date());
+  var dias = _diasEntre(dataUltimoEvento, hoje);
+  var proximoJuros = valorUtilizado * (parseFloat(d.taxaMensal)||0) / 100;
+  // IOF Básico: taxa DIÁRIA sobre o saldo devedor, pelos dias decorridos
+  var proximoIofBasico = valorUtilizado * dias * (parseFloat(d.iofBasicoPct)||0) / 100;
+  // IOF Adicional: taxa fixa MENSAL sobre o saldo devedor "renovado" no período
+  var proximoIofAdicional = valorUtilizado * (parseFloat(d.iofAdicionalPct)||0) / 100;
+
+  return {
+    valorUtilizado: valorUtilizado, valorLiberado: parseFloat(d.valorLiberado)||0,
+    disponivel: Math.max(0, (parseFloat(d.valorLiberado)||0) - valorUtilizado),
+    proximoJuros: proximoJuros,
+    proximoIofBasico: proximoIofBasico, proximoIofAdicional: proximoIofAdicional,
+    proximoIof: proximoIofBasico + proximoIofAdicional,
+    diasDesdeUltimoEvento: dias, dataUltimoEvento: dataUltimoEvento,
+    totalJurosPago: totalJurosPago, totalIofPago: totalIofPago,
+    movimentos: movs, quitado: valorUtilizado<=0.01 && movs.length>0
+  };
+}
+
 function dividaCardHTML(d){
+  if(d.tipo === 'financiamento' && d.sistemaAmortizacao === 'ROTATIVO') return rotativoCardHTML(d);
   if(d.tipo === 'financiamento') return financiamentoCardHTML(d);
 
   var pag = PAGADORES.find(function(p){ return String(p.id)===String(d.pagadorId); });
@@ -6390,12 +6576,55 @@ function dividaCardHTML(d){
   '</div>';
 }
 
+function rotativoCardHTML(d){
+  var r = resumoRotativo(d);
+  var pct = r.valorLiberado>0 ? Math.round((r.valorUtilizado/r.valorLiberado)*100) : 0;
+  var statusLabel = r.quitado ? 'QUITADO' : (r.valorUtilizado>0 ? 'EM USO' : 'SEM SAQUES');
+  var statusColor = r.quitado ? 'var(--green)' : (r.valorUtilizado>0 ? 'var(--blue)' : 'var(--t3)');
+
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid #0F9D58">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
+      '<div style="min-width:0">'+
+        '<div style="font-size:10px;font-weight:800;color:#0F9D58;letter-spacing:.5px;margin-bottom:2px">🔄 CAPITAL DE GIRO ROTATIVO</div>'+
+        '<div style="font-weight:800;font-size:14px">'+esc(d.desc)+'</div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+(d.taxaMensal||0)+'%/mês · limite '+fmtBRL(r.valorLiberado)+'</div>'+
+      '</div>'+
+      '<span style="flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+statusColor+';color:'+statusColor+'">'+statusLabel+'</span>'+
+    '</div>'+
+
+    '<div style="display:flex;justify-content:space-between;align-items:baseline;margin:10px 0;padding:10px;background:var(--bg3);border-radius:8px">'+
+      '<div style="font-size:11px;color:var(--t3)">Valor utilizado</div>'+
+      '<div style="font-size:19px;font-weight:900;color:'+(r.valorUtilizado>0?'var(--red)':'var(--green)')+'">'+fmtBRL(r.valorUtilizado)+'</div>'+
+    '</div>'+
+
+    '<div style="margin-bottom:10px">'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:4px">'+
+        '<span>Limite usado</span><span>'+pct+'% · disponível '+fmtBRL(r.disponivel)+'</span>'+
+      '</div>'+
+      '<div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">'+
+        '<div style="height:100%;width:'+pct+'%;background:#0F9D58;border-radius:3px"></div>'+
+      '</div>'+
+    '</div>'+
+
+    (r.valorUtilizado>0 ?
+      '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Próximo juros estimado: '+fmtBRL(r.proximoJuros)+(r.proximoIof>0?' + IOF '+fmtBRL(r.proximoIof):'')+'</div>'
+      : '<div style="font-size:11px;color:var(--t3);margin-bottom:10px">Nenhum saque em aberto</div>') +
+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<button data-rotmov="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">+ Movimento</button>'+
+      '<button data-rothist="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Extrato</button>'+
+      '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
+      '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '</div>'+
+  '</div>';
+}
+
 function financiamentoCardHTML(d){
   var resumo = resumoFinanciamento(d);
   var pctPago = resumo.numParcelas>0 ? Math.round((resumo.parcelasPagas/resumo.numParcelas)*100) : 0;
   var statusLabel = resumo.quitado ? 'QUITADO' : (resumo.parcelasPagas>0 ? 'EM ANDAMENTO' : 'INICIADO');
   var statusColor = resumo.quitado ? 'var(--green)' : 'var(--blue)';
-  var sistemaLabel = d.sistemaAmortizacao==='SAC' ? 'SAC' : 'Price';
+  var sistemaLabel = d.sistemaAmortizacao==='SAC' ? 'SAC' : (d.sistemaAmortizacao==='BULLET' ? 'Pagamento Único' : 'Price');
   var isIndexada = d.tipoTaxa === 'indexada';
   var taxaAtualExibida = isIndexada
     ? taxaAplicavelNaData(d.historicoTaxas, ymd(new Date()), d.taxaMensal)
@@ -6404,7 +6633,7 @@ function financiamentoCardHTML(d){
   return '<div class="card" style="margin-bottom:10px;border-left:3px solid #6D28D9">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
       '<div style="min-width:0">'+
-        '<div style="font-size:10px;font-weight:800;color:#6D28D9;letter-spacing:.5px;margin-bottom:2px">🏦 FINANCIAMENTO'+(isIndexada?' · 📊 INDEXADA':'')+'</div>'+
+        '<div style="font-size:10px;font-weight:800;color:#6D28D9;letter-spacing:.5px;margin-bottom:2px">'+(d.sistemaAmortizacao==='BULLET' ? '💼 CAPITAL DE GIRO' : '🏦 FINANCIAMENTO')+(isIndexada?' · 📊 INDEXADA':'')+'</div>'+
         '<div style="font-weight:800;font-size:14px">'+esc(d.desc)+'</div>'+
         '<div style="font-size:11px;color:var(--t3)">'+sistemaLabel+' · '+(taxaAtualExibida||0).toFixed(2)+'%/mês'+(isIndexada?' (atual)':'')+' · '+resumo.numParcelas+'x</div>'+
       '</div>'+
@@ -6463,7 +6692,8 @@ function renderDividas(){
   el.innerHTML = abertas.map(dividaCardHTML).join('');
 
   var comLedger = abertas.filter(function(d){ return d.tipo !== 'financiamento'; });
-  var financiamentos = abertas.filter(function(d){ return d.tipo === 'financiamento'; });
+  var financiamentos = abertas.filter(function(d){ return d.tipo === 'financiamento' && d.sistemaAmortizacao !== 'ROTATIVO'; });
+  var rotativos = abertas.filter(function(d){ return d.tipo === 'financiamento' && d.sistemaAmortizacao === 'ROTATIVO'; });
 
   var totalGeral = 0;
   // Financiamentos: cálculo síncrono, soma direto
@@ -6471,6 +6701,13 @@ function renderDividas(){
     var resumo = resumoFinanciamento(d);
     totalGeral += resumo.saldoAtual;
     var novoStatus = resumo.quitado ? 'pago' : (resumo.parcelasPagas>0 ? 'parcial' : 'pendente');
+    if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
+  });
+  // Capital de Giro Rotativo: cálculo síncrono a partir do ledger
+  rotativos.forEach(function(d){
+    var r = resumoRotativo(d);
+    totalGeral += r.valorUtilizado;
+    var novoStatus = r.quitado ? 'pago' : (r.valorUtilizado>0 ? 'parcial' : 'pendente');
     if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
   });
 
@@ -6576,6 +6813,166 @@ function delMovimentoDivida(dividaId, movId){
 }
 
 // ── Ações de Financiamento ─────────────────────────────────
+// ── Modal: Novo Movimento (Capital de Giro Rotativo) ──────
+var rotMovDividaId = null;
+
+function abrirNovoMovimentoRotativo(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  rotMovDividaId = id;
+  setRotMovTipo('saque');
+  document.getElementById('rotmov-valor').value = '';
+  document.getElementById('rotmov-data').value = ymd(new Date());
+  document.getElementById('rotmov-obs').value = '';
+  document.getElementById('rotmov-modal').style.display = 'flex';
+}
+
+function closeRotMov(){
+  document.getElementById('rotmov-modal').style.display = 'none';
+  rotMovDividaId = null;
+}
+
+function setRotMovTipo(tipo){
+  document.getElementById('rotmov-tipo').value = tipo;
+  document.getElementById('rotmov-saque').classList.toggle('on', tipo==='saque');
+  document.getElementById('rotmov-juros').classList.toggle('on', tipo==='jurosrotativo');
+  document.getElementById('rotmov-amort').classList.toggle('on', tipo==='amortizacao');
+
+  var iofWrap = document.getElementById('rotmov-iof-wrap');
+  var sugestao = document.getElementById('rotmov-sugestao');
+  iofWrap.style.display = (tipo==='jurosrotativo') ? 'block' : 'none';
+
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(rotMovDividaId); });
+  if(d && tipo==='jurosrotativo'){
+    var r = resumoRotativo(d);
+    sugestao.style.display = 'block';
+    sugestao.innerHTML = '💡 Juros estimado sobre '+fmtBRL(r.valorUtilizado)+' a '+(d.taxaMensal||0)+'%/mês: <b>'+fmtBRL(r.proximoJuros)+'</b> — <span style="cursor:pointer;color:var(--blue);text-decoration:underline" onclick="document.getElementById(\'rotmov-valor\').value=\''+r.proximoJuros.toFixed(2)+'\';atualizarIofRotativo()">usar este valor</span>';
+  } else if(d && tipo==='saque'){
+    var r2 = resumoRotativo(d);
+    sugestao.style.display = 'block';
+    sugestao.innerHTML = '💡 Disponível no limite: <b>'+fmtBRL(r2.disponivel)+'</b>';
+  } else {
+    sugestao.style.display = 'none';
+  }
+  atualizarIofRotativo();
+}
+
+function atualizarIofRotativo(){
+  var tipo = document.getElementById('rotmov-tipo').value;
+  if(tipo !== 'jurosrotativo') return;
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(rotMovDividaId); });
+  if(!d) return;
+
+  var r = resumoRotativo(d);
+  var dataMov = document.getElementById('rotmov-data').value || ymd(new Date());
+  var dias = _diasEntre(r.dataUltimoEvento, dataMov);
+
+  // IOF Básico: taxa diária × saldo devedor × dias decorridos desde o
+  // último pagamento de juros (ou desde o início, se for o primeiro).
+  var iofBasico = r.valorUtilizado * dias * (parseFloat(d.iofBasicoPct)||0) / 100;
+  // IOF Adicional: taxa fixa mensal sobre o saldo devedor "renovado" no período.
+  var iofAdicional = r.valorUtilizado * (parseFloat(d.iofAdicionalPct)||0) / 100;
+  var iofTotal = iofBasico + iofAdicional;
+
+  document.getElementById('rotmov-iof-valor').innerHTML =
+    fmtBRL(iofTotal) +
+    '<div style="font-size:10px;font-weight:400;color:var(--t3);margin-top:4px">'+
+      'Básico: '+fmtBRL(iofBasico)+' ('+dias+' dias sobre '+fmtBRL(r.valorUtilizado)+') · '+
+      'Adicional: '+fmtBRL(iofAdicional)+
+    '</div>';
+
+  // Guardar para uso em salvarMovimentoRotativo sem recalcular
+  window._rotIofCache = {basico: iofBasico, adicional: iofAdicional, dias: dias};
+}
+
+function salvarMovimentoRotativo(){
+  if(!rotMovDividaId) return;
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(rotMovDividaId); });
+  if(!d) return;
+
+  var tipo  = document.getElementById('rotmov-tipo').value;
+  var valor = parseFloat(document.getElementById('rotmov-valor').value||0);
+  var data  = document.getElementById('rotmov-data').value;
+  var obs   = (document.getElementById('rotmov-obs').value||'').trim();
+
+  if(!valor || valor<=0){ toast('⚠️ Informe o valor','err'); return; }
+  if(!data){ toast('⚠️ Informe a data','err'); return; }
+
+  var r = resumoRotativo(d);
+  if(tipo==='saque' && valor > r.disponivel + 0.01){
+    if(!confirm('O valor do saque (' + fmtBRL(valor) + ') excede o limite disponível (' + fmtBRL(r.disponivel) + '). Confirmar mesmo assim?')) return;
+  }
+  if(tipo==='amortizacao' && valor > r.valorUtilizado + 0.01){
+    toast('⚠️ Valor maior que o utilizado atualmente ('+fmtBRL(r.valorUtilizado)+')','err'); return;
+  }
+
+  var mov = {id:Date.now(), tipo:tipo, valor:valor, data:data, obs:obs};
+  if(tipo==='jurosrotativo'){
+    // Recalcular na hora de salvar (garante consistência com a data escolhida)
+    atualizarIofRotativo();
+    var cache = window._rotIofCache || {basico:0, adicional:0};
+    mov.iofBasico = Math.round(cache.basico*100)/100;
+    mov.iofAdicional = Math.round(cache.adicional*100)/100;
+    mov.iof = mov.iofBasico + mov.iofAdicional;
+  }
+
+  d.movimentos = (d.movimentos||[]).concat([mov]);
+  var rNovo = resumoRotativo(d);
+  d.valorUtilizado = rNovo.valorUtilizado;
+  d.status = rNovo.quitado ? 'pago' : (rNovo.valorUtilizado>0 ? 'parcial' : 'pendente');
+
+  saveDividas();
+  apiCall('salvarDivida', d, function(){});
+
+  closeRotMov();
+  renderDividas();
+  var labelTipo = tipo==='saque'?'Saque':(tipo==='jurosrotativo'?'Pagamento de juros':'Amortização');
+  toast('✅ '+labelTipo+' registrado'+(mov.iof?' (IOF: '+fmtBRL(mov.iof)+')':'')+'!');
+}
+
+function abrirExtratoRotativo(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  var r = resumoRotativo(d);
+
+  document.getElementById('divhist-title').textContent = '📋 Extrato — '+d.desc;
+
+  var html = '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">'+
+    '<span style="font-size:11px;color:var(--t3)">Valor utilizado</span>'+
+    '<span style="font-weight:800;font-size:15px">'+fmtBRL(r.valorUtilizado)+'</span>'+
+  '</div>';
+  html += '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:12px">'+
+    '<span style="font-size:11px;color:var(--t3)">Total pago: juros '+fmtBRL(r.totalJurosPago)+' · IOF '+fmtBRL(r.totalIofPago)+'</span>'+
+  '</div>';
+
+  html += '<button data-linkdiv="'+d.id+'" style="width:100%;margin-bottom:14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Abrir/compartilhar extrato completo</button>';
+
+  var tipoInfo = { saque:{icon:'📥',label:'Saque',cor:'var(--orange)'}, jurosrotativo:{icon:'💵',label:'Pagamento de juros',cor:'var(--green)'}, amortizacao:{icon:'📤',label:'Amortização',cor:'var(--blue)'} };
+  if(r.movimentos.length){
+    r.movimentos.forEach(function(m){
+      var info = tipoInfo[m.tipo] || {icon:'•',label:m.tipo,cor:'var(--t1)'};
+      var sinal = m.tipo==='saque' ? '+' : (m.tipo==='amortizacao' ? '−' : '');
+      var iofDetalhe = '';
+      if(m.iof>0){
+        iofDetalhe = ' · IOF: '+fmtBRL(m.iof);
+        if(m.iofBasico!==undefined || m.iofAdicional!==undefined){
+          iofDetalhe += ' (básico '+fmtBRL(m.iofBasico||0)+' + adicional '+fmtBRL(m.iofAdicional||0)+')';
+        }
+      }
+      html += '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700;color:'+info.cor+'">'+info.icon+' '+info.label+'</span>'+
+        '<span style="font-size:13px;font-weight:700">'+sinal+' '+fmtBRL(m.valor)+'</span></div>'+
+        '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+fmtDate(m.data)+(m.obs?' · '+esc(m.obs):'')+iofDetalhe+'</div>'+
+      '</div>';
+    });
+  } else {
+    html += '<div style="text-align:center;color:var(--t3);padding:16px">Nenhum movimento registrado ainda</div>';
+  }
+
+  document.getElementById('divhist-body').innerHTML = html;
+  document.getElementById('divhist-modal').style.display = 'flex';
+}
+
 function _syncFinanciamento(d){
   var resumo = resumoFinanciamento(d);
   d.saldoAtual = resumo.saldoAtual;
@@ -7938,7 +8335,14 @@ function verificarSincronizacao(){
       var localCount  = chk.local.length;
       var serverCount = serverList ? serverList.length : null;
       var status = serverList===null ? 'erro' : (localCount===serverCount ? 'ok' : 'diff');
-      resultados.push({nome:chk.nome, local:localCount, servidor:serverCount, status:status});
+      var motivoErro = '';
+      if(status==='erro'){
+        if(err) motivoErro = 'Falha de rede: ' + (err.message||err);
+        else if(d && d.error) motivoErro = 'Servidor: ' + d.error;
+        else if(!d) motivoErro = 'Sem resposta do servidor';
+        else motivoErro = 'Resposta inesperada';
+      }
+      resultados.push({nome:chk.nome, local:localCount, servidor:serverCount, status:status, erro:motivoErro});
       proximo();
     });
   }
@@ -7980,8 +8384,12 @@ function mostrarResultadoSincronizacao(resultados){
   }
 
   if(comErro.length>0){
-    html += '<div style="margin-top:10px;padding:10px;background:rgba(230,180,60,.1);border-radius:8px;font-size:11px;color:var(--yellow)">⚠️ Não foi possível verificar agora: '+comErro.map(function(r){return r.nome;}).join(', ')+
-      '. Pode ser uma falha temporária de conexão — tente verificar de novo em alguns segundos.</div>';
+    html += '<div style="margin-top:10px;padding:10px;background:rgba(230,180,60,.1);border-radius:8px;font-size:11px;color:var(--yellow)">';
+    html += '⚠️ Não foi possível verificar:<br>';
+    comErro.forEach(function(r){
+      html += '• <b>'+r.nome+'</b>'+(r.erro?' — '+esc(r.erro):'')+'<br>';
+    });
+    html += '</div>';
   }
 
   document.getElementById('divhist-title').textContent = '🔍 Verificação de Sincronização';
