@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-020504</title>
+<title>Fluxo v20260703-023657</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2498,16 +2498,20 @@ function syncAll(){
     if(done===14){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
-  apiCall('getRecur',null,function(err,d){
-    if(!err && d && d.ok && d.data){
-      var serverIds = d.data.map(function(r){ return String(r.id); });
-      var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1 && !isTombstoned('recur', r.id) && _pareceRecente(r.id); });
-      RECUR = d.data.filter(function(r){ return !isTombstoned('recur', r.id); }).concat(localOnly);
-      saveRecur();
-    }
-    recurReady = true;
-    tryProcessRecur();
-    tick();
+  buscarExclusoesServidor('recur', function(exclRecur){
+    var exclRecurSet = {};
+    exclRecur.forEach(function(id){ exclRecurSet[String(id)] = true; });
+    apiCall('getRecur',null,function(err,d){
+      if(!err && d && d.ok && d.data){
+        var serverIds = d.data.map(function(r){ return String(r.id); });
+        var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1 && !exclRecurSet[String(r.id)]; });
+        RECUR = d.data.filter(function(r){ return !exclRecurSet[String(r.id)]; }).concat(localOnly);
+        saveRecur();
+      }
+      recurReady = true;
+      tryProcessRecur();
+      tick();
+    });
   });
 
   sincronizarRecibos(function(){ tick(); });
@@ -2543,45 +2547,50 @@ function syncAll(){
     tick();
   });
 
-  apiCall('getTransactions',null,function(err,d){
-    if(!err && d.ok){
-      var serverTxs = d.data
-        .map(function(t){
-          return Object.assign({}, t, {
-            date:  ymds(t.date),
-            desc:  String(t.desc  || t.description || ''),
-            value: parseFloat(t.value || t.amount || t.valor || 0),
-            cat:   String(t.cat   || t.category   || t.categoria || '📦 Outros'),
-            type:  String(t.type  || t.tipo || ''),
-            id:    String(t.id    || t.ID  || Date.now())
-          });
-        })
-        .filter(function(t){ return t.type === 'inc' || t.type === 'exp'; });
+  buscarExclusoesServidor('txs', function(exclTxs){
+    var exclTxsSet = {};
+    exclTxs.forEach(function(id){ exclTxsSet[String(id)] = true; });
 
-      // Preservar entradas locais que não estão no servidor ainda
-      // (ex: pagamentos feitos agora que o servidor ainda não confirmou)
-      // EXCETO as que foram excluídas localmente (tombstone) — essas nunca
-      // devem ressuscitar, mesmo que o servidor ainda não tenha processado.
-      var serverIds = {};
-      serverTxs.forEach(function(t){ serverIds[String(t.id)] = true; });
-      var localOnly = TXS.filter(function(t){
-        return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp') && !isTombstoned('txs', t.id) && _pareceRecente(t.id);
-      });
+    apiCall('getTransactions',null,function(err,d){
+      if(!err && d.ok){
+        var serverTxs = d.data
+          .map(function(t){
+            return Object.assign({}, t, {
+              date:  ymds(t.date),
+              desc:  String(t.desc  || t.description || ''),
+              value: parseFloat(t.value || t.amount || t.valor || 0),
+              cat:   String(t.cat   || t.category   || t.categoria || '📦 Outros'),
+              type:  String(t.type  || t.tipo || ''),
+              id:    String(t.id    || t.ID  || Date.now())
+            });
+          })
+          .filter(function(t){ return (t.type === 'inc' || t.type === 'exp') && !exclTxsSet[String(t.id)]; });
 
-      var merged = serverTxs.concat(localOnly);
-      // Deduplicar: mesmo desc+date+value+type → manter apenas um
-      var seenMerge = {};
-      TXS = merged.filter(function(t){
-        var k = [t.type, String(t.desc||'').trim().toLowerCase(), ymds(t.date||''), String(parseFloat(t.value||0).toFixed(2))].join('|');
-        if(seenMerge[k]) return false;
-        seenMerge[k] = true;
-        return true;
-      });
-      // Ordenar por data desc
-      TXS.sort(function(a,b){ return ymds(b.date) > ymds(a.date) ? 1 : -1; });
-      save();
-    }
-    tick();
+        // Preservar entradas locais que não estão no servidor ainda
+        // (ex: pagamentos feitos agora que o servidor ainda não confirmou)
+        // EXCETO as que já constam como excluídas no SERVIDOR — essas
+        // nunca devem ressuscitar, mesmo que pareçam "só locais".
+        var serverIds = {};
+        serverTxs.forEach(function(t){ serverIds[String(t.id)] = true; });
+        var localOnly = TXS.filter(function(t){
+          return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp') && !exclTxsSet[String(t.id)];
+        });
+
+        var merged = serverTxs.concat(localOnly);
+        // Deduplicar: mesmo desc+date+value+type → manter apenas um
+        var seenMerge = {};
+        TXS = merged.filter(function(t){
+          var k = [t.type, String(t.desc||'').trim().toLowerCase(), ymds(t.date||''), String(parseFloat(t.value||0).toFixed(2))].join('|');
+          if(seenMerge[k]) return false;
+          seenMerge[k] = true;
+          return true;
+        });
+        // Ordenar por data desc
+        TXS.sort(function(a,b){ return ymds(b.date) > ymds(a.date) ? 1 : -1; });
+        save();
+      }
+      tick();
+    });
   });
 
   // Sync Contratos
@@ -2612,51 +2621,60 @@ function syncAll(){
   });
 
   // Sync Gastos Cartão
-  apiCall('getCGastos',null,function(err,d){
-    if(!err && d && d.ok && d.data){
-      var serverCG = d.data.filter(function(g){ return !isTombstoned('cgastos', g.id); });
-      var serverIdsCG = {};
-      serverCG.forEach(function(g){ serverIdsCG[String(g.id)] = true; });
-      var localOnlyCG = CGASTOS.filter(function(g){ return !serverIdsCG[String(g.id)] && !isTombstoned('cgastos', g.id) && _pareceRecente(g.id); });
-      CGASTOS = serverCG.concat(localOnlyCG);
-      saveCGastos();
-    }
-    tick();
+  buscarExclusoesServidor('cgastos', function(exclCG){
+    var exclCGSet = {};
+    exclCG.forEach(function(id){ exclCGSet[String(id)] = true; });
+    apiCall('getCGastos',null,function(err,d){
+      if(!err && d && d.ok && d.data){
+        var serverCG = d.data.filter(function(g){ return !exclCGSet[String(g.id)]; });
+        var serverIdsCG = {};
+        serverCG.forEach(function(g){ serverIdsCG[String(g.id)] = true; });
+        var localOnlyCG = CGASTOS.filter(function(g){ return !serverIdsCG[String(g.id)] && !exclCGSet[String(g.id)]; });
+        CGASTOS = serverCG.concat(localOnlyCG);
+        saveCGastos();
+      }
+      tick();
+    });
   });
 
-  apiCall('getTasks',null,function(err,d){
-    if(!err && d.ok){
-      var fresh = d.data.map(function(t){
-        // Normalizar deadline — pode vir como string ISO, DD/MM/YYYY, ou YYYY-MM-DD
-        var dl = t.deadline || t.prazo || t.due || '';
-        // Se vier como número (timestamp Excel), converter
-        if(typeof dl === 'number') dl = new Date(dl).toISOString();
-        var dlNorm = ymds(String(dl));
-        return Object.assign({}, t, {
-          deadline:  dlNorm,
-          desc:      String(t.desc || t.description || t.descricao || ''),
-          status:    String(t.status || '').trim() || 'pend',
-          type:      String(t.type   || t.tipo || 'exp'),
-          id:        String(t.id     || t.ID   || Date.now()),
-          recurId:   t.recurId ? String(t.recurId) : '',
-          value:     parseFloat(t.value || 0)
-        });
-      }).filter(function(t){ return !isTombstoned('tasks', t.id); }); // não ressuscitar excluídas
+  buscarExclusoesServidor('tasks', function(exclTasks){
+    var exclTasksSet = {};
+    exclTasks.forEach(function(id){ exclTasksSet[String(id)] = true; });
 
-      // Mesclar: preservar tarefas locais que o servidor ainda não tem
-      // (ex: criadas há poucos segundos, antes do servidor confirmar)
-      var serverIds = {};
-      fresh.forEach(function(t){ serverIds[String(t.id)] = true; });
-      var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !isTombstoned('tasks', t.id) && _pareceRecente(t.id); });
+    apiCall('getTasks',null,function(err,d){
+      if(!err && d.ok){
+        var fresh = d.data.map(function(t){
+          // Normalizar deadline — pode vir como string ISO, DD/MM/YYYY, ou YYYY-MM-DD
+          var dl = t.deadline || t.prazo || t.due || '';
+          // Se vier como número (timestamp Excel), converter
+          if(typeof dl === 'number') dl = new Date(dl).toISOString();
+          var dlNorm = ymds(String(dl));
+          return Object.assign({}, t, {
+            deadline:  dlNorm,
+            desc:      String(t.desc || t.description || t.descricao || ''),
+            status:    String(t.status || '').trim() || 'pend',
+            type:      String(t.type   || t.tipo || 'exp'),
+            id:        String(t.id     || t.ID   || Date.now()),
+            recurId:   t.recurId ? String(t.recurId) : '',
+            value:     parseFloat(t.value || 0)
+          });
+        }).filter(function(t){ return !exclTasksSet[String(t.id)]; }); // não ressuscitar excluídas
 
-      TASKS = fresh.concat(localOnly);
-      save();
-    }
-    tasksReady = true;
-    tryProcessRecur();
-    // Atualizar aba Hoje imediatamente após TASKS chegarem do servidor
-    if(curSection === 'hoje') renderHoje();
-    tick();
+        // Mesclar: preservar tarefas locais que o servidor ainda não tem
+        // (ex: criadas há poucos segundos, antes do servidor confirmar)
+        var serverIds = {};
+        fresh.forEach(function(t){ serverIds[String(t.id)] = true; });
+        var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !exclTasksSet[String(t.id)]; });
+
+        TASKS = fresh.concat(localOnly);
+        save();
+      }
+      tasksReady = true;
+      tryProcessRecur();
+      // Atualizar aba Hoje imediatamente após TASKS chegarem do servidor
+      if(curSection === 'hoje') renderHoje();
+      tick();
+    });
   });
 }
 
@@ -5132,31 +5150,36 @@ function syncDocs(){
 function saveCartoes(){  localStorage.setItem('ff_cartoes',  JSON.stringify(CARTOES)); }
 
 function sincronizarCartoes(cb){
-  apiCall('getCartoes', null, function(err, d){
-    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
-    serverList = serverList.filter(function(cc){ return !isTombstoned('cartoes', cc.id); });
-    var serverMap = {};
-    serverList.forEach(function(cc){ serverMap[String(cc.id)] = true; });
+  buscarExclusoesServidor('cartoes', function(exclusoes){
+    var exclSet = {};
+    exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
-    var pendentes = CARTOES.filter(function(cc){
-      return !serverMap[String(cc.id)] && !isTombstoned('cartoes', cc.id) && _pareceRecente(cc.id);
-    });
+    apiCall('getCartoes', null, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      serverList = serverList.filter(function(cc){ return !exclSet[String(cc.id)]; });
+      var serverMap = {};
+      serverList.forEach(function(cc){ serverMap[String(cc.id)] = true; });
 
-    function finalizar(){
-      var pendMap = {};
-      pendentes.forEach(function(cc){ pendMap[String(cc.id)] = true; });
-      CARTOES = serverList.concat(CARTOES.filter(function(cc){ return pendMap[String(cc.id)]; }));
-      saveCartoes();
-      if(cb) cb();
-    }
+      var pendentes = CARTOES.filter(function(cc){
+        return !serverMap[String(cc.id)] && !exclSet[String(cc.id)];
+      });
 
-    if(pendentes.length === 0){ finalizar(); return; }
+      function finalizar(){
+        var pendMap = {};
+        pendentes.forEach(function(cc){ pendMap[String(cc.id)] = true; });
+        CARTOES = serverList.concat(CARTOES.filter(function(cc){ return pendMap[String(cc.id)]; }));
+        saveCartoes();
+        if(cb) cb();
+      }
 
-    var enviados = 0;
-    pendentes.forEach(function(cc){
-      apiCall('salvarCartao', cc, function(){
-        enviados++;
-        if(enviados === pendentes.length) finalizar();
+      if(pendentes.length === 0){ finalizar(); return; }
+
+      var enviados = 0;
+      pendentes.forEach(function(cc){
+        apiCall('salvarCartao', cc, function(){
+          enviados++;
+          if(enviados === pendentes.length) finalizar();
+        });
       });
     });
   });
@@ -5208,35 +5231,50 @@ function _pareceRecente(id, horasLimite){
 
 function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS)); }
 
+// Busca a lista de IDs excluídos no SERVIDOR para um tipo de dado —
+// fonte de verdade entre dispositivos (diferente da lápide local, que só
+// protege o mesmo aparelho que fez a exclusão). Qualquer item cujo ID
+// apareça aqui deve ser removido localmente, não importa a idade dele.
+function buscarExclusoesServidor(tipo, cb){
+  apiCall('getExclusoes', {tipo: tipo}, function(err, d){
+    cb((!err && d && d.ok && d.data) ? d.data : []);
+  });
+}
+
 function sincronizarRecibos(cb){
-  apiCall('getRecibos', null, function(err, d){
-    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
-    serverList = serverList.filter(function(r){ return !isTombstoned('recibos', r.id); });
-    var serverMap = {};
-    serverList.forEach(function(r){ serverMap[String(r.id)] = true; });
+  buscarExclusoesServidor('recibos', function(exclusoes){
+    var exclSet = {};
+    exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
-    var pendentes = RECIBOS.filter(function(r){
-      return !serverMap[String(r.id)] && !isTombstoned('recibos', r.id) && _pareceRecente(r.id);
-    });
+    apiCall('getRecibos', null, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      serverList = serverList.filter(function(r){ return !exclSet[String(r.id)]; });
+      var serverMap = {};
+      serverList.forEach(function(r){ serverMap[String(r.id)] = true; });
 
-    function finalizar(){
-      // RECONCILIAÇÃO: servidor é a fonte de verdade — qualquer item local
-      // que não está no servidor E não está pendente de envio (ex: foi
-      // excluído em outro dispositivo) é removido daqui também.
-      var pendMap = {};
-      pendentes.forEach(function(r){ pendMap[String(r.id)] = true; });
-      RECIBOS = serverList.concat(RECIBOS.filter(function(r){ return pendMap[String(r.id)]; }));
-      saveRecibos();
-      if(cb) cb();
-    }
+      // Pendente de envio = existe só localmente E NÃO está na lista de
+      // exclusões do servidor (ou seja, é genuinamente novo, não foi
+      // excluído em outro dispositivo).
+      var pendentes = RECIBOS.filter(function(r){
+        return !serverMap[String(r.id)] && !exclSet[String(r.id)];
+      });
 
-    if(pendentes.length === 0){ finalizar(); return; }
+      function finalizar(){
+        var pendMap = {};
+        pendentes.forEach(function(r){ pendMap[String(r.id)] = true; });
+        RECIBOS = serverList.concat(RECIBOS.filter(function(r){ return pendMap[String(r.id)]; }));
+        saveRecibos();
+        if(cb) cb();
+      }
 
-    var enviados = 0;
-    pendentes.forEach(function(r){
-      apiCall('salvarRecibo', r, function(){
-        enviados++;
-        if(enviados === pendentes.length) finalizar();
+      if(pendentes.length === 0){ finalizar(); return; }
+
+      var enviados = 0;
+      pendentes.forEach(function(r){
+        apiCall('salvarRecibo', r, function(){
+          enviados++;
+          if(enviados === pendentes.length) finalizar();
+        });
       });
     });
   });
@@ -6741,31 +6779,36 @@ function delDivida(id){
 }
 
 function sincronizarDividas(cb){
-  apiCall('getDividas', null, function(err, d){
-    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
-    serverList = serverList.filter(function(x){ return !isTombstoned('dividas', x.id); });
-    var serverMap = {};
-    serverList.forEach(function(x){ serverMap[String(x.id)] = true; });
+  buscarExclusoesServidor('dividas', function(exclusoes){
+    var exclSet = {};
+    exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
-    var pendentes = DIVIDAS.filter(function(x){
-      return !serverMap[String(x.id)] && !isTombstoned('dividas', x.id) && _pareceRecente(x.id);
-    });
+    apiCall('getDividas', null, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      serverList = serverList.filter(function(x){ return !exclSet[String(x.id)]; });
+      var serverMap = {};
+      serverList.forEach(function(x){ serverMap[String(x.id)] = true; });
 
-    function finalizar(){
-      var pendMap = {};
-      pendentes.forEach(function(x){ pendMap[String(x.id)] = true; });
-      DIVIDAS = serverList.concat(DIVIDAS.filter(function(x){ return pendMap[String(x.id)]; }));
-      saveDividas();
-      if(cb) cb();
-    }
+      var pendentes = DIVIDAS.filter(function(x){
+        return !serverMap[String(x.id)] && !exclSet[String(x.id)];
+      });
 
-    if(pendentes.length === 0){ finalizar(); return; }
+      function finalizar(){
+        var pendMap = {};
+        pendentes.forEach(function(x){ pendMap[String(x.id)] = true; });
+        DIVIDAS = serverList.concat(DIVIDAS.filter(function(x){ return pendMap[String(x.id)]; }));
+        saveDividas();
+        if(cb) cb();
+      }
 
-    var enviados = 0;
-    pendentes.forEach(function(x){
-      apiCall('salvarDivida', x, function(){
-        enviados++;
-        if(enviados === pendentes.length) finalizar();
+      if(pendentes.length === 0){ finalizar(); return; }
+
+      var enviados = 0;
+      pendentes.forEach(function(x){
+        apiCall('salvarDivida', x, function(){
+          enviados++;
+          if(enviados === pendentes.length) finalizar();
+        });
       });
     });
   });
@@ -7162,30 +7205,35 @@ function delContaBanco(id){
 
 // ── Sincronização de Contas Bancárias ────────────────────
 function sincronizarContasBanco(cb){
-  apiCall('getContasBanco', null, function(err, d){
-    var serverList = (!err && d && d.ok && d.data) ? d.data : [];
-    serverList = serverList.filter(function(c){ return !isTombstoned('contasbanco', c.id); });
-    var serverMap  = {};
-    serverList.forEach(function(c){ serverMap[String(c.id)] = true; });
+  buscarExclusoesServidor('contasbanco', function(exclusoes){
+    var exclSet = {};
+    exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
-    var pendentes = CONTAS_BANCO.filter(function(c){
-      return !serverMap[String(c.id)] && !isTombstoned('contasbanco', c.id) && _pareceRecente(c.id);
-    });
+    apiCall('getContasBanco', null, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      serverList = serverList.filter(function(c){ return !exclSet[String(c.id)]; });
+      var serverMap  = {};
+      serverList.forEach(function(c){ serverMap[String(c.id)] = true; });
 
-    function finalizar(){
-      var pendMap = {};
-      pendentes.forEach(function(c){ pendMap[String(c.id)] = true; });
-      CONTAS_BANCO = serverList.concat(CONTAS_BANCO.filter(function(c){ return pendMap[String(c.id)]; }));
-      saveContasBanco();
-      if(cb) cb();
-    }
+      var pendentes = CONTAS_BANCO.filter(function(c){
+        return !serverMap[String(c.id)] && !exclSet[String(c.id)];
+      });
 
-    if(pendentes.length === 0){ finalizar(); return; }
-    var enviados = 0;
-    pendentes.forEach(function(c){
-      apiCall('salvarContaBanco', c, function(){
-        enviados++;
-        if(enviados === pendentes.length) finalizar();
+      function finalizar(){
+        var pendMap = {};
+        pendentes.forEach(function(c){ pendMap[String(c.id)] = true; });
+        CONTAS_BANCO = serverList.concat(CONTAS_BANCO.filter(function(c){ return pendMap[String(c.id)]; }));
+        saveContasBanco();
+        if(cb) cb();
+      }
+
+      if(pendentes.length === 0){ finalizar(); return; }
+      var enviados = 0;
+      pendentes.forEach(function(c){
+        apiCall('salvarContaBanco', c, function(){
+          enviados++;
+          if(enviados === pendentes.length) finalizar();
+        });
       });
     });
   });
