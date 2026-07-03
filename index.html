@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-025340</title>
+<title>Fluxo v20260703-171015</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -942,7 +942,7 @@ select option{background:#1A2A3A}
           </div>
           <div><div class="fl">Data</div><input id="tx-date" type="date"></div>
         </div>
-        <div style="margin-bottom:10px">
+        <div id="tx-pm-wrap" style="margin-bottom:10px">
           <div class="fl">Forma de pagamento</div>
           <div style="display:flex;gap:8px">
             <button type="button" class="pm-btn on" id="pm-dinheiro" onclick="setPM('dinheiro')">💵 Dinheiro</button>
@@ -952,10 +952,22 @@ select option{background:#1A2A3A}
           </div>
         </div>
         <div id="tx-cartao-row" style="display:none;margin-bottom:10px">
-          <div class="fl">💳 Selecione o cartão</div>
-          <select id="tx-cartao-sel">
-            <option value="">— selecione —</option>
-          </select>
+          <div class="row2">
+            <div><div class="fl">💳 Cartão</div>
+              <select id="tx-cartao-sel">
+                <option value="">— selecione —</option>
+              </select>
+            </div>
+            <div><div class="fl">Parcelas</div>
+              <select id="tx-cartao-parc">
+                <option value="1">À vista (1x)</option>
+                <option value="2">2x</option><option value="3">3x</option>
+                <option value="4">4x</option><option value="6">6x</option>
+                <option value="10">10x</option><option value="12">12x</option>
+                <option value="18">18x</option><option value="24">24x</option>
+              </select>
+            </div>
+          </div>
         </div>
         <button class="btn" id="btn-add-tx" onclick="addTx()">Registrar ✓</button>
 
@@ -2807,6 +2819,9 @@ function setTxType(t){
   document.getElementById('bt-exp').className='ttype'+(t==='exp'?' exp':'');
   document.getElementById('bt-inc').className='ttype'+(t==='inc'?' inc':'');
   document.getElementById('tx-cat').value = t==='inc' ? '💼 Salário':'🍽️ Alimentação';
+  var pmWrap = document.getElementById('tx-pm-wrap');
+  if(pmWrap) pmWrap.style.display = (t==='exp') ? 'block' : 'none';
+  if(t==='inc') setPM('dinheiro');
   onTxCatChange();
 }
 
@@ -3290,25 +3305,32 @@ function addTx(){
   if(!desc){toast('⚠️ Informe a descrição','err');return;}
   if(!val||val<=0){toast('⚠️ Informe o valor','err');return;}
   if(!date){toast('⚠️ Informe a data','err');return;}
-  var btn=document.getElementById('btn-add-tx'); btn.disabled=true;
-  var cartaoSelEl = document.getElementById('tx-cartao-sel');
-  var cartaoId    = (curPM==='cartao' && cartaoSelEl) ? cartaoSelEl.value : '';
-  var cartao      = cartaoId ? CARTOES.find(function(cc){ return String(cc.id)===cartaoId; }) : null;
 
+  // Pagamento no CARTÃO → registrar só como CGASTO (com parcelamento),
+  // NUNCA como TXS também — evita contar a mesma despesa duas vezes
+  // (uma via lançamento normal, outra via categoria do cartão).
+  if(curPM==='cartao' && curTxType==='exp'){
+    var cartaoSelEl = document.getElementById('tx-cartao-sel');
+    var cartaoId = cartaoSelEl ? cartaoSelEl.value : '';
+    var parcEl = document.getElementById('tx-cartao-parc');
+    var parc = parseInt((parcEl&&parcEl.value)||1);
+    if(!cartaoId){ toast('⚠️ Selecione o cartão','err'); return; }
+
+    var ok = registrarGastoCartao(cartaoId, date, desc, val, cat, parc);
+    if(!ok) return;
+
+    setPM('dinheiro');
+    document.getElementById('tx-desc').value='';
+    document.getElementById('tx-val').value='';
+    renderCC(); renderAll();
+    toast('✅ Compra no cartão registrada'+(parc>1?' em '+parc+'x':'')+'!');
+    return;
+  }
+
+  var btn=document.getElementById('btn-add-tx'); btn.disabled=true;
   var tx={type:curTxType,desc:desc,value:val,cat:cat,date:date};
-  if(cartaoId) tx.cartaoId = cartaoId;
 
   var tmp=Date.now(); TXS.unshift(Object.assign({id:tmp},tx)); renderAll();
-
-  // Se pagamento no cartão → registrar também em CGASTOS para controle da fatura
-  if(cartao && curTxType==='exp'){
-    var fatMes = faturaDoGasto(new Date(date+'T12:00:00'), cartao.fech);
-    var gasto = { id: tmp, cartaoId:cartaoId, cartao:cartao.nome,
-      desc:desc, val:val, cat:cat, data:date, fatMes:fatMes, pago:false };
-    CGASTOS.push(gasto);
-    saveCGastos();
-    apiPost('salvarCGasto', gasto, function(){});
-  }
 
   apiCall('addTransaction',tx,function(err){
     if(err){ TXS=TXS.filter(function(t){return t.id!==tmp;}); renderAll(); toast('❌ Erro ao salvar','err'); }
@@ -5748,6 +5770,45 @@ function delCartao(id){
   apiCall('deletarItemSheet', {aba:'Cartoes', id:id}, function(){});
   renderFinCC(); toast('🗑️ Cartão removido');
 }
+// Núcleo reutilizável — registra uma compra no cartão (parcelada ou não),
+// gerando uma linha por parcela, cada uma na fatura e categoria certas.
+// Usado tanto pelo formulário da aba Cartões quanto pelo formulário de
+// Nova Despesa na Agenda (quando forma de pagamento = Cartão de Crédito).
+function registrarGastoCartao(cartaoId, data, desc, val, cat, parc){
+  var cartao = CARTOES.find(function(cc){ return String(cc.id)===String(cartaoId); });
+  if(!cartao){ toast('⚠️ Cartão inválido','err'); return false; }
+  if(!desc){ toast('⚠️ Informe a descrição','err'); return false; }
+  if(!val || val<=0){ toast('⚠️ Informe o valor','err'); return false; }
+  parc = parseInt(parc)||1;
+
+  var valParc = val/parc;
+  var baseDate = new Date(data+'T12:00:00');
+  var compraId = Date.now(); // vincula todas as parcelas desta mesma compra
+  for(var p=0; p<parc; p++){
+    var d = new Date(baseDate.getFullYear(), baseDate.getMonth()+p, baseDate.getDate());
+    var fatMes = faturaDoGasto(d, cartao.fech);
+    var g = {id:compraId+p, cartaoId:String(cartao.id), cartao:cartao.nome,
+      desc:desc, val:valParc, cat:cat, data:ymd(d), fatMes:fatMes, pago:false,
+      compraId:compraId, parcelaAtual:p+1, parcelaTotal:parc, valorCompraTotal:val};
+    CGASTOS.push(g);
+    apiCall('salvarCGasto', g, function(){});
+  }
+  saveCGastos();
+
+  // Atualizar tasks recorrentes vinculadas ao cartão com novo total
+  var fatMesAtual = faturaDoGasto(new Date(data+'T12:00:00'), cartao.fech);
+  var novoTotal = totalFaturaCartao(String(cartaoId));
+  TASKS.forEach(function(t){
+    var r = RECUR.find(function(x){ return String(x.cartaoId)===String(cartaoId); });
+    if(r && String(t.recurId)===String(r.id) && t.deadline && t.deadline.startsWith(fatMesAtual)){
+      t.value = novoTotal;
+    }
+  });
+  localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+
+  return true;
+}
+
 function addGastoCartao(){
   var cid=(document.getElementById('cg-cartao')||{}).value||'';
   var data=(document.getElementById('cg-data')||{}).value||ymd(new Date());
@@ -5755,35 +5816,10 @@ function addGastoCartao(){
   var val=parseFloat((document.getElementById('cg-val')||{}).value||0);
   var cat=(document.getElementById('cg-cat')||{}).value||'📦 Outros';
   var parc=parseInt((document.getElementById('cg-parc')||{}).value||1);
-  var cartao=CARTOES.find(function(cc){return String(cc.id)===cid;});
-  if(!cartao){toast('⚠️ Selecione o cartão','err');return;}
-  if(!desc){toast('⚠️ Informe a descrição','err');return;}
-  if(!val||val<=0){toast('⚠️ Informe o valor','err');return;}
-  var valParc=val/parc;
-  var baseDate=new Date(data+'T12:00:00');
-  var compraId=Date.now(); // vincula todas as parcelas desta mesma compra
-  for(var p=0;p<parc;p++){
-    var d=new Date(baseDate.getFullYear(),baseDate.getMonth()+p,baseDate.getDate());
-    var fatMes=faturaDoGasto(d,cartao.fech);
-    var g={id:compraId+p,cartaoId:String(cartao.id),cartao:cartao.nome,
-      desc:desc, val:valParc, cat:cat, data:ymd(d), fatMes:fatMes, pago:false,
-      compraId:compraId, parcelaAtual:p+1, parcelaTotal:parc, valorCompraTotal:val};
-    CGASTOS.push(g);
-    apiCall('salvarCGasto',g,function(){});
-  }
-  saveCGastos();
-  // Atualizar tasks recorrentes vinculadas ao cartão com novo total
-  if(cartao){
-    var fatMesAtual = faturaDoGasto(new Date(data+'T12:00:00'), cartao.fech);
-    var novoTotal = totalFaturaCartao(cid);
-    TASKS.forEach(function(t){
-      var r = RECUR.find(function(x){ return String(x.cartaoId)===cid; });
-      if(r && String(t.recurId)===String(r.id) && t.deadline && t.deadline.startsWith(fatMesAtual)){
-        t.value = novoTotal;
-      }
-    });
-    localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
-  }
+
+  var ok = registrarGastoCartao(cid, data, desc, val, cat, parc);
+  if(!ok) return;
+
   ['cg-desc','cg-val'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   var pgEl=document.getElementById('cg-parc'); if(pgEl) pgEl.value='1';
   renderCC(); renderHist(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
