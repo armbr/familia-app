@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260702-212949</title>
+<title>Fluxo v20260703-004333</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1645,9 +1645,8 @@ select option{background:#1A2A3A}
     <div style="margin-bottom:14px">
       <div class="fl" style="margin-bottom:6px">Tipo de movimento</div>
       <div style="display:flex;gap:6px">
-        <button type="button" id="movtipo-aporte" onclick="setMovTipo('aporte')" class="vbtn on" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">📥 Aporte</button>
-        <button type="button" id="movtipo-pagamento" onclick="setMovTipo('pagamento')" class="vbtn" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">💵 Pagamento</button>
-        <button type="button" id="movtipo-despesa" onclick="setMovTipo('despesa')" class="vbtn" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">🧾 Despesa</button>
+        <button type="button" id="movtipo-aumenta" onclick="setMovTipo('aporte')" class="vbtn on" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">📥 Aporte</button>
+        <button type="button" id="movtipo-diminui" onclick="setMovTipo('pagamento')" class="vbtn" style="flex:1;padding:10px 4px;border-radius:9px;font-size:11px">💵 Pagamento</button>
       </div>
       <input type="hidden" id="mov-tipo" value="aporte">
     </div>
@@ -1659,7 +1658,7 @@ select option{background:#1A2A3A}
       <input id="mov-data" type="date">
     </div>
     <div style="margin-bottom:16px"><div class="fl" id="mov-obs-label">Observação (opcional)</div>
-      <input id="mov-obs" type="text" placeholder="Ex: conta de luz pagada para o credor" maxlength="160">
+      <input id="mov-obs" type="text" placeholder="Ex: conta de luz paga em nome do credor" maxlength="160">
     </div>
 
     <div style="display:flex;gap:8px">
@@ -6421,6 +6420,15 @@ var movDividaId = null;
 
 function abrirNovoMovimento(dividaId){
   movDividaId = dividaId;
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(dividaId); });
+  var isDevo = !d || d.tipo !== 'recebo'; // default devo se não achar
+
+  var lblAumenta = isDevo ? '📥 Peguei emprestado' : '📤 Emprestei mais';
+  var lblDiminui = isDevo ? '💵 Paguei'            : '💰 Recebi';
+
+  document.getElementById('movtipo-aumenta').textContent = lblAumenta;
+  document.getElementById('movtipo-diminui').textContent = lblDiminui;
+
   setMovTipo('aporte');
   document.getElementById('mov-valor').value = '';
   document.getElementById('mov-data').value = ymd(new Date());
@@ -6435,14 +6443,8 @@ function closeMovModal(){
 
 function setMovTipo(tipo){
   document.getElementById('mov-tipo').value = tipo;
-  ['aporte','pagamento','despesa'].forEach(function(t){
-    var btn = document.getElementById('movtipo-'+t);
-    if(btn) btn.classList.toggle('on', t===tipo);
-  });
-  var obsLabel = document.getElementById('mov-obs-label');
-  if(obsLabel){
-    obsLabel.textContent = tipo==='despesa' ? 'Em nome de quem / motivo' : 'Observação (opcional)';
-  }
+  document.getElementById('movtipo-aumenta').classList.toggle('on', tipo==='aporte');
+  document.getElementById('movtipo-diminui').classList.toggle('on', tipo==='pagamento');
 }
 
 function salvarMovimentoDivida(){
@@ -6680,10 +6682,11 @@ function verHistoricoDivida(id){
       '<span style="font-weight:800;font-size:15px">'+fmtBRL(res.saldoAtual)+'</span>'+
     '</div>';
 
+    var isDevo = d.tipo !== 'recebo';
     var tipoInfo = {
-      aporte:    {icon:'📥', label:'Aporte/Empréstimo', cor:'var(--orange)'},
-      pagamento: {icon:'💵', label:'Pagamento', cor:'var(--green)'},
-      despesa:   {icon:'🧾', label:'Despesa em nome', cor:'var(--blue)'}
+      aporte:    {icon:'📥', label: isDevo ? 'Peguei emprestado' : 'Emprestei mais', cor:'var(--orange)'},
+      pagamento: {icon: isDevo?'💵':'💰', label: isDevo ? 'Paguei' : 'Recebi', cor:'var(--green)'},
+      despesa:   {icon:'🧾', label:'Despesa em nome (legado)', cor:'var(--blue)'} // compat com registros antigos
     };
 
     if(res.linhas && res.linhas.length){
