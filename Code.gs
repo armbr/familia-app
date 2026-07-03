@@ -1129,6 +1129,65 @@ function getExclusoes(tipo) {
   return { ok: true, data: ids };
 }
 
+// Faxina manual — execute esta função UMA VEZ (ou sempre que quiser) no
+// editor do Apps Script. Ela varre TODAS as exclusões já registradas e
+// remove qualquer linha física que ainda tenha ficado para trás em suas
+// respectivas abas (não afeta o funcionamento do app — os itens já estão
+// corretamente escondidos — só limpa a planilha).
+function limparRegistrosOrfaos() {
+  var sheet = garantirAbaTombstones();
+  var rows = sheet.getDataRange().getValues();
+  if (rows.length <= 1) { Logger.log('Nenhuma exclusão registrada ainda.'); return; }
+
+  // tipo → { spreadsheet, nomeAba, colunaId (0-based) }
+  var mapaTipo = {
+    recibos:      { ssFn: ss,        aba: 'Recibos',      col: 0 },
+    cartoes:      { ssFn: ss,        aba: 'Cartoes',       col: 0 },
+    contasbanco:  { ssFn: ss,        aba: 'ContasBanco',   col: 0 },
+    cgastos:      { ssFn: ss,        aba: 'GastosCartao',  col: 0 },
+    pagadores:    { ssFn: ss,        aba: 'Pagadores',     col: 0 },
+    alugueis:     { ssFn: ss,        aba: 'Aluguéis',      col: 0 },
+    contratos:    { ssFn: ss,        aba: 'Contratos',     col: 0 },
+    txs:          { ssFn: ss,        aba: 'Transações',    col: 0 },
+    tasks:        { ssFn: ss,        aba: 'Tarefas',       col: 0 },
+    recur:        { ssFn: ss,        aba: 'Recorrentes',   col: 0 },
+    dividas:      { ssFn: dividasSS, aba: 'Dívidas',       col: 0 }
+  };
+
+  var porTipo = {};
+  for (var i = 1; i < rows.length; i++) {
+    var tipo = String(rows[i][0]);
+    var id   = String(rows[i][1]);
+    (porTipo[tipo] = porTipo[tipo] || []).push(id);
+  }
+
+  var totalRemovidas = 0;
+  Object.keys(porTipo).forEach(function(tipo){
+    var cfg = mapaTipo[tipo];
+    if (!cfg) { Logger.log('Tipo sem mapeamento de limpeza: ' + tipo); return; }
+    var idsExcluidos = {};
+    porTipo[tipo].forEach(function(id){ idsExcluidos[id] = true; });
+
+    try {
+      var sp = cfg.ssFn();
+      var sh = sp.getSheetByName(cfg.aba);
+      if (!sh) return;
+      var dados = sh.getDataRange().getValues();
+      for (var r = dados.length - 1; r >= 1; r--) {
+        if (idsExcluidos[String(dados[r][cfg.col])]) {
+          sh.deleteRow(r + 1);
+          totalRemovidas++;
+        }
+      }
+    } catch(e) {
+      Logger.log('Erro ao limpar ' + tipo + ': ' + e.message);
+    }
+  });
+
+  Logger.log('✅ Faxina concluída — ' + totalRemovidas + ' linha(s) órfã(s) removida(s) das planilhas.');
+  return totalRemovidas;
+}
+
 // Mapa de nome-de-aba → tipo usado nas exclusões (mantém curto e estável)
 var ABA_PARA_TIPO = {
   'Recibos': 'recibos', 'Cartoes': 'cartoes', 'ContasBanco': 'contasbanco',
@@ -1206,7 +1265,9 @@ function garantirEstruturaDividas() {
                  'metodoJuros','taxaMensal','indexador','valorPrincipalAtual','dataBaseAtual',
                  'diasEmAtraso','saldoDevedorEstimado','status','criadoEm','atualizadoEm',
                  'sistemaAmortizacao','numParcelas','parcelasPagas','extrasJSON',
-                 'tipoTaxa','historicoTaxasJSON'];
+                 'tipoTaxa','historicoTaxasJSON',
+                 'valorLiberado','dataUltimaParcela','iofTotal',
+                 'valorUtilizado','iofBasicoPct','iofAdicionalPct'];
   var eraNova = !sh;
   if (!sh) sh = sp.insertSheet('Dívidas');
   var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
@@ -1414,8 +1475,24 @@ function salvarDividaEstruturada(body) {
   var now = new Date();
   var hoje = Utilities.formatDate(now, 'America/Sao_Paulo', 'yyyy-MM-dd');
 
-  // ── FINANCIAMENTO — modelo próprio (sem ledger de movimentos) ──
+  // ── FINANCIAMENTO — modelo próprio (sem ledger de movimentos), OU
+  //    Capital de Giro Rotativo — usa ledger de movimentos (saque/juros/amortização)
   if (body.tipo === 'financiamento') {
+    var isRotativo = body.sistemaAmortizacao === 'ROTATIVO';
+    var valorUtilizadoCalc = parseFloat(body.valorUtilizado) || 0;
+
+    if (isRotativo) {
+      // Recalcular valorUtilizado a partir do ledger de movimentos, se enviado
+      var movsRot = body.movimentos || [];
+      if (movsRot.length) {
+        valorUtilizadoCalc = movsRot.reduce(function(saldo, m){
+          if (m.tipo === 'saque') return saldo + (parseFloat(m.valor)||0);
+          if (m.tipo === 'amortizacao') return Math.max(0, saldo - (parseFloat(m.valor)||0));
+          return saldo; // jurosrotativo não altera o principal
+        }, 0);
+      }
+    }
+
     var valuesByHeader = {
       id:                    String(body.id),
       tipo:                  'financiamento',
@@ -1427,10 +1504,10 @@ function salvarDividaEstruturada(body) {
       metodoJuros:           body.sistemaAmortizacao || '',
       taxaMensal:            parseFloat(body.taxaMensal) || 0,
       indexador:             '',
-      valorPrincipalAtual:   parseFloat(body.saldoAtual) || 0,
+      valorPrincipalAtual:   isRotativo ? valorUtilizadoCalc : (parseFloat(body.saldoAtual) || 0),
       dataBaseAtual:         hoje ? new Date(hoje + 'T12:00:00') : '',
       diasEmAtraso:          0,
-      saldoDevedorEstimado:  parseFloat(body.saldoAtual) || 0,
+      saldoDevedorEstimado:  isRotativo ? valorUtilizadoCalc : (parseFloat(body.saldoAtual) || 0),
       status:                body.status || 'pendente',
       criadoEm:              body.criadoEm ? new Date(body.criadoEm) : now,
       atualizadoEm:          now,
@@ -1439,9 +1516,27 @@ function salvarDividaEstruturada(body) {
       parcelasPagas:         parseInt(body.parcelasPagas) || 0,
       extrasJSON:            JSON.stringify(body.extras || []),
       tipoTaxa:              body.tipoTaxa || 'fixa',
-      historicoTaxasJSON:    JSON.stringify(body.historicoTaxas || [])
+      historicoTaxasJSON:    JSON.stringify(body.historicoTaxas || []),
+      valorLiberado:         parseFloat(body.valorLiberado) || 0,
+      dataUltimaParcela:     body.dataUltimaParcela ? new Date(body.dataUltimaParcela + 'T12:00:00') : '',
+      iofTotal:              parseFloat(body.iofTotal) || 0,
+      valorUtilizado:        valorUtilizadoCalc,
+      iofBasicoPct:          parseFloat(body.iofBasicoPct) || 0,
+      iofAdicionalPct:       parseFloat(body.iofAdicionalPct) || 0
     };
     _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader);
+
+    // Salvar o ledger de movimentos do Rotativo (saque/juros/amortização)
+    // Reaproveita as colunas jurosNoPeriodo/saldoApos para guardar o
+    // detalhamento do IOF (adicional/básico) de cada pagamento de juros.
+    if (isRotativo && body.movimentos) {
+      sincronizarSubArrayDivida(sheets.movimentos, body.id, body.movimentos, function(m) {
+        return [String(m.id), String(body.id), body.pagadorNome || '', m.tipo || '',
+                m.data ? new Date(m.data + 'T12:00:00') : '', parseFloat(m.valor) || 0,
+                m.obs || '', parseFloat(m.iofAdicional)||0, parseFloat(m.iofBasico)||0];
+      });
+    }
+
     return { ok: true, status: valuesByHeader.status, saldoAtual: valuesByHeader.valorPrincipalAtual };
   }
 
@@ -1527,7 +1622,13 @@ function getDividasEstruturadas() {
     var did = String(mDados[i][1]); if (!did) continue;
     (movPorDivida[did] = movPorDivida[did] || []).push({
       id: mDados[i][0], data: fmtDate(mDados[i][4]), tipo: mDados[i][3],
-      valor: parseFloat(mDados[i][5]) || 0, obs: mDados[i][6] || ''
+      valor: parseFloat(mDados[i][5]) || 0, obs: mDados[i][6] || '',
+      // Para Rotativo: col7=iofAdicional, col8=iofBasico (reaproveitando
+      // jurosNoPeriodo/saldoApos). Para devo/recebo, esses mesmos campos
+      // guardam seu significado original (juros do período / saldo após).
+      iofAdicional: parseFloat(mDados[i][7]) || 0,
+      iofBasico: parseFloat(mDados[i][8]) || 0,
+      iof: (parseFloat(mDados[i][7])||0) + (parseFloat(mDados[i][8])||0)
     });
   }
 
@@ -1566,6 +1667,12 @@ function getDividasEstruturadas() {
       try { item.extras = JSON.parse(obj.extrasJSON || '[]'); } catch(e) { item.extras = []; }
       item.tipoTaxa = obj.tipoTaxa || 'fixa';
       try { item.historicoTaxas = JSON.parse(obj.historicoTaxasJSON || '[]'); } catch(e2) { item.historicoTaxas = []; }
+      item.valorLiberado     = parseFloat(obj.valorLiberado) || 0;
+      item.dataUltimaParcela = fmtDate(obj.dataUltimaParcela);
+      item.iofTotal           = parseFloat(obj.iofTotal) || 0;
+      item.valorUtilizado    = parseFloat(obj.valorUtilizado) || 0;
+      item.iofBasicoPct       = parseFloat(obj.iofBasicoPct) || 0;
+      item.iofAdicionalPct    = parseFloat(obj.iofAdicionalPct) || 0;
     }
 
     result.push(item);
@@ -1843,6 +1950,12 @@ function gerarTabelaAmortizacaoServer(fin){
       juros = saldo * i;
       amort = Math.min(amortConstante, saldo);
       valorParcela = amort + juros;
+    } else if (sistema === 'BULLET') {
+      // Pagamento Único — só juros até a penúltima parcela; na última,
+      // juros + o saldo inteiro de volta.
+      juros = saldo * i;
+      amort = (k === n) ? saldo : 0;
+      valorParcela = amort + juros;
     } else {
       juros = saldo * i;
       amort = Math.min(parcelaFixa - juros, saldo);
@@ -1878,7 +1991,7 @@ function paginaFinanciamento(d){
   var saldoAtual = pagas>0 && tabela[pagas-1] ? tabela[pagas-1].saldoDevedor : d.valorOriginal;
   var quitado = pagas >= tabela.length || saldoAtual <= 0.01;
   var pctPago = tabela.length>0 ? Math.round((pagas/tabela.length)*100) : 0;
-  var sistemaLabel = d.sistemaAmortizacao === 'SAC' ? 'SAC' : 'Price';
+  var sistemaLabel = d.sistemaAmortizacao === 'SAC' ? 'SAC' : (d.sistemaAmortizacao === 'BULLET' ? 'Pagamento Único' : 'Price');
   var statusLabel = quitado ? 'QUITADO' : (pagas>0 ? 'EM ANDAMENTO' : 'INICIADO');
   var statusCor = quitado ? '#2ECC9A' : '#5CA8E0';
   var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
