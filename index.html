@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-023657</title>
+<title>Fluxo v20260703-025340</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2505,6 +2505,8 @@ function syncAll(){
       if(!err && d && d.ok && d.data){
         var serverIds = d.data.map(function(r){ return String(r.id); });
         var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1 && !exclRecurSet[String(r.id)]; });
+        // Reenviar ao servidor — addRecur já é idempotente por ID.
+        localOnly.forEach(function(r){ apiCall('addRecur', r, function(){}); });
         RECUR = d.data.filter(function(r){ return !exclRecurSet[String(r.id)]; }).concat(localOnly);
         saveRecur();
       }
@@ -2575,6 +2577,10 @@ function syncAll(){
         var localOnly = TXS.filter(function(t){
           return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp') && !exclTxsSet[String(t.id)];
         });
+        // Reenviar ao servidor — agora seguro, pois addTransaction é
+        // idempotente (atualiza em vez de duplicar se o ID já existir).
+        // Corrige itens que ficaram só locais por falha de rede na criação.
+        localOnly.forEach(function(t){ apiCall('addTransaction', t, function(){}); });
 
         var merged = serverTxs.concat(localOnly);
         // Deduplicar: mesmo desc+date+value+type → manter apenas um
@@ -2630,6 +2636,9 @@ function syncAll(){
         var serverIdsCG = {};
         serverCG.forEach(function(g){ serverIdsCG[String(g.id)] = true; });
         var localOnlyCG = CGASTOS.filter(function(g){ return !serverIdsCG[String(g.id)] && !exclCGSet[String(g.id)]; });
+        // Reenviar ao servidor — salvarCGasto usa salvarItemSheet, que é
+        // idempotente por ID (atualiza em vez de duplicar).
+        localOnlyCG.forEach(function(g){ apiCall('salvarCGasto', g, function(){}); });
         CGASTOS = serverCG.concat(localOnlyCG);
         saveCGastos();
       }
@@ -2665,6 +2674,9 @@ function syncAll(){
         var serverIds = {};
         fresh.forEach(function(t){ serverIds[String(t.id)] = true; });
         var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !exclTasksSet[String(t.id)]; });
+        // Reenviar ao servidor — agora seguro, pois addTask verifica o ID
+        // antes de inserir (não duplica se já existir).
+        localOnly.forEach(function(t){ apiCall('addTask', t, function(){}); });
 
         TASKS = fresh.concat(localOnly);
         save();
