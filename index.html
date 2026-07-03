@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-015605</title>
+<title>Fluxo v20260703-020504</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2501,7 +2501,7 @@ function syncAll(){
   apiCall('getRecur',null,function(err,d){
     if(!err && d && d.ok && d.data){
       var serverIds = d.data.map(function(r){ return String(r.id); });
-      var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1 && !isTombstoned('recur', r.id); });
+      var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1 && !isTombstoned('recur', r.id) && _pareceRecente(r.id); });
       RECUR = d.data.filter(function(r){ return !isTombstoned('recur', r.id); }).concat(localOnly);
       saveRecur();
     }
@@ -2565,7 +2565,7 @@ function syncAll(){
       var serverIds = {};
       serverTxs.forEach(function(t){ serverIds[String(t.id)] = true; });
       var localOnly = TXS.filter(function(t){
-        return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp') && !isTombstoned('txs', t.id);
+        return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp') && !isTombstoned('txs', t.id) && _pareceRecente(t.id);
       });
 
       var merged = serverTxs.concat(localOnly);
@@ -2617,7 +2617,7 @@ function syncAll(){
       var serverCG = d.data.filter(function(g){ return !isTombstoned('cgastos', g.id); });
       var serverIdsCG = {};
       serverCG.forEach(function(g){ serverIdsCG[String(g.id)] = true; });
-      var localOnlyCG = CGASTOS.filter(function(g){ return !serverIdsCG[String(g.id)] && !isTombstoned('cgastos', g.id); });
+      var localOnlyCG = CGASTOS.filter(function(g){ return !serverIdsCG[String(g.id)] && !isTombstoned('cgastos', g.id) && _pareceRecente(g.id); });
       CGASTOS = serverCG.concat(localOnlyCG);
       saveCGastos();
     }
@@ -2647,7 +2647,7 @@ function syncAll(){
       // (ex: criadas há poucos segundos, antes do servidor confirmar)
       var serverIds = {};
       fresh.forEach(function(t){ serverIds[String(t.id)] = true; });
-      var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !isTombstoned('tasks', t.id); });
+      var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !isTombstoned('tasks', t.id) && _pareceRecente(t.id); });
 
       TASKS = fresh.concat(localOnly);
       save();
@@ -5138,7 +5138,9 @@ function sincronizarCartoes(cb){
     var serverMap = {};
     serverList.forEach(function(cc){ serverMap[String(cc.id)] = true; });
 
-    var pendentes = CARTOES.filter(function(cc){ return !serverMap[String(cc.id)] && !isTombstoned('cartoes', cc.id); });
+    var pendentes = CARTOES.filter(function(cc){
+      return !serverMap[String(cc.id)] && !isTombstoned('cartoes', cc.id) && _pareceRecente(cc.id);
+    });
 
     function finalizar(){
       var pendMap = {};
@@ -5189,6 +5191,21 @@ function removeTombstone(key, id){
   localStorage.setItem('ff_deleted_'+key, JSON.stringify(list));
 }
 
+// Um item "só local" pode significar duas coisas MUITO diferentes:
+// (a) foi criado agora e ainda não terminou de subir pro servidor, ou
+// (b) já existiu nos dois lugares, mas foi excluído em OUTRO dispositivo
+//     — e este aparelho só tem uma cópia antiga em cache.
+// Como a lápide (tombstone) só protege o MESMO dispositivo que fez a
+// exclusão, usamos a idade do ID (baseado em Date.now()) como sinal
+// extra: um item "só local" só é tratado como pendente de envio se foi
+// criado recentemente. Itens antigos "só locais" são deletados em vez de
+// ressuscitados/reenviados — é o padrão do caso (b).
+function _pareceRecente(id, horasLimite){
+  var ts = parseInt(String(id).replace(/\D/g,'').substring(0,13), 10);
+  if(!ts || isNaN(ts) || ts < 1000000000000) return true; // não deu pra medir — preserva por segurança
+  return (Date.now() - ts) < (horasLimite||72) * 60 * 60 * 1000;
+}
+
 function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS)); }
 
 function sincronizarRecibos(cb){
@@ -5198,7 +5215,9 @@ function sincronizarRecibos(cb){
     var serverMap = {};
     serverList.forEach(function(r){ serverMap[String(r.id)] = true; });
 
-    var pendentes = RECIBOS.filter(function(r){ return !serverMap[String(r.id)] && !isTombstoned('recibos', r.id); });
+    var pendentes = RECIBOS.filter(function(r){
+      return !serverMap[String(r.id)] && !isTombstoned('recibos', r.id) && _pareceRecente(r.id);
+    });
 
     function finalizar(){
       // RECONCILIAÇÃO: servidor é a fonte de verdade — qualquer item local
@@ -6727,33 +6746,26 @@ function sincronizarDividas(cb){
     serverList = serverList.filter(function(x){ return !isTombstoned('dividas', x.id); });
     var serverMap = {};
     serverList.forEach(function(x){ serverMap[String(x.id)] = true; });
-    var pendentes = DIVIDAS.filter(function(x){ return !serverMap[String(x.id)]; });
-    if(pendentes.length === 0){
-      if(serverList.length > 0){
-        var localOnly = DIVIDAS.filter(function(x){ return !serverMap[String(x.id)]; });
-        DIVIDAS = serverList.concat(localOnly);
-        saveDividas();
-      }
+
+    var pendentes = DIVIDAS.filter(function(x){
+      return !serverMap[String(x.id)] && !isTombstoned('dividas', x.id) && _pareceRecente(x.id);
+    });
+
+    function finalizar(){
+      var pendMap = {};
+      pendentes.forEach(function(x){ pendMap[String(x.id)] = true; });
+      DIVIDAS = serverList.concat(DIVIDAS.filter(function(x){ return pendMap[String(x.id)]; }));
+      saveDividas();
       if(cb) cb();
-      return;
     }
+
+    if(pendentes.length === 0){ finalizar(); return; }
+
     var enviados = 0;
     pendentes.forEach(function(x){
       apiCall('salvarDivida', x, function(){
         enviados++;
-        if(enviados === pendentes.length){
-          apiCall('getDividas', null, function(err2, d2){
-            if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
-              var dataFiltrada = d2.data.filter(function(x){ return !isTombstoned('dividas', x.id); });
-              var localMap2 = {};
-              dataFiltrada.forEach(function(x){ localMap2[String(x.id)] = true; });
-              DIVIDAS.forEach(function(x){ if(!localMap2[String(x.id)]) dataFiltrada.push(x); });
-              DIVIDAS = dataFiltrada;
-              saveDividas();
-            }
-            if(cb) cb();
-          });
-        }
+        if(enviados === pendentes.length) finalizar();
       });
     });
   });
@@ -7134,6 +7146,7 @@ function addContaBanco(){
 
 function delContaBanco(id){
   if(!confirm('Excluir esta conta e todos os extratos importados?')) return;
+  addTombstone('contasbanco', id);
   CONTAS_BANCO = CONTAS_BANCO.filter(function(c){ return String(c.id)!==String(id); });
   delete EXTRATOS[String(id)];
   saveContasBanco(); saveExtratos();
@@ -7151,19 +7164,30 @@ function delContaBanco(id){
 function sincronizarContasBanco(cb){
   apiCall('getContasBanco', null, function(err, d){
     var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    serverList = serverList.filter(function(c){ return !isTombstoned('contasbanco', c.id); });
     var serverMap  = {};
     serverList.forEach(function(c){ serverMap[String(c.id)] = true; });
 
-    // Enviar contas locais que o servidor não tem
-    var pendentes = CONTAS_BANCO.filter(function(c){ return !serverMap[String(c.id)]; });
-    pendentes.forEach(function(c){ apiCall('salvarContaBanco', c, function(){}); });
+    var pendentes = CONTAS_BANCO.filter(function(c){
+      return !serverMap[String(c.id)] && !isTombstoned('contasbanco', c.id) && _pareceRecente(c.id);
+    });
 
-    // Mesclar servidor → local (não sobrescrever locais mais recentes)
-    var localMap = {};
-    CONTAS_BANCO.forEach(function(c){ localMap[String(c.id)] = true; });
-    serverList.forEach(function(c){ if(!localMap[String(c.id)]) CONTAS_BANCO.push(c); });
-    saveContasBanco();
-    if(cb) cb();
+    function finalizar(){
+      var pendMap = {};
+      pendentes.forEach(function(c){ pendMap[String(c.id)] = true; });
+      CONTAS_BANCO = serverList.concat(CONTAS_BANCO.filter(function(c){ return pendMap[String(c.id)]; }));
+      saveContasBanco();
+      if(cb) cb();
+    }
+
+    if(pendentes.length === 0){ finalizar(); return; }
+    var enviados = 0;
+    pendentes.forEach(function(c){
+      apiCall('salvarContaBanco', c, function(){
+        enviados++;
+        if(enviados === pendentes.length) finalizar();
+      });
+    });
   });
 }
 
