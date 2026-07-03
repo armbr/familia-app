@@ -82,6 +82,7 @@ function doGetInternal(action, body) {
     case 'salvarCartao':      return salvarItemSheet('Cartoes', body);
     case 'getCartoes':        return getItemsSheet('Cartoes');
     case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
+    case 'getExclusoes':      return getExclusoes(body.tipo);
     case 'salvarContaBanco':  return salvarItemSheet('ContasBanco', body);
     case 'getContasBanco':    return getItemsSheet('ContasBanco');
     case 'salvarExtrato':       return salvarExtratoSheet(body);
@@ -205,6 +206,7 @@ function addTransaction(body) {
 }
 
 function deleteTransaction(id) {
+  registrarExclusao('txs', id);
   var r = sheetRows('Transações');
   for (var i = 0; i < r.rows.length; i++) {
     if (String(r.rows[i][0]) === String(id)) {
@@ -352,6 +354,7 @@ function updateTask(body) {
 }
 
 function deleteTask(id) {
+  registrarExclusao('tasks', id);
   var r = sheetRows('Tarefas');
   for (var i = 0; i < r.rows.length; i++) {
     if (String(r.rows[i][0]) === String(id)) {
@@ -477,6 +480,7 @@ function addRecur(body) {
 }
 
 function deleteRecur(id) {
+  registrarExclusao('recur', id);
   var r = sheetRows('Recorrentes');
   if (!r.sheet) return { ok: false, error: 'Aba não encontrada' };
   for (var i = 0; i < r.rows.length; i++) {
@@ -1062,8 +1066,55 @@ function salvarItemSheet(nomeAba, body) {
   return { ok: true, created: true };
 }
 
+// ════════════════════════════════════════════════════════════
+//  TOMBSTONES NO SERVIDOR — registro central de exclusões.
+//  Diferente de tombstones no localStorage (que só protegem o
+//  MESMO dispositivo que excluiu), este registro é consultado
+//  por QUALQUER dispositivo na sincronização, eliminando de vez
+//  a ressurreição de itens excluídos em outro aparelho.
+// ════════════════════════════════════════════════════════════
+function garantirAbaTombstones() {
+  var sheet = ss().getSheetByName('Exclusoes');
+  if (!sheet) {
+    sheet = ss().insertSheet('Exclusoes');
+    sheet.getRange(1,1,1,3).setValues([['tipo','id','excluidoEm']]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1,1,1,3).setFontWeight('bold').setBackground('#C0392B').setFontColor('#FFF');
+  }
+  return sheet;
+}
+
+function registrarExclusao(tipo, id) {
+  if (!tipo || !id) return;
+  var sheet = garantirAbaTombstones();
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === tipo && String(rows[i][1]) === String(id)) return; // já registrado
+  }
+  sheet.appendRow([tipo, String(id), new Date()]);
+}
+
+function getExclusoes(tipo) {
+  var sheet = garantirAbaTombstones();
+  var rows = sheet.getDataRange().getValues();
+  var ids = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === tipo) ids.push(String(rows[i][1]));
+  }
+  return { ok: true, data: ids };
+}
+
+// Mapa de nome-de-aba → tipo usado nas exclusões (mantém curto e estável)
+var ABA_PARA_TIPO = {
+  'Recibos': 'recibos', 'Cartoes': 'cartoes', 'ContasBanco': 'contasbanco',
+  'GastosCartao': 'cgastos', 'Pagadores': 'pagadores', 'Aluguéis': 'alugueis',
+  'Contratos': 'contratos'
+};
+
 function deletarItemSheet(nomeAba, id) {
   var sheet = ss().getSheetByName(nomeAba);
+  var tipo = ABA_PARA_TIPO[nomeAba];
+  if (tipo) registrarExclusao(tipo, id);
   if (!sheet) return { ok: true };
   var dados = sheet.getDataRange().getValues();
   for (var i = dados.length - 1; i >= 1; i--) {
@@ -1498,6 +1549,7 @@ function getDividasEstruturadas() {
 }
 
 function deletarDivida(id) {
+  registrarExclusao('dividas', id);
   var sheets = garantirEstruturaDividas();
   var dados = sheets.dividas.getDataRange().getValues();
   for (var i = dados.length - 1; i >= 1; i--) {
