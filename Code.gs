@@ -1613,8 +1613,8 @@ function paginaDivida(e) {
 
   function brl(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
   function brDate(iso){ return iso ? String(iso).split('-').reverse().join('/') : '—'; }
-  var tipoIcones = { aporte:'📥', pagamento:'💵', despesa:'🧾' };
-  var tipoLabels = { aporte:'Aporte/Empréstimo', pagamento:'Pagamento', despesa:'Despesa em nome' };
+  var tipoIcones = { aporte:'📥', pagamento: isDevo?'💵':'💰', despesa:'🧾' };
+  var tipoLabels = { aporte: isDevo?'Peguei emprestado':'Emprestei mais', pagamento: isDevo?'Paguei':'Recebi', despesa:'Despesa em nome (legado)' };
 
   var totalAportes    = (d.movimentos||[]).filter(function(m){return m.tipo==='aporte';}).reduce(function(s,m){return s+m.valor;},0);
   var totalPagamentos = (d.movimentos||[]).filter(function(m){return m.tipo!=='aporte';}).reduce(function(s,m){return s+m.valor;},0);
