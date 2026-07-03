@@ -2644,6 +2644,63 @@ function criarTriggerLembreteAluguel() {
 }
 
 // ════════════════════════════════════════════════════════════
+//  LEMBRETE DE FECHAMENTO DE FATURA — roda todo dia perto das
+//  23:59 e avisa por push quando o dia de fechamento de algum
+//  cartão cadastrado é HOJE, para o usuário lembrar de clicar
+//  em "Fechar Fatura" no app.
+// ════════════════════════════════════════════════════════════
+function enviarLembreteFechamentoFatura() {
+  function fmtV(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+
+  var cartoesResp = getItemsSheet('Cartoes');
+  var cartoes = (cartoesResp && cartoesResp.data) ? cartoesResp.data : [];
+  if (!cartoes.length) { Logger.log('Nenhum cartão cadastrado.'); return; }
+
+  var gastosResp = getItemsSheet('GastosCartao');
+  var gastos = (gastosResp && gastosResp.data) ? gastosResp.data : [];
+
+  var hoje = new Date();
+  var diaHoje = hoje.getDate();
+  var ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate();
+  var mesAtual = Utilities.formatDate(hoje, 'America/Sao_Paulo', 'yyyy-MM');
+
+  var avisados = 0;
+  cartoes.forEach(function(cc){
+    var diaFech = parseInt(cc.fech) || 25;
+    // Se o dia de fechamento cadastrado não existe neste mês (ex: 31 em
+    // mês de 30 dias), considerar o último dia do mês como fechamento.
+    var diaFechEfetivo = Math.min(diaFech, ultimoDiaMes);
+    if (diaHoje !== diaFechEfetivo) return;
+
+    // Só avisa se houver gastos pendentes nesta fatura (evita notificação vazia)
+    var pendentes = gastos.filter(function(g){
+      return String(g.cartaoId) === String(cc.id) && g.fatMes === mesAtual && !g.pago;
+    });
+    if (!pendentes.length) return;
+
+    var total = pendentes.reduce(function(s,g){ return s + (parseFloat(g.val)||0); }, 0);
+    try {
+      enviarPush(
+        '💳 Fatura fecha hoje',
+        'A fatura do cartão ' + cc.nome + ' fecha hoje (' + fmtV(total) + ' em aberto). Não esqueça de clicar em "Fechar Fatura" no app!'
+      );
+      avisados++;
+    } catch(e) { Logger.log('Erro ao enviar push de fechamento: ' + e.message); }
+  });
+  Logger.log('Lembretes de fechamento de fatura enviados: ' + avisados);
+}
+
+// Execute esta função UMA VEZ para ativar o lembrete diário (~23:59)
+function criarTriggerLembreteFatura() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'enviarLembreteFechamentoFatura') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('enviarLembreteFechamentoFatura')
+    .timeBased().everyDays(1).atHour(23).nearMinute(59).create();
+  Logger.log('✅ Trigger de lembrete de fechamento de fatura criado — roda todo dia perto das 23:59.');
+}
+
+// ════════════════════════════════════════════════════════════
 //  FUNÇÕES DE TESTE — Execute manualmente no editor
 // ════════════════════════════════════════════════════════════
 
