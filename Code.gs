@@ -201,7 +201,19 @@ function addTransaction(body) {
   }
   // Usar o id enviado pelo cliente se disponível, para manter consistência no sync
   var id = body.id ? String(body.id) : String(Date.now());
-  sheet.appendRow([id, body.type, body.desc, parseFloat(body.value), body.cat, body.date, new Date().toISOString(), body.fromAgenda ? 'true' : '', body.recurId ? String(body.recurId) : '']);
+
+  // Idempotente — se já existe uma linha com esse ID, atualiza em vez de
+  // duplicar (necessário para permitir reenvio seguro em caso de falha
+  // de rede na primeira tentativa, sem risco de criar duas linhas).
+  var dados = sheet.getDataRange().getValues();
+  var novaLinha = [id, body.type, body.desc, parseFloat(body.value), body.cat, body.date, new Date().toISOString(), body.fromAgenda ? 'true' : '', body.recurId ? String(body.recurId) : ''];
+  for (var i = 1; i < dados.length; i++) {
+    if (String(dados[i][0]) === id) {
+      sheet.getRange(i+1, 1, 1, novaLinha.length).setValues([novaLinha]);
+      return { ok: true, id: id, updated: true };
+    }
+  }
+  sheet.appendRow(novaLinha);
   return { ok: true, id: id };
 }
 
@@ -264,11 +276,24 @@ function addTask(body) {
   var descIdx2    = headers.indexOf('desc');
   var deadlineIdx2= headers.indexOf('deadline');
   var recurIdx2   = headers.indexOf('recurId');
+  var idIdx2      = headers.indexOf('id');
   var allRows     = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow()-1, headers.length).getValues() : [];
   var newMo       = String(body.deadline || '').substring(0,7);
   var newDesc     = String(body.desc || '').trim().toLowerCase();
   var newRid      = String(body.recurId || '');
 
+  // 1) Idempotência por ID — se o cliente está reenviando uma tarefa que já
+  // existe (ex: retry após falha de rede), não duplicar, apenas confirmar.
+  if (body.id) {
+    for (var bi = 0; bi < allRows.length; bi++) {
+      if (String(allRows[bi][idIdx2]) === String(body.id)) {
+        return { ok: true, id: body.id, alreadyExists: true };
+      }
+    }
+  }
+
+  // 2) Duplicata por conteúdo (mesma descrição + mesmo mês) — protege
+  // contra recorrências geradas em paralelo por dois dispositivos
   for (var ri = 0; ri < allRows.length; ri++) {
     var rDesc = String(allRows[ri][descIdx2] || '').trim().toLowerCase();
     var rDl   = String(allRows[ri][deadlineIdx2] || '').substring(0,7);
