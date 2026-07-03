@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-004333</title>
+<title>Fluxo v20260703-010536</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -857,6 +857,7 @@ select option{background:#1A2A3A}
     <div class="right">
       <span id="offline-badge">● offline</span>
       <button id="sync-btn" onclick="syncAll()">↻ Sync</button>
+      <button onclick="verificarSincronizacao()" title="Verificar sincronização entre dispositivos" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:4px 6px">🔍</button>
       <button id="push-btn" onclick="ativarNotificacoes()" title="Ativar notificações push" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px 6px">🔕</button>
     </div>
   </div>
@@ -2494,14 +2495,14 @@ function syncAll(){
 
   function tick(){
     done++;
-    if(done===13){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
+    if(done===14){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
   apiCall('getRecur',null,function(err,d){
     if(!err && d && d.ok && d.data){
       var serverIds = d.data.map(function(r){ return String(r.id); });
-      var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1; });
-      RECUR = d.data.concat(localOnly);
+      var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1 && !isTombstoned('recur', r.id); });
+      RECUR = d.data.filter(function(r){ return !isTombstoned('recur', r.id); }).concat(localOnly);
       saveRecur();
     }
     recurReady = true;
@@ -2523,6 +2524,7 @@ function syncAll(){
   });
 
   sincronizarCartoes(function(){ renderFinCC(); tick(); });
+  sincronizarNotasOfx(function(){ tick(); });
 
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
@@ -2558,10 +2560,12 @@ function syncAll(){
 
       // Preservar entradas locais que não estão no servidor ainda
       // (ex: pagamentos feitos agora que o servidor ainda não confirmou)
+      // EXCETO as que foram excluídas localmente (tombstone) — essas nunca
+      // devem ressuscitar, mesmo que o servidor ainda não tenha processado.
       var serverIds = {};
       serverTxs.forEach(function(t){ serverIds[String(t.id)] = true; });
       var localOnly = TXS.filter(function(t){
-        return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp');
+        return !serverIds[String(t.id)] && (t.type === 'inc' || t.type === 'exp') && !isTombstoned('txs', t.id);
       });
 
       var merged = serverTxs.concat(localOnly);
@@ -3144,6 +3148,7 @@ function cancelRecurFromModal(){
 }
 
 function delRecur(id){
+  addTombstone('recur', id);
   RECUR = RECUR.filter(function(r){ return String(r.id) !== String(id); });
   saveRecur();
   apiCall('deleteRecur', {id:id}, function(){});
@@ -3286,10 +3291,11 @@ function addTx(){
 }
 
 function delTx(id){
+  addTombstone('txs', id);
   var bk=[].concat(TXS);
   TXS=TXS.filter(function(t){return String(t.id)!==String(id);}); renderAll();
   apiCall('deleteTransaction',{id:id},function(err){
-    if(err){TXS=bk;renderAll();toast('❌ Erro ao remover','err');}
+    if(err){TXS=bk;removeTombstone('txs',id);renderAll();toast('❌ Erro ao remover','err');}
     else toast('🗑️ Removido');
   });
 }
@@ -5128,41 +5134,27 @@ function saveCartoes(){  localStorage.setItem('ff_cartoes',  JSON.stringify(CART
 function sincronizarCartoes(cb){
   apiCall('getCartoes', null, function(err, d){
     var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+    serverList = serverList.filter(function(cc){ return !isTombstoned('cartoes', cc.id); });
     var serverMap = {};
     serverList.forEach(function(cc){ serverMap[String(cc.id)] = true; });
-    // Enviar locais que servidor não tem
-    var pendentes = CARTOES.filter(function(cc){ return !serverMap[String(cc.id)]; });
-    if(pendentes.length === 0){
-      // Nada para enviar — atualizar local com servidor
-      if(serverList.length > 0){
-        var localMap = {};
-        CARTOES.forEach(function(cc){ localMap[String(cc.id)] = true; });
-        serverList.forEach(function(cc){ if(!localMap[String(cc.id)]) CARTOES.push(cc); });
-        // Substituir completamente com dados do servidor + locais únicos
-        var localOnly2 = CARTOES.filter(function(cc){ return !serverMap[String(cc.id)]; });
-        CARTOES = serverList.concat(localOnly2);
-        saveCartoes();
-      }
+
+    var pendentes = CARTOES.filter(function(cc){ return !serverMap[String(cc.id)] && !isTombstoned('cartoes', cc.id); });
+
+    function finalizar(){
+      var pendMap = {};
+      pendentes.forEach(function(cc){ pendMap[String(cc.id)] = true; });
+      CARTOES = serverList.concat(CARTOES.filter(function(cc){ return pendMap[String(cc.id)]; }));
+      saveCartoes();
       if(cb) cb();
-      return;
     }
+
+    if(pendentes.length === 0){ finalizar(); return; }
+
     var enviados = 0;
     pendentes.forEach(function(cc){
       apiCall('salvarCartao', cc, function(){
         enviados++;
-        if(enviados === pendentes.length){
-          // Todos enviados — buscar lista atualizada
-          apiCall('getCartoes', null, function(err2, d2){
-            if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
-              var localMap2 = {};
-              d2.data.forEach(function(cc){ localMap2[String(cc.id)] = true; });
-              CARTOES.forEach(function(cc){ if(!localMap2[String(cc.id)]) d2.data.push(cc); });
-              CARTOES = d2.data;
-              saveCartoes();
-            }
-            if(cb) cb();
-          });
-        }
+        if(enviados === pendentes.length) finalizar();
       });
     });
   });
@@ -5200,44 +5192,32 @@ function removeTombstone(key, id){
 function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECIBOS)); }
 
 function sincronizarRecibos(cb){
-  // 1. Buscar recibos do servidor
   apiCall('getRecibos', null, function(err, d){
     var serverList = (!err && d && d.ok && d.data) ? d.data : [];
-    // Remover qualquer item que foi excluído localmente (evita ressuscitar)
     serverList = serverList.filter(function(r){ return !isTombstoned('recibos', r.id); });
     var serverMap = {};
     serverList.forEach(function(r){ serverMap[String(r.id)] = true; });
 
-    // 2. Enviar recibos locais que o servidor não tem
-    var pendentes = RECIBOS.filter(function(r){ return !serverMap[String(r.id)]; });
-    var enviados = 0;
-    if(pendentes.length === 0){
-      // Nada para enviar — apenas atualizar local com servidor
-      if(serverList.length > 0){
-        var localMap = {};
-        RECIBOS.forEach(function(r){ localMap[String(r.id)] = true; });
-        serverList.forEach(function(r){ if(!localMap[String(r.id)]) RECIBOS.unshift(r); });
-        saveRecibos();
-      }
+    var pendentes = RECIBOS.filter(function(r){ return !serverMap[String(r.id)] && !isTombstoned('recibos', r.id); });
+
+    function finalizar(){
+      // RECONCILIAÇÃO: servidor é a fonte de verdade — qualquer item local
+      // que não está no servidor E não está pendente de envio (ex: foi
+      // excluído em outro dispositivo) é removido daqui também.
+      var pendMap = {};
+      pendentes.forEach(function(r){ pendMap[String(r.id)] = true; });
+      RECIBOS = serverList.concat(RECIBOS.filter(function(r){ return pendMap[String(r.id)]; }));
+      saveRecibos();
       if(cb) cb();
-      return;
     }
-    pendentes.forEach(function(r, i){
+
+    if(pendentes.length === 0){ finalizar(); return; }
+
+    var enviados = 0;
+    pendentes.forEach(function(r){
       apiCall('salvarRecibo', r, function(){
         enviados++;
-        if(enviados === pendentes.length){
-          // Todos enviados — buscar lista atualizada do servidor
-          apiCall('getRecibos', null, function(err2, d2){
-            if(!err2 && d2 && d2.ok && d2.data && d2.data.length){
-              var dataFiltrada = d2.data.filter(function(r){ return !isTombstoned('recibos', r.id); });
-              var localMap2 = {};
-              RECIBOS.forEach(function(r){ localMap2[String(r.id)] = true; });
-              dataFiltrada.forEach(function(r){ if(!localMap2[String(r.id)]) RECIBOS.unshift(r); });
-              saveRecibos();
-            }
-            if(cb) cb();
-          });
-        }
+        if(enviados === pendentes.length) finalizar();
       });
     });
   });
@@ -5693,6 +5673,7 @@ function addCartao(){
 }
 function delCartao(id){
   if(!confirm('Remover este cartão?')) return;
+  addTombstone('cartoes', id);
   CARTOES=CARTOES.filter(function(c){return String(c.id)!==String(id);});
   saveCartoes();
   apiCall('deletarItemSheet', {aba:'Cartoes', id:id}, function(){});
@@ -7768,12 +7749,121 @@ function closeOfxNota(){
 function salvarOfxNota(){
   if(!ofxNotaFitId) return;
   var texto = (document.getElementById('ofxnota-text').value||'').trim();
-  if(texto) NOTAS_OFX[ofxNotaFitId] = texto;
-  else delete NOTAS_OFX[ofxNotaFitId];
+  if(texto){
+    NOTAS_OFX[ofxNotaFitId] = texto;
+    apiCall('salvarNotaOfx', {fitId: ofxNotaFitId, nota: texto}, function(){});
+  } else {
+    delete NOTAS_OFX[ofxNotaFitId];
+    apiCall('deletarNotaOfx', {fitId: ofxNotaFitId}, function(){});
+  }
   saveNotasOFX();
   closeOfxNota();
   renderExtrato();
   toast('📝 Nota salva');
+}
+
+function sincronizarNotasOfx(cb){
+  apiCall('getNotasOfx', null, function(err, d){
+    if(!err && d && d.ok && d.data){
+      var localSnapshot = Object.assign({}, NOTAS_OFX); // guardar antes de sobrescrever
+      var serverData = d.data;
+      var pendentes = Object.keys(localSnapshot).filter(function(k){ return !(k in serverData); });
+
+      NOTAS_OFX = Object.assign({}, serverData);
+      pendentes.forEach(function(k){
+        NOTAS_OFX[k] = localSnapshot[k];
+        apiCall('salvarNotaOfx', {fitId: k, nota: localSnapshot[k]}, function(){});
+      });
+      saveNotasOFX();
+    }
+    if(cb) cb();
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  VERIFICAR SINCRONIZAÇÃO — compara contagem local vs servidor
+//  em cada tipo de dado do app. Ajuda a detectar cedo qualquer
+//  dado que esteja "preso" só no dispositivo, sem sincronizar
+//  corretamente com os outros aparelhos.
+// ════════════════════════════════════════════════════════════
+function verificarSincronizacao(){
+  if(!API){ toast('⚠️ Configure a URL do Apps Script','err'); return; }
+  toast('🔍 Verificando sincronização...');
+
+  var checks = [
+    {nome:'📋 Tarefas / Agenda',        local:TASKS,    action:'getTasks',        extrai:function(d){ return d.data||[]; }},
+    {nome:'🔁 Recorrências',            local:RECUR,    action:'getRecur',        extrai:function(d){ return d.data||[]; }},
+    {nome:'💰 Lançamentos (Finanças)',  local:TXS.filter(function(t){return t.type==='inc'||t.type==='exp';}),
+                                          action:'getTransactions', extrai:function(d){ return (d.data||[]).filter(function(t){return t.type==='inc'||t.type==='exp';}); }},
+    {nome:'💳 Cartões',                 local:CARTOES,  action:'getCartoes',      extrai:function(d){ return d.data||[]; }},
+    {nome:'🛍️ Gastos no Cartão',        local:CGASTOS,  action:'getCGastos',      extrai:function(d){ return d.data||[]; }},
+    {nome:'💰 Dívidas / Financiamentos',local:DIVIDAS,  action:'getDividas',      extrai:function(d){ return d.data||[]; }},
+    {nome:'🧾 Recibos',                 local:RECIBOS,  action:'getRecibos',      extrai:function(d){ return d.data||[]; }},
+    {nome:'👥 Contatos',                local:PAGADORES,action:'getPagadores',    extrai:function(d){ return d.data||[]; }},
+    {nome:'🏠 Aluguéis',                local:ALUGUEIS, action:'getAlugueis',     extrai:function(d){ return d.data||[]; }},
+    {nome:'📄 Contratos',               local:CONTRATOS,action:'getContratos',    extrai:function(d){ return d.data||[]; }},
+    {nome:'📁 Documentos',              local:DOCS,     action:'getDocs',         extrai:function(d){ return d.data||[]; }},
+    {nome:'🏦 Contas Bancárias',        local:CONTAS_BANCO, action:'getContasBanco', extrai:function(d){ return d.data||[]; }},
+    {nome:'📝 Notas de Extrato',        local:Object.keys(NOTAS_OFX), action:'getNotasOfx', extrai:function(d){ return Object.keys(d.data||{}); }}
+  ];
+
+  var resultados = [];
+  var pendentes = checks.length;
+
+  checks.forEach(function(chk){
+    apiCall(chk.action, null, function(err, d){
+      var serverList = (!err && d && d.ok) ? chk.extrai(d) : null;
+      var localCount  = chk.local.length;
+      var serverCount = serverList ? serverList.length : null;
+      var status = serverList===null ? 'erro' : (localCount===serverCount ? 'ok' : 'diff');
+      resultados.push({nome:chk.nome, local:localCount, servidor:serverCount, status:status});
+      pendentes--;
+      if(pendentes===0) mostrarResultadoSincronizacao(resultados);
+    });
+  });
+}
+
+function mostrarResultadoSincronizacao(resultados){
+  var comDiferenca = resultados.filter(function(r){ return r.status==='diff'; });
+  var comErro       = resultados.filter(function(r){ return r.status==='erro'; });
+
+  var html = '<div style="font-size:12px;color:var(--t3);margin-bottom:14px;line-height:1.5">'+
+    'Compara quantos registros existem <b>neste dispositivo</b> vs. <b>no servidor</b> (planilha), '+
+    'para cada tipo de dado do app.</div>';
+
+  if(comDiferenca.length===0 && comErro.length===0){
+    html += '<div style="text-align:center;padding:20px;background:rgba(46,204,154,.1);border-radius:10px;color:var(--green);font-weight:700">✅ Tudo sincronizado corretamente!</div>';
+  }
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">'+
+    '<tr style="color:var(--t3);text-align:left"><th style="padding:6px 4px">Categoria</th><th style="padding:6px 4px;text-align:center">Local</th><th style="padding:6px 4px;text-align:center">Servidor</th><th style="padding:6px 4px;text-align:center"></th></tr>';
+
+  resultados.forEach(function(r){
+    var cor = r.status==='ok' ? 'var(--t3)' : (r.status==='erro' ? 'var(--yellow)' : 'var(--red)');
+    var icone = r.status==='ok' ? '✅' : (r.status==='erro' ? '⚠️' : '❌');
+    html += '<tr style="border-top:1px solid var(--border)">'+
+      '<td style="padding:7px 4px">'+r.nome+'</td>'+
+      '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+cor+'">'+r.local+'</td>'+
+      '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+cor+'">'+(r.servidor===null?'—':r.servidor)+'</td>'+
+      '<td style="padding:7px 4px;text-align:center">'+icone+'</td>'+
+    '</tr>';
+  });
+  html += '</table>';
+
+  if(comDiferenca.length>0){
+    html += '<div style="margin-top:14px;padding:10px;background:rgba(255,107,107,.1);border-radius:8px;font-size:12px;color:var(--t2)">'+
+      '⚠️ <b>'+comDiferenca.length+' categoria(s)</b> com contagem diferente entre este dispositivo e o servidor. '+
+      'Isso pode indicar itens excluídos aqui que ainda não sumiram lá (ou vice-versa).</div>';
+    html += '<button onclick="closeDivHistModal();syncAll();" style="width:100%;margin-top:10px;padding:12px;border:none;border-radius:10px;background:var(--blue);color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">🔄 Sincronizar agora</button>';
+  }
+
+  if(comErro.length>0){
+    html += '<div style="margin-top:10px;font-size:11px;color:var(--yellow)">⚠️ Não foi possível verificar: '+comErro.map(function(r){return r.nome;}).join(', ')+'</div>';
+  }
+
+  document.getElementById('divhist-title').textContent = '🔍 Verificação de Sincronização';
+  document.getElementById('divhist-body').innerHTML = html;
+  document.getElementById('divhist-modal').style.display = 'flex';
 }
 
 function renderDocs(){
