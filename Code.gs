@@ -89,6 +89,9 @@ function doGetInternal(action, body) {
     case 'getExtratos':         return getExtratosSheet(body.contaId);
     case 'deletarExtrato':      return deletarExtratoSheet(body.contaId, body.extratoId);
     case 'deletarExtratoPorChave': return deletarExtratoPorChave(body.contaId, body.arquivo, body.dataIni, body.dataFim);
+    case 'salvarNotaOfx':      return salvarNotaOfx(body.fitId, body.nota);
+    case 'getNotasOfx':        return getNotasOfx();
+    case 'deletarNotaOfx':     return deletarNotaOfx(body.fitId);
     case 'salvarDivida':      return salvarDividaEstruturada(body);
     case 'getDividas':        return getDividasEstruturadas();
     case 'calcularSaldoDivida': return calcularSaldoDivida(body);
@@ -2091,6 +2094,55 @@ function deletarExtratoPorChave(contaId, arquivo, dataIni, dataFim) {
     } catch(e) {}
   }
   return { ok: true, removidos: removidos };
+}
+
+// ════════════════════════════════════════════════════════════
+//  NOTAS DE TRANSAÇÕES BANCÁRIAS (OFX) — uma linha por FITID.
+//  Antes ficavam só no localStorage do dispositivo; agora
+//  sincronizam entre todos os aparelhos.
+// ════════════════════════════════════════════════════════════
+function garantirAbaNotasOfx() {
+  var sheet = ss().getSheetByName('NotasOFX');
+  if (!sheet) {
+    sheet = ss().insertSheet('NotasOFX');
+    sheet.getRange(1,1,1,3).setValues([['fitId','nota','atualizadoEm']]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1,1,1,3).setFontWeight('bold').setBackground('#0F9D58').setFontColor('#FFF');
+  }
+  return sheet;
+}
+
+function salvarNotaOfx(fitId, nota) {
+  if (!fitId) return { ok: false, error: 'fitId ausente' };
+  var sheet = garantirAbaNotasOfx();
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(fitId)) {
+      sheet.getRange(i+1, 2, 1, 2).setValues([[nota||'', new Date()]]);
+      return { ok: true };
+    }
+  }
+  sheet.appendRow([String(fitId), nota||'', new Date()]);
+  return { ok: true };
+}
+
+function getNotasOfx() {
+  var sheet = garantirAbaNotasOfx();
+  var rows = sheet.getDataRange().getValues();
+  var result = {};
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0] && rows[i][1]) result[String(rows[i][0])] = String(rows[i][1]);
+  }
+  return { ok: true, data: result };
+}
+
+function deletarNotaOfx(fitId) {
+  var sheet = garantirAbaNotasOfx();
+  var rows = sheet.getDataRange().getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]) === String(fitId)) { sheet.deleteRow(i+1); return { ok: true }; }
+  }
+  return { ok: true };
 }
 
 // Faxina manual — execute esta função UMA VEZ no editor do Apps Script
