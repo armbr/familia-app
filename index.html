@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260703-200219</title>
+<title>Fluxo v20260704-002154</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3487,11 +3487,35 @@ function renderBal(){
 //  que as compras individuais aparecem direto do CGASTOS.
 // ════════════════════════════════════════════════════════════
 function encontrarLancamentosLegado(){
-  return TXS.filter(function(t){
+  // Padrão 1: TXS criados pelo antigo "Fechar Fatura" (agregava por
+  // categoria, sem vínculo cgastoIds) — causa duplicidade com os
+  // gastos individuais que agora aparecem direto do CGASTOS.
+  var padrao1 = TXS.filter(function(t){
     return t.fromAgenda === true &&
            t.fatMesOrigem &&
            (!t.cgastoIds || !t.cgastoIds.length);
   });
+
+  // Padrão 2: TXS que é uma cópia exata de um CGASTO já existente —
+  // sobra do antigo bug em que pagar no cartão pelo formulário rápido
+  // de Finanças criava DOIS registros (um TXS normal + um CGASTO),
+  // quando deveria criar só o CGASTO.
+  var cgastoChaves = {};
+  CGASTOS.forEach(function(g){
+    var chave = (g.desc||'').trim().toLowerCase()+'|'+ymds(g.data)+'|'+parseFloat(g.val||0).toFixed(2);
+    cgastoChaves[chave] = true;
+  });
+  var idsJaEmPadrao1 = {};
+  padrao1.forEach(function(t){ idsJaEmPadrao1[String(t.id)] = true; });
+
+  var padrao2 = TXS.filter(function(t){
+    if(idsJaEmPadrao1[String(t.id)]) return false; // já contado no padrão 1
+    if(t.type !== 'exp') return false;
+    var chave = (t.desc||'').trim().toLowerCase()+'|'+ymds(t.date)+'|'+parseFloat(t.value||0).toFixed(2);
+    return !!cgastoChaves[chave];
+  });
+
+  return padrao1.concat(padrao2);
 }
 
 function verificarDuplicidadeFaturas(){
@@ -3503,14 +3527,15 @@ function verificarDuplicidadeFaturas(){
 
   var totalLegado = legados.reduce(function(s,t){ return s+parseFloat(t.value||0); }, 0);
   var html = '<div style="font-size:13px;color:var(--t2);margin-bottom:12px;line-height:1.5">'+
-    'Encontrados <b>'+legados.length+'</b> lançamento(s) de faturas fechadas com a versão antiga do app — '+
-    'eles somam a categoria inteira em um único item e agora causam <b>duplicidade</b> com as compras individuais.'+
+    'Encontrados <b>'+legados.length+'</b> lançamento(s) duplicado(s) — sobras de versões anteriores do app '+
+    '(fechamento de fatura antigo, ou pagamento no cartão que criou dois registros ao mesmo tempo).'+
   '</div>';
 
   html += legados.map(function(t){
+    var origem = t.fatMesOrigem ? ('mês de origem: '+esc(t.fatMesOrigem)) : 'cópia de gasto no cartão';
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'+
       '<div><div style="font-size:13px;font-weight:600">'+esc(t.desc)+'</div>'+
-        '<div style="font-size:11px;color:var(--t3)">'+fmtDate(t.date)+' · mês de origem: '+esc(t.fatMesOrigem)+'</div></div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+fmtDate(t.date)+' · '+origem+'</div></div>'+
       '<div style="font-weight:800;color:var(--red)">'+fmtBRL(t.value)+'</div>'+
     '</div>';
   }).join('');
