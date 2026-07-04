@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260704-124701</title>
+<title>Fluxo v20260704-132824</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -223,6 +223,7 @@ html,body{
   font-weight:600;transition:all .2s;
 }
 #sync-btn.spinning{color:var(--green);border-color:var(--green);animation:spin .7s linear infinite}
+#diag-btn.spinning{animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* Balance card */
@@ -857,7 +858,7 @@ select option{background:#1A2A3A}
     <div class="right">
       <span id="offline-badge">● offline</span>
       <button id="sync-btn" onclick="syncAll()">↻ Sync</button>
-      <button onclick="verificarSincronizacao()" title="Verificar sincronização entre dispositivos" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:4px 6px">🔍</button>
+      <button id="diag-btn" onclick="verificarSincronizacao()" title="Verificar sincronização entre dispositivos" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:4px 6px">🔍</button>
       <button id="push-btn" onclick="ativarNotificacoes()" title="Ativar notificações push" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px 6px">🔕</button>
     </div>
   </div>
@@ -2576,18 +2577,40 @@ function syncAll(){
   var done=0;
   var recurReady=false, tasksReady=false;
 
+  // Painel de progresso em tempo real — mesma ideia do botão de
+  // diagnóstico: mostra cada uma das 14 categorias sendo sincronizadas,
+  // marcando ✅ conforme cada uma termina (rodam em paralelo, então a
+  // ordem de conclusão pode variar).
+  var syncNomes = [
+    '🔁 Recorrências','🧾 Recibos','💰 Dívidas / Financiamentos',
+    '🏦 Contas Bancárias','📄 Extratos','💳 Cartões','📝 Notas de Extrato',
+    '📁 Documentos','💰 Lançamentos (Finanças)','📄 Contratos',
+    '👥 Contatos','🏠 Aluguéis','🛍️ Gastos no Cartão','📋 Tarefas / Agenda'
+  ];
+  var syncFeito = syncNomes.map(function(){ return false; });
+
+  document.getElementById('divhist-title').textContent = '↻ Sincronizando...';
+  document.getElementById('divhist-modal').style.display = 'flex';
+  renderProgressoSync(syncNomes, syncFeito);
+
+  function tick(idxNome){
+    done++;
+    if(idxNome!==undefined) syncFeito[idxNome] = true;
+    renderProgressoSync(syncNomes, syncFeito);
+    if(done===14){
+      btn.classList.remove('spinning'); load(false); renderAll(); renderHoje();
+      toast('✅ Sincronizado!');
+      setTimeout(function(){ closeDivHistModal(); }, 900);
+    }
+  }
+
   function tryProcessRecur(){
     // Só rodar processRecur depois que RECUR e TASKS estiverem atualizados
     if(recurReady && tasksReady) processRecur();
   }
 
-  function tick(){
-    done++;
-    if(done===14){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
-  }
-
   buscarExclusoesServidor('recur', function(exclRecur, sucesso){
-    if(!sucesso){ recurReady = true; tryProcessRecur(); tick(); return; }
+    if(!sucesso){ recurReady = true; tryProcessRecur(); tick(0); return; }
     var exclRecurSet = {};
     exclRecur.forEach(function(id){ exclRecurSet[String(id)] = true; });
     apiCall('getRecur',null,function(err,d){
@@ -2601,25 +2624,25 @@ function syncAll(){
       }
       recurReady = true;
       tryProcessRecur();
-      tick();
+      tick(0);
     });
   });
 
-  sincronizarRecibos(function(){ tick(); });
-  sincronizarDividas(function(){ tick(); });
+  sincronizarRecibos(function(){ tick(1); });
+  sincronizarDividas(function(){ tick(2); });
   // Bancos: OBRIGATÓRIO sincronizar contas antes de extratos —
   // no dispositivo novo CONTAS_BANCO começa vazio e sincronizarExtratos
   // retornaria imediatamente sem buscar nada do servidor.
   sincronizarContasBanco(function(){
-    tick();
+    tick(3);
     sincronizarExtratos(function(){
       if(curSection==='bank') renderContasBanco();
-      tick();
+      tick(4);
     });
   });
 
-  sincronizarCartoes(function(){ renderFinCC(); tick(); });
-  sincronizarNotasOfx(function(){ tick(); });
+  sincronizarCartoes(function(){ renderFinCC(); tick(5); });
+  sincronizarNotasOfx(function(){ tick(6); });
 
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
@@ -2635,11 +2658,11 @@ function syncAll(){
       });
       localStorage.setItem('ff_docs', JSON.stringify(DOCS));
     }
-    tick();
+    tick(7);
   });
 
   buscarExclusoesServidor('txs', function(exclTxs, sucesso){
-    if(!sucesso){ tick(); return; }
+    if(!sucesso){ tick(8); return; }
     var exclTxsSet = {};
     exclTxs.forEach(function(id){ exclTxsSet[String(id)] = true; });
 
@@ -2685,7 +2708,7 @@ function syncAll(){
         TXS.sort(function(a,b){ return ymds(b.date) > ymds(a.date) ? 1 : -1; });
         save();
       }
-      tick();
+      tick(8);
     });
   });
 
@@ -2695,7 +2718,7 @@ function syncAll(){
       CONTRATOS = d.data;
       saveContratos();
     }
-    tick();
+    tick(9);
   });
 
   // Sync Pagadores
@@ -2704,7 +2727,7 @@ function syncAll(){
       PAGADORES = d.data;
       savePagadores();
     }
-    tick();
+    tick(10);
   });
 
   // Sync Aluguéis
@@ -2713,12 +2736,12 @@ function syncAll(){
       ALUGUEIS = d.data;
       saveAlugueis();
     }
-    tick();
+    tick(11);
   });
 
   // Sync Gastos Cartão
   buscarExclusoesServidor('cgastos', function(exclCG, sucessoCG){
-    if(!sucessoCG){ tick(); return; }
+    if(!sucessoCG){ tick(12); return; }
     var exclCGSet = {};
     exclCG.forEach(function(id){ exclCGSet[String(id)] = true; });
     apiCall('getCGastos',null,function(err,d){
@@ -2733,12 +2756,12 @@ function syncAll(){
         CGASTOS = serverCG.concat(localOnlyCG);
         saveCGastos();
       }
-      tick();
+      tick(12);
     });
   });
 
   buscarExclusoesServidor('tasks', function(exclTasks, sucessoTasks){
-    if(!sucessoTasks){ tasksReady = true; tryProcessRecur(); tick(); return; }
+    if(!sucessoTasks){ tasksReady = true; tryProcessRecur(); tick(13); return; }
     var exclTasksSet = {};
     exclTasks.forEach(function(id){ exclTasksSet[String(id)] = true; });
 
@@ -2777,7 +2800,7 @@ function syncAll(){
       tryProcessRecur();
       // Atualizar aba Hoje imediatamente após TASKS chegarem do servidor
       if(curSection === 'hoje') renderHoje();
-      tick();
+      tick(13);
     });
   });
 }
@@ -8366,7 +8389,6 @@ function sincronizarNotasOfx(cb){
 // ════════════════════════════════════════════════════════════
 function verificarSincronizacao(){
   if(!API){ toast('⚠️ Configure a URL do Apps Script','err'); return; }
-  toast('🔍 Verificando sincronização...');
 
   var checks = [
     {nome:'📋 Tarefas / Agenda',        local:TASKS,    action:'getTasks',        extrai:function(d){ return d.data||[]; }},
@@ -8385,12 +8407,27 @@ function verificarSincronizacao(){
     {nome:'📝 Notas de Extrato',        local:Object.keys(NOTAS_OFX), action:'getNotasOfx', extrai:function(d){ return Object.keys(d.data||{}); }}
   ];
 
+  // Ativar giro no botão para deixar claro que está rodando
+  var btn = document.getElementById('diag-btn');
+  if(btn) btn.classList.add('spinning');
+
+  // Abrir o modal JÁ, mostrando progresso — em vez de esperar tudo
+  // terminar (que pode levar bastante tempo em rede lenta/instável).
+  document.getElementById('divhist-title').textContent = '🔍 Verificação de Sincronização';
+  document.getElementById('divhist-modal').style.display = 'flex';
+  renderProgressoSincronizacao(checks, 0, []);
+
   var resultados = [];
   var idx = 0;
 
   function proximo(){
-    if(idx >= checks.length){ mostrarResultadoSincronizacao(resultados); return; }
+    if(idx >= checks.length){
+      if(btn) btn.classList.remove('spinning');
+      mostrarResultadoSincronizacao(resultados);
+      return;
+    }
     var chk = checks[idx++];
+    renderProgressoSincronizacao(checks, idx-1, resultados); // mostra "verificando este agora"
     apiCall(chk.action, null, function(err, d){
       var serverList = (!err && d && d.ok) ? chk.extrai(d) : null;
       var localCount  = chk.local.length;
@@ -8404,10 +8441,68 @@ function verificarSincronizacao(){
         else motivoErro = 'Resposta inesperada';
       }
       resultados.push({nome:chk.nome, local:localCount, servidor:serverCount, status:status, erro:motivoErro});
+      renderProgressoSincronizacao(checks, idx, resultados);
       proximo();
     });
   }
   proximo();
+}
+
+// Mostra o progresso da verificação em tempo real — linhas já concluídas
+// aparecem com resultado, a atual mostra "verificando...", e as
+// restantes aparecem esmaecidas aguardando a vez.
+// Painel de progresso do Sync — mesmo padrão visual do diagnóstico,
+// mas como as 14 sincronizações rodam em PARALELO (não em sequência),
+// cada linha vira ✅ assim que a SUA própria chamada terminar, podendo
+// completar em qualquer ordem.
+function renderProgressoSync(nomes, feito){
+  var concluidas = feito.filter(function(f){return f;}).length;
+  var html = '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;line-height:1.5">'+
+    'Sincronizando '+concluidas+' de '+nomes.length+'...'+
+  '</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  nomes.forEach(function(nome, i){
+    var pronto = feito[i];
+    html += '<tr style="border-top:1px solid var(--border)">'+
+      '<td style="padding:7px 4px">'+nome+'</td>'+
+      '<td style="padding:7px 4px;text-align:right;font-size:14px">'+(pronto?'✅':'⏳')+'</td>'+
+    '</tr>';
+  });
+  html += '</table>';
+  document.getElementById('divhist-body').innerHTML = html;
+}
+
+function renderProgressoSincronizacao(checks, idxAtual, resultados){
+  var html = '<div style="font-size:12px;color:var(--t3);margin-bottom:12px;line-height:1.5">'+
+    'Verificando '+Math.min(idxAtual+ (resultados.length<checks.length?1:0), checks.length)+' de '+checks.length+'...'+
+  '</div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+    '<tr style="color:var(--t3);text-align:left"><th style="padding:6px 4px">Categoria</th><th style="padding:6px 4px;text-align:center">Local</th><th style="padding:6px 4px;text-align:center">Servidor</th><th style="padding:6px 4px;text-align:center"></th></tr>';
+
+  checks.forEach(function(chk, i){
+    var r = resultados[i];
+    var icone, corLocal, corServidor, servidorTxt;
+    if(r){
+      corLocal = r.status==='ok' ? 'var(--t3)' : (r.status==='erro' ? 'var(--yellow)' : 'var(--red)');
+      icone = r.status==='ok' ? '✅' : (r.status==='erro' ? '⚠️' : '❌');
+      servidorTxt = r.servidor===null ? '—' : r.servidor;
+    } else if(i === idxAtual){
+      corLocal = 'var(--blue)'; icone = '⏳'; servidorTxt = '...';
+    } else {
+      corLocal = 'var(--t3)'; icone=''; servidorTxt = '';
+    }
+    var opacidade = r ? '1' : (i===idxAtual ? '1' : '.35');
+    html += '<tr style="border-top:1px solid var(--border);opacity:'+opacidade+'">'+
+      '<td style="padding:7px 4px">'+chk.nome+'</td>'+
+      '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+corLocal+'">'+(r?r.local:chk.local.length)+'</td>'+
+      '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+corLocal+'">'+servidorTxt+'</td>'+
+      '<td style="padding:7px 4px;text-align:center">'+icone+'</td>'+
+    '</tr>';
+  });
+  html += '</table>';
+
+  document.getElementById('divhist-body').innerHTML = html;
 }
 
 function mostrarResultadoSincronizacao(resultados){
