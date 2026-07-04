@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260704-140720</title>
+<title>Fluxo v20260704-174134</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2354,14 +2354,14 @@ function resetSetup(){
 // ════════════════════════════════════════════════════════
 //  HTTP — apiCall (GET) e apiPost (GET com chunks)
 // ════════════════════════════════════════════════════════
-function apiCall(action, body, cb){
+function _apiCallOnce(action, body, cb){
   if(!API){ if(cb) cb(new Error('URL não configurada')); return; }
   var url = API + '?action=' + action;
   if(body){
     url += '&payload=' + encodeURIComponent(JSON.stringify(body));
   }
   var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  var tid  = ctrl ? setTimeout(function(){ ctrl.abort(); }, 15000) : null;
+  var tid  = ctrl ? setTimeout(function(){ ctrl.abort(); }, 25000) : null;
   fetch(url, {
     method: 'GET', redirect: 'follow',
     headers: { 'Accept': 'application/json, text/plain, */*' },
@@ -2379,7 +2379,7 @@ function apiCall(action, body, cb){
     if(e.name === 'AbortError'){ if(cb) cb(new Error('Timeout')); return; }
     // Fallback XHR
     var xhr = new XMLHttpRequest();
-    xhr.timeout = 15000;
+    xhr.timeout = 25000;
     xhr.open('GET', url, true);
     xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
     xhr.onload = function(){
@@ -2389,6 +2389,22 @@ function apiCall(action, body, cb){
     xhr.onerror   = function(){ if(cb) cb(new Error('Sem conexão')); };
     xhr.ontimeout = function(){ if(cb) cb(new Error('Timeout')); };
     xhr.send();
+  });
+}
+
+// Envelope com nova tentativa automática — se a primeira chamada falhar
+// (timeout, sem conexão, etc.), tenta mais 1 vez após uma pequena pausa
+// antes de reportar erro. Cobre instabilidades passageiras de rede entre
+// o dispositivo e o Google, sem exigir ação do usuário.
+function apiCall(action, body, cb, _tentativa){
+  _apiCallOnce(action, body, function(err, data){
+    if(err && !_tentativa){
+      setTimeout(function(){
+        apiCall(action, body, cb, 1); // 1 nova tentativa, depois desiste
+      }, 1200);
+      return;
+    }
+    if(cb) cb(err, data);
   });
 }
 
