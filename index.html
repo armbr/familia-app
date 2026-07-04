@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260704-002154</title>
+<title>Fluxo v20260704-123540</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2586,7 +2586,8 @@ function syncAll(){
     if(done===14){ btn.classList.remove('spinning'); load(false); renderAll(); renderHoje(); toast('✅ Sincronizado!'); }
   }
 
-  buscarExclusoesServidor('recur', function(exclRecur){
+  buscarExclusoesServidor('recur', function(exclRecur, sucesso){
+    if(!sucesso){ recurReady = true; tryProcessRecur(); tick(); return; }
     var exclRecurSet = {};
     exclRecur.forEach(function(id){ exclRecurSet[String(id)] = true; });
     apiCall('getRecur',null,function(err,d){
@@ -2637,7 +2638,8 @@ function syncAll(){
     tick();
   });
 
-  buscarExclusoesServidor('txs', function(exclTxs){
+  buscarExclusoesServidor('txs', function(exclTxs, sucesso){
+    if(!sucesso){ tick(); return; }
     var exclTxsSet = {};
     exclTxs.forEach(function(id){ exclTxsSet[String(id)] = true; });
 
@@ -2715,7 +2717,8 @@ function syncAll(){
   });
 
   // Sync Gastos Cartão
-  buscarExclusoesServidor('cgastos', function(exclCG){
+  buscarExclusoesServidor('cgastos', function(exclCG, sucessoCG){
+    if(!sucessoCG){ tick(); return; }
     var exclCGSet = {};
     exclCG.forEach(function(id){ exclCGSet[String(id)] = true; });
     apiCall('getCGastos',null,function(err,d){
@@ -2734,7 +2737,8 @@ function syncAll(){
     });
   });
 
-  buscarExclusoesServidor('tasks', function(exclTasks){
+  buscarExclusoesServidor('tasks', function(exclTasks, sucessoTasks){
+    if(!sucessoTasks){ tasksReady = true; tryProcessRecur(); tick(); return; }
     var exclTasksSet = {};
     exclTasks.forEach(function(id){ exclTasksSet[String(id)] = true; });
 
@@ -4431,7 +4435,19 @@ function chgTaskStatus(id,s){
     if(curSection==='hoje') renderHoje();
   }
   apiCall('updateTask',{id:id,status:s},function(err){
-    if(err){t.status=old;localStorage.setItem('ff_tasks',JSON.stringify(TASKS));renderAll();}
+    if(err){
+      // A tarefa pode nunca ter sido criada com sucesso no servidor
+      // (falha de rede na criação original) — em vez de reverter
+      // silenciosamente, tenta recriá-la agora com o status já correto.
+      apiCall('addTask', t, function(err2){
+        if(err2){
+          t.status=old;
+          localStorage.setItem('ff_tasks',JSON.stringify(TASKS));
+          renderAll();
+          toast('⚠️ Não foi possível salvar no servidor — tente novamente com internet','err');
+        }
+      });
+    }
   });
 }
 
@@ -5289,7 +5305,8 @@ function syncDocs(){
 function saveCartoes(){  localStorage.setItem('ff_cartoes',  JSON.stringify(CARTOES)); }
 
 function sincronizarCartoes(cb){
-  buscarExclusoesServidor('cartoes', function(exclusoes){
+  buscarExclusoesServidor('cartoes', function(exclusoes, sucesso){
+    if(!sucesso){ if(cb) cb(); return; }
     var exclSet = {};
     exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
@@ -5376,12 +5393,18 @@ function saveRecibos(){  localStorage.setItem('ff_recibos',  JSON.stringify(RECI
 // apareça aqui deve ser removido localmente, não importa a idade dele.
 function buscarExclusoesServidor(tipo, cb){
   apiCall('getExclusoes', {tipo: tipo}, function(err, d){
-    cb((!err && d && d.ok && d.data) ? d.data : []);
+    var ok = !err && d && d.ok && d.data !== undefined;
+    // cb(lista, sucesso) — sucesso=false sinaliza falha de rede; quem
+    // chama deve EVITAR mesclar/sobrescrever dados locais nesse caso,
+    // para não arriscar ressuscitar algo que foi excluído (proteção
+    // "fail-closed" em vez de assumir silenciosamente "sem exclusões").
+    cb(ok ? d.data : [], ok);
   });
 }
 
 function sincronizarRecibos(cb){
-  buscarExclusoesServidor('recibos', function(exclusoes){
+  buscarExclusoesServidor('recibos', function(exclusoes, sucesso){
+    if(!sucesso){ if(cb) cb(); return; }
     var exclSet = {};
     exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
@@ -7249,7 +7272,8 @@ function delDivida(id){
 }
 
 function sincronizarDividas(cb){
-  buscarExclusoesServidor('dividas', function(exclusoes){
+  buscarExclusoesServidor('dividas', function(exclusoes, sucesso){
+    if(!sucesso){ if(cb) cb(); return; }
     var exclSet = {};
     exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
@@ -7675,7 +7699,8 @@ function delContaBanco(id){
 
 // ── Sincronização de Contas Bancárias ────────────────────
 function sincronizarContasBanco(cb){
-  buscarExclusoesServidor('contasbanco', function(exclusoes){
+  buscarExclusoesServidor('contasbanco', function(exclusoes, sucesso){
+    if(!sucesso){ if(cb) cb(); return; }
     var exclSet = {};
     exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
