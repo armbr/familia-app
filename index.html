@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260704-132824</title>
+<title>Fluxo v20260704-134045</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2695,15 +2695,13 @@ function syncAll(){
         // Corrige itens que ficaram só locais por falha de rede na criação.
         localOnly.forEach(function(t){ apiCall('addTransaction', t, function(){}); });
 
-        var merged = serverTxs.concat(localOnly);
-        // Deduplicar: mesmo desc+date+value+type → manter apenas um
-        var seenMerge = {};
-        TXS = merged.filter(function(t){
-          var k = [t.type, String(t.desc||'').trim().toLowerCase(), ymds(t.date||''), String(parseFloat(t.value||0).toFixed(2))].join('|');
-          if(seenMerge[k]) return false;
-          seenMerge[k] = true;
-          return true;
-        });
+        // Mesclar servidor + locais pendentes — sem deduplicar por
+        // conteúdo (descrição+data+valor), pois isso descartava
+        // incorretamente transações DIFERENTES que só coincidiam de ter
+        // a mesma descrição/data/valor (ex: duas compras de R$50 no
+        // mesmo dia). A união já é livre de colisão por ID, que é a
+        // única duplicata que realmente importa evitar.
+        TXS = serverTxs.concat(localOnly);
         // Ordenar por data desc
         TXS.sort(function(a,b){ return ymds(b.date) > ymds(a.date) ? 1 : -1; });
         save();
