@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260704-134045</title>
+<title>Fluxo v20260704-140720</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2609,6 +2609,12 @@ function syncAll(){
     if(recurReady && tasksReady) processRecur();
   }
 
+  // Espalhar o disparo das 14 sincronizações ao longo de ~2s, em vez de
+  // tudo de uma vez — reduz a sobrecarga simultânea no Apps Script,
+  // especialmente importante em conexões mais lentas (celular/dados
+  // móveis), onde muitas requisições ao mesmo tempo aumentam o risco de
+  // timeout em cascata.
+  setTimeout(function(){
   buscarExclusoesServidor('recur', function(exclRecur, sucesso){
     if(!sucesso){ recurReady = true; tryProcessRecur(); tick(0); return; }
     var exclRecurSet = {};
@@ -2627,12 +2633,14 @@ function syncAll(){
       tick(0);
     });
   });
+  }, 0);
 
-  sincronizarRecibos(function(){ tick(1); });
-  sincronizarDividas(function(){ tick(2); });
+  setTimeout(function(){ sincronizarRecibos(function(){ tick(1); }); }, 150);
+  setTimeout(function(){ sincronizarDividas(function(){ tick(2); }); }, 300);
   // Bancos: OBRIGATÓRIO sincronizar contas antes de extratos —
   // no dispositivo novo CONTAS_BANCO começa vazio e sincronizarExtratos
   // retornaria imediatamente sem buscar nada do servidor.
+  setTimeout(function(){
   sincronizarContasBanco(function(){
     tick(3);
     sincronizarExtratos(function(){
@@ -2640,10 +2648,12 @@ function syncAll(){
       tick(4);
     });
   });
+  }, 450);
 
-  sincronizarCartoes(function(){ renderFinCC(); tick(5); });
-  sincronizarNotasOfx(function(){ tick(6); });
+  setTimeout(function(){ sincronizarCartoes(function(){ renderFinCC(); tick(5); }); }, 600);
+  setTimeout(function(){ sincronizarNotasOfx(function(){ tick(6); }); }, 750);
 
+  setTimeout(function(){
   apiCall('getDocs',null,function(err,d){
     if(!err && d.ok){
       DOCS = d.data.map(function(x){
@@ -2660,7 +2670,9 @@ function syncAll(){
     }
     tick(7);
   });
+  }, 900);
 
+  setTimeout(function(){
   buscarExclusoesServidor('txs', function(exclTxs, sucesso){
     if(!sucesso){ tick(8); return; }
     var exclTxsSet = {};
@@ -2709,8 +2721,10 @@ function syncAll(){
       tick(8);
     });
   });
+  }, 1050);
 
   // Sync Contratos
+  setTimeout(function(){
   apiCall('getContratos',null,function(err,d){
     if(!err && d && d.ok && d.data){
       CONTRATOS = d.data;
@@ -2718,8 +2732,10 @@ function syncAll(){
     }
     tick(9);
   });
+  }, 1200);
 
   // Sync Pagadores
+  setTimeout(function(){
   apiCall('getPagadores',null,function(err,d){
     if(!err && d && d.ok && d.data){
       PAGADORES = d.data;
@@ -2727,8 +2743,10 @@ function syncAll(){
     }
     tick(10);
   });
+  }, 1350);
 
   // Sync Aluguéis
+  setTimeout(function(){
   apiCall('getAlugueis',null,function(err,d){
     if(!err && d && d.ok && d.data){
       ALUGUEIS = d.data;
@@ -2736,8 +2754,10 @@ function syncAll(){
     }
     tick(11);
   });
+  }, 1500);
 
   // Sync Gastos Cartão
+  setTimeout(function(){
   buscarExclusoesServidor('cgastos', function(exclCG, sucessoCG){
     if(!sucessoCG){ tick(12); return; }
     var exclCGSet = {};
@@ -2757,7 +2777,9 @@ function syncAll(){
       tick(12);
     });
   });
+  }, 1650);
 
+  setTimeout(function(){
   buscarExclusoesServidor('tasks', function(exclTasks, sucessoTasks){
     if(!sucessoTasks){ tasksReady = true; tryProcessRecur(); tick(13); return; }
     var exclTasksSet = {};
@@ -2801,6 +2823,7 @@ function syncAll(){
       tick(13);
     });
   });
+  }, 1800);
 }
 
 // ════════════════════════════════════════
