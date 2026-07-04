@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260704-123540</title>
+<title>Fluxo v20260704-124701</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -4475,9 +4475,20 @@ function delTask(id){
   }
   var bk=[].concat(TASKS);
   TASKS=TASKS.filter(function(t){return String(t.id)!==String(id);}); renderTasks();
-  apiCall('deleteTask',{id:id},function(err){
-    if(err){TASKS=bk;removeTombstone('tasks',id);renderTasks();toast('❌ Erro','err');}
-    else toast('🗑️ Removido');
+  apiCall('deleteTask',{id:id},function(err, resp){
+    if(err){
+      TASKS=bk;removeTombstone('tasks',id);renderTasks();
+      toast('❌ Erro ao excluir: '+(err.message||err),'err');
+      console.error('delTask erro de rede:', err);
+    } else if(resp && resp.ok===false){
+      // O servidor respondeu, mas não encontrou a tarefa — isso significa
+      // que ela nunca existiu lá (falha na criação original). Nesse caso
+      // a exclusão local É o resultado correto: não há nada a reverter.
+      toast('🗑️ Removido (não estava no servidor)');
+      console.warn('deleteTask: tarefa não encontrada no servidor, id='+id);
+    } else {
+      toast('🗑️ Removido');
+    }
   });
 }
 
