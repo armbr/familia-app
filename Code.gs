@@ -606,7 +606,7 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-var EMAIL_DESTINO  = 'armbr258@gmail.com';
+var EMAIL_DESTINO  = '@gmail.com';
 var EMAILS_DESTINO = [EMAIL_DESTINO]; // Para adicionar mais: ['email1@gmail.com', 'email2@gmail.com']
 
 
