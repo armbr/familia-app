@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260704-174134</title>
+<title>Fluxo v20260705-234653</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -860,6 +860,7 @@ select option{background:#1A2A3A}
       <button id="sync-btn" onclick="syncAll()">↻ Sync</button>
       <button id="diag-btn" onclick="verificarSincronizacao()" title="Verificar sincronização entre dispositivos" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:4px 6px">🔍</button>
       <button id="push-btn" onclick="ativarNotificacoes()" title="Ativar notificações push" style="background:transparent;border:none;cursor:pointer;font-size:20px;padding:4px 6px">🔕</button>
+      <button onclick="exportarBackupCompleto()" title="Exportar backup completo" style="background:transparent;border:none;cursor:pointer;font-size:18px;padding:4px 6px">💾</button>
     </div>
   </div>
 
@@ -1895,6 +1896,10 @@ select option{background:#1A2A3A}
           <input id="d-subpasta" type="text" placeholder="Ex: Empresa ABC, Loteamento XYZ, João Silva..." maxlength="50">
         </div>
 
+        <div><div class="fl">Data de vencimento <span style="color:var(--t3);font-weight:400">(opcional — CNH, seguro, contrato...)</span></div>
+          <input id="d-vencimento" type="date">
+        </div>
+
         <button class="btn" id="btn-add-doc" onclick="addDoc()">Salvar Link ✓</button>
       </div>
     </div>
@@ -1937,6 +1942,31 @@ select option{background:#1A2A3A}
           <input id="bk-conta" type="text" placeholder="00000-0" maxlength="20">
         </div>
       </div>
+
+      <div style="margin:14px 0 6px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">📋 Dados para compartilhar (opcional)</div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">Titular</div>
+          <input id="bk-titular" type="text" placeholder="Nome completo / Razão social" maxlength="80">
+        </div>
+        <div><div class="fl">Tipo</div>
+          <select id="bk-titular-tipo">
+            <option value="pf">Pessoa Física</option>
+            <option value="pj">Pessoa Jurídica</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <div><div class="fl">CPF/CNPJ</div>
+          <input id="bk-cpfcnpj" type="text" placeholder="000.000.000-00" maxlength="20">
+        </div>
+        <div><div class="fl">Código do banco</div>
+          <input id="bk-codigo" type="text" placeholder="Ex: 341 (Itaú)" maxlength="10">
+        </div>
+      </div>
+      <div style="margin-bottom:10px"><div class="fl">Chave Pix</div>
+        <input id="bk-pix" type="text" placeholder="CPF, e-mail, telefone ou aleatória" maxlength="80">
+      </div>
+
       <div class="row2" style="margin-bottom:12px">
         <div><div class="fl">Cor de identificação</div>
           <input id="bk-cor" type="color" value="#6D28D9" style="height:38px;width:100%;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer">
@@ -2045,6 +2075,27 @@ select option{background:#1A2A3A}
       <button onclick="closeTxDetail()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
     </div>
     <div id="txdetail-body"></div>
+  </div>
+</div>
+
+<!-- Modal: Definir Apelido de operação bancária -->
+<div id="apelido-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:210;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800">🏷️ Definir Apelido</div>
+      <button onclick="closeDefinirApelido()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--t3);margin-bottom:12px;line-height:1.5">
+      Esse apelido será aplicado automaticamente a esta e a outras transações parecidas (mesmo tipo de operação, mesma direção e nome semelhante) — já importadas ou futuras.
+    </div>
+    <div id="apelido-preview-desc" style="font-size:12px;color:var(--t2);margin-bottom:10px;padding:8px 10px;background:var(--bg3);border-radius:8px"></div>
+    <div style="margin-bottom:16px"><div class="fl">Apelido</div>
+      <input id="apelido-texto" type="text" placeholder="Ex: Pix do João" maxlength="60">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="apelido-btn-remover" onclick="confirmarRemoverApelido()" style="display:none;padding:12px 14px;border:1px solid var(--red);border-radius:8px;background:transparent;color:var(--red);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">🗑️</button>
+      <button onclick="salvarApelidoModal()" style="flex:1;padding:12px;border:none;border-radius:8px;background:#6D28D9;color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
+    </div>
   </div>
 </div>
 
@@ -2208,6 +2259,7 @@ var CONTRATOS  = (function(){ try{ return JSON.parse(localStorage.getItem('ff_co
 var CONTAS_BANCO = (function(){ try{ return JSON.parse(localStorage.getItem('ff_contas_banco') || '[]') || []; }catch(e){ localStorage.removeItem('ff_contas_banco'); return []; } })();
 var EXTRATOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_extratos')    || '{}') || {}; }catch(e){ localStorage.removeItem('ff_extratos');    return {}; } })();
 var NOTAS_OFX    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_notas_ofx')  || '{}') || {}; }catch(e){ localStorage.removeItem('ff_notas_ofx');   return {}; } })();
+var APELIDOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_apelidos')   || '[]') || []; }catch(e){ localStorage.removeItem('ff_apelidos');    return []; } })();
 var curBankContaId = null;   // conta bancária selecionada atualmente
 var curExtrato     = [];     // transações do extrato em exibição
 var curExtratoSel  = 'todos'; // 'todos' ou 'YYYY-MM' (mês calendário)
@@ -2473,6 +2525,60 @@ function apiPost(action, body, cb){
   });
 }
 
+// ════════════════════════════════════════════════════════════
+//  BACKUP COMPLETO — exporta todos os dados do app num único
+//  arquivo JSON, independente do Google Sheets. Serve como cópia
+//  de segurança que você guarda onde quiser (Drive, computador,
+//  pen drive) — não é restaurado automaticamente pelo app, mas
+//  serve de registro caso precise reconstruir os dados manualmente.
+// ════════════════════════════════════════════════════════════
+function exportarBackupCompleto(){
+  try{
+    var backup = {
+      geradoEm: new Date().toISOString(),
+      versaoApp: document.title,
+      dados: {
+        tarefas:            TASKS,
+        recorrencias:       RECUR,
+        lancamentos:        TXS,
+        cartoes:            CARTOES,
+        gastosCartao:       CGASTOS,
+        dividas:            DIVIDAS,
+        recibos:            RECIBOS,
+        contatos:           PAGADORES,
+        alugueis:           ALUGUEIS,
+        contratos:          CONTRATOS,
+        documentos:         DOCS,
+        contasBancarias:    CONTAS_BANCO,
+        extratos:           EXTRATOS,
+        notasExtrato:       NOTAS_OFX,
+        apelidos:           APELIDOS
+      }
+    };
+
+    var totalRegistros = Object.keys(backup.dados).reduce(function(s,k){
+      var v = backup.dados[k];
+      return s + (Array.isArray(v) ? v.length : Object.keys(v||{}).length);
+    }, 0);
+
+    var json = JSON.stringify(backup, null, 2);
+    var blob = new Blob([json], {type:'application/json;charset=utf-8;'});
+    var dataStr = ymd(new Date());
+    var filename = 'fluxo-backup-'+dataStr+'.json';
+
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+
+    toast('💾 Backup exportado! '+totalRegistros+' registros no total.');
+  }catch(e){
+    console.error('Erro ao exportar backup:', e);
+    toast('❌ Erro ao gerar backup','err');
+  }
+}
+
 function ativarNotificacoes(){
   if(typeof window.solicitarPushPermissao === 'function'){
     window.solicitarPushPermissao();
@@ -2601,7 +2707,8 @@ function syncAll(){
     '🔁 Recorrências','🧾 Recibos','💰 Dívidas / Financiamentos',
     '🏦 Contas Bancárias','📄 Extratos','💳 Cartões','📝 Notas de Extrato',
     '📁 Documentos','💰 Lançamentos (Finanças)','📄 Contratos',
-    '👥 Contatos','🏠 Aluguéis','🛍️ Gastos no Cartão','📋 Tarefas / Agenda'
+    '👥 Contatos','🏠 Aluguéis','🛍️ Gastos no Cartão','📋 Tarefas / Agenda',
+    '🏷️ Apelidos'
   ];
   var syncFeito = syncNomes.map(function(){ return false; });
 
@@ -2613,7 +2720,7 @@ function syncAll(){
     done++;
     if(idxNome!==undefined) syncFeito[idxNome] = true;
     renderProgressoSync(syncNomes, syncFeito);
-    if(done===14){
+    if(done===15){
       btn.classList.remove('spinning'); load(false); renderAll(); renderHoje();
       toast('✅ Sincronizado!');
       setTimeout(function(){ closeDivHistModal(); }, 900);
@@ -2668,6 +2775,7 @@ function syncAll(){
 
   setTimeout(function(){ sincronizarCartoes(function(){ renderFinCC(); tick(5); }); }, 600);
   setTimeout(function(){ sincronizarNotasOfx(function(){ tick(6); }); }, 750);
+  setTimeout(function(){ sincronizarApelidos(function(){ tick(14); }); }, 1950);
 
   setTimeout(function(){
   apiCall('getDocs',null,function(err,d){
@@ -2679,7 +2787,8 @@ function syncAll(){
           url:      String(x.url     || ''),
           type:     String(x.type    || 'doc'),
           pasta:    String(x.pasta   || x.group || 'Outros'),
-          subpasta: String(x.subpasta|| '')
+          subpasta: String(x.subpasta|| ''),
+          vencimento: String(x.vencimento|| '')
         };
       });
       localStorage.setItem('ff_docs', JSON.stringify(DOCS));
@@ -3826,6 +3935,48 @@ function txCard(t){
   '</div>';
 }
 
+// ── Modal: Definir Apelido ────────────────────────────────
+var apelidoTxAtual = null;
+
+function abrirDefinirApelido(fitId){
+  var tx = curExtrato.find(function(t){ return String(t.fitId)===String(fitId); });
+  if(!tx) return;
+  apelidoTxAtual = tx;
+  var existente = encontrarApelidoParaTx(tx);
+
+  document.getElementById('apelido-preview-desc').textContent = tx.desc;
+  document.getElementById('apelido-texto').value = existente ? existente.apelido : '';
+  document.getElementById('apelido-btn-remover').style.display = existente ? 'block' : 'none';
+  document.getElementById('apelido-modal').style.display = 'flex';
+  closeTxDetail();
+}
+
+function closeDefinirApelido(){
+  document.getElementById('apelido-modal').style.display = 'none';
+  apelidoTxAtual = null;
+}
+
+function salvarApelidoModal(){
+  if(!apelidoTxAtual) return;
+  var texto = (document.getElementById('apelido-texto').value||'').trim();
+  if(!texto){ toast('⚠️ Digite um apelido','err'); return; }
+  definirApelido(apelidoTxAtual.desc, apelidoTxAtual.tipo, texto);
+  closeDefinirApelido();
+  renderExtrato();
+  toast('🏷️ Apelido salvo! Aplicado automaticamente a operações parecidas.');
+}
+
+function confirmarRemoverApelido(){
+  if(!apelidoTxAtual) return;
+  var existente = encontrarApelidoParaTx(apelidoTxAtual);
+  if(!existente) return;
+  if(!confirm('Remover este apelido? As transações voltarão a mostrar a descrição original do banco.')) return;
+  removerApelido(existente.id);
+  closeDefinirApelido();
+  renderExtrato();
+  toast('🗑️ Apelido removido');
+}
+
 function toggleTxCardDetail(detailId){
   var el = document.getElementById(detailId);
   if(!el) return;
@@ -4645,6 +4796,8 @@ function initTaskDelegation(){
     var edittime = e.target.closest('[data-edittime]');
     if(edittime){ editarHorarioTask(edittime.getAttribute('data-edittime')); return; }
     // Bancos
+    var sharedados = e.target.closest('[data-sharedados]');
+    if(sharedados){ compartilharDadosBancarios(sharedados.getAttribute('data-sharedados')); return; }
     var delconta = e.target.closest('[data-delconta]');
     if(delconta){ delContaBanco(delconta.getAttribute('data-delconta')); return; }
     var delextrato = e.target.closest('[data-delextrato]');
@@ -5281,15 +5434,17 @@ function addDoc(){
   var typeEl    = document.getElementById('d-type');
   var pastaEl   = document.getElementById('d-pasta');
   var subEl     = document.getElementById('d-subpasta');
+  var vencEl    = document.getElementById('d-vencimento');
   var btn       = document.getElementById('btn-add-doc');
 
   if(!nameEl || !urlEl){ toast('⚠️ Formulário não encontrado','err'); return; }
 
-  var name     = nameEl.value.trim();
-  var url      = urlEl.value.trim();
-  var type     = typeEl    ? typeEl.value    : 'doc';
-  var pasta    = pastaEl   ? pastaEl.value   : 'Outros';
-  var subpasta = subEl     ? subEl.value.trim() : '';
+  var name       = nameEl.value.trim();
+  var url        = urlEl.value.trim();
+  var type       = typeEl    ? typeEl.value    : 'doc';
+  var pasta      = pastaEl   ? pastaEl.value   : 'Outros';
+  var subpasta   = subEl     ? subEl.value.trim() : '';
+  var vencimento = vencEl    ? vencEl.value : '';
 
   if(!name){ toast('⚠️ Informe o nome do arquivo','err'); return; }
   if(!url || url.indexOf('http')===-1){ toast('⚠️ Cole um link válido','err'); return; }
@@ -5298,17 +5453,18 @@ function addDoc(){
   nameEl.value = '';
   urlEl.value  = '';
   if(subEl) subEl.value = '';
+  if(vencEl) vencEl.value = '';
 
   if(btn) btn.disabled = true;
   toast('💾 Salvando...');
 
   var tmp = Date.now();
-  var doc = { id:tmp, name:name, url:url, type:type, pasta:pasta, subpasta:subpasta };
+  var doc = { id:tmp, name:name, url:url, type:type, pasta:pasta, subpasta:subpasta, vencimento: vencimento ? fmtDate(vencimento) : '' };
   DOCS.unshift(doc);
   localStorage.setItem('ff_docs', JSON.stringify(DOCS));
   renderDocs();
 
-  apiCall('addDoc', {name:name, url:url, type:type, pasta:pasta, subpasta:subpasta}, function(err, d){
+  apiCall('addDoc', {name:name, url:url, type:type, pasta:pasta, subpasta:subpasta, vencimento:vencimento}, function(err, d){
     if(err){
       DOCS = DOCS.filter(function(x){ return x.id !== tmp; });
       localStorage.setItem('ff_docs', JSON.stringify(DOCS));
@@ -7728,7 +7884,8 @@ function renderContasBanco(){
           '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.nome)+'</div>'+
           '<div style="font-size:10px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+'</div>'+
         '</div>'+
-        '<button data-delconta="'+c.id+'" style="margin-left:auto;background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir conta">🗑️</button>'+
+        '<button data-sharedados="'+c.id+'" style="margin-left:auto;background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;padding:2px" title="Compartilhar dados bancários">🔗</button>'+
+        '<button data-delconta="'+c.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir conta">🗑️</button>'+
       '</div>';
     }).join('')+
   '</div>';
@@ -7742,14 +7899,57 @@ function addContaBanco(){
   var conta  = (document.getElementById('bk-conta').value||'').trim();
   var cor    = document.getElementById('bk-cor').value || '#6D28D9';
   var saldo  = parseFloat(document.getElementById('bk-saldo').value||0);
+  var titular      = (document.getElementById('bk-titular').value||'').trim();
+  var titularTipo  = document.getElementById('bk-titular-tipo').value;
+  var cpfCnpj      = (document.getElementById('bk-cpfcnpj').value||'').trim();
+  var codigoBanco  = (document.getElementById('bk-codigo').value||'').trim();
+  var chavePix     = (document.getElementById('bk-pix').value||'').trim();
   if(!nome){ toast('⚠️ Informe o nome do banco','err'); return; }
-  var c = {id: Date.now(), nome: nome, tipo: tipo, agencia: ag, conta: conta, cor: cor, saldo: saldo};
+  var c = {id: Date.now(), nome: nome, tipo: tipo, agencia: ag, conta: conta, cor: cor, saldo: saldo,
+    titular: titular, titularTipo: titularTipo, cpfCnpj: cpfCnpj, codigoBanco: codigoBanco, chavePix: chavePix};
   CONTAS_BANCO.push(c);
   saveContasBanco();
   apiCall('salvarContaBanco', c, function(){});
-  ['bk-nome','bk-agencia','bk-conta','bk-saldo'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['bk-nome','bk-agencia','bk-conta','bk-saldo','bk-titular','bk-cpfcnpj','bk-codigo','bk-pix'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   renderContasBanco();
   toast('✅ Conta cadastrada!');
+}
+
+function compartilharDadosBancarios(id){
+  var c = CONTAS_BANCO.find(function(x){ return String(x.id)===String(id); });
+  if(!c) return;
+  if(!c.titular && !c.chavePix && !c.cpfCnpj){
+    toast('⚠️ Preencha os dados de titular/CPF/Pix na edição da conta antes de compartilhar','err');
+    return;
+  }
+
+  var linhas = ['📋 Dados bancários — '+(c.titular||c.nome)];
+  linhas.push('');
+  if(c.titular) linhas.push('👤 Titular: '+c.titular+' ('+(c.titularTipo==='pj'?'Pessoa Jurídica':'Pessoa Física')+')');
+  if(c.cpfCnpj) linhas.push((c.titularTipo==='pj'?'🪪 CNPJ: ':'🪪 CPF: ')+c.cpfCnpj);
+  linhas.push('🏦 Banco: '+c.nome+(c.codigoBanco?' (Código: '+c.codigoBanco+')':''));
+  if(c.agencia) linhas.push('🏢 Agência: '+c.agencia);
+  if(c.conta)   linhas.push('💳 Conta: '+c.conta);
+  if(c.chavePix) linhas.push('🔑 Chave Pix: '+c.chavePix);
+
+  var texto = linhas.join('\n');
+
+  if(navigator.share){
+    navigator.share({ title: 'Dados bancários — '+(c.titular||c.nome), text: texto })
+      .catch(function(err){ if(err && err.name!=='AbortError') console.warn('Erro ao compartilhar:', err); });
+    return;
+  }
+
+  // Fallback: copiar pra área de transferência
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(texto).then(function(){
+      toast('📋 Dados copiados! Cole onde quiser enviar.');
+    }).catch(function(){
+      prompt('Copie os dados abaixo:', texto);
+    });
+  } else {
+    prompt('Copie os dados abaixo:', texto);
+  }
 }
 
 function delContaBanco(id){
@@ -8297,12 +8497,15 @@ function renderExtrato(){
     var nota = NOTAS_OFX[tx.fitId] || '';
     var kNorm = tx.desc.toLowerCase().replace(/\s+/g,' ').trim();
     var isRecorr = recorr[kNorm];
+    var apelidoInfo = encontrarApelidoParaTx(tx);
+    var textoExibido = apelidoInfo ? apelidoInfo.apelido : tx.desc;
 
     return '<div data-txdetail="'+esc(tx.fitId)+'" style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
         '<div style="min-width:0;flex:1">'+
           '<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+
-            esc(tx.desc)+
+            (apelidoInfo?'<span style="font-size:11px;margin-right:3px" title="Apelido — descrição original ao expandir">🏷️</span>':'')+
+            esc(textoExibido)+
             (isRecorr?'<span style="margin-left:6px;font-size:9px;font-weight:800;color:var(--blue);border:1px solid var(--blue);padding:1px 5px;border-radius:4px;vertical-align:middle">RECORRENTE</span>':'')+
           '</div>'+
           '<div style="font-size:11px;color:var(--t3);margin-top:2px">'+fmtDate(tx.data)+'</div>'+
@@ -8326,14 +8529,19 @@ function abrirDetalheTx(fitId){
   var sinal = isCredito ? '+' : '-';
   var nota = NOTAS_OFX[tx.fitId] || '';
   var conta = CONTAS_BANCO.find(function(c){ return String(c.id)===String(curBankContaId); });
+  var apelidoInfo = encontrarApelidoParaTx(tx);
 
   var html =
     '<div style="text-align:center;padding:16px 0;margin-bottom:6px;border-bottom:1px solid var(--border)">'+
       '<div style="font-size:11px;font-weight:700;color:'+(isCredito?'var(--green)':'var(--red)')+';text-transform:uppercase;letter-spacing:.5px">'+(isCredito?'Crédito':'Débito')+'</div>'+
       '<div style="font-size:26px;font-weight:900;color:'+cor+';margin-top:4px">'+sinal+' '+fmtBRL(tx.valor)+'</div>'+
     '</div>'+
+    (apelidoInfo?'<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:10px;font-weight:700;color:#B794F6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">🏷️ Apelido</div>'+
+      '<div style="font-size:15px;font-weight:700;color:#B794F6">'+esc(apelidoInfo.apelido)+'</div>'+
+    '</div>':'')+
     '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
-      '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Descrição completa</div>'+
+      '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Descrição completa (original do banco)</div>'+
       '<div style="font-size:14px;font-weight:600;word-break:break-word;line-height:1.4">'+esc(tx.desc)+'</div>'+
     '</div>'+
     '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">'+
@@ -8352,7 +8560,8 @@ function abrirDetalheTx(fitId){
       '<div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">📝 Sua nota</div>'+
       '<div style="font-size:13px;color:var(--blue);font-style:italic;word-break:break-word">'+esc(nota)+'</div>'+
     '</div>':'')+
-    '<button data-ofxnota="'+esc(tx.fitId)+'" data-ofxdesc="'+esc(tx.desc)+'" onclick="closeTxDetail()" style="width:100%;margin-top:14px;padding:11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">'+(nota?'✏️ Editar nota':'📝 Adicionar nota')+'</button>';
+    '<button onclick="abrirDefinirApelido(\''+esc(tx.fitId)+'\')" style="width:100%;margin-top:14px;padding:11px;border:1px solid #B794F6;border-radius:8px;background:transparent;color:#B794F6;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">'+(apelidoInfo?'🏷️ Editar apelido':'🏷️ Definir apelido')+'</button>'+
+    '<button data-ofxnota="'+esc(tx.fitId)+'" data-ofxdesc="'+esc(tx.desc)+'" onclick="closeTxDetail()" style="width:100%;margin-top:8px;padding:11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">'+(nota?'✏️ Editar nota':'📝 Adicionar nota')+'</button>';
 
   document.getElementById('txdetail-body').innerHTML = html;
   document.getElementById('txdetail-modal').style.display = 'flex';
@@ -8400,6 +8609,149 @@ function salvarOfxNota(){
   toast('📝 Nota salva');
 }
 
+// ════════════════════════════════════════════════════════════
+//  APELIDOS — reconhecimento automático de operações bancárias
+//  recorrentes (ex: "PIX RECEBIDO JOAO M SILVA" → "Pix do João"),
+//  aplicado a qualquer transação com assinatura igual ou parecida,
+//  em extratos já importados e em importações futuras.
+// ════════════════════════════════════════════════════════════
+function saveApelidos(){ localStorage.setItem('ff_apelidos', JSON.stringify(APELIDOS)); }
+
+var TIPOS_OPERACAO_BANCARIA = ['PIX','TED','DOC','TRANSFERENCIA','TRANSF','BOLETO','PAGAMENTO','COMPRA','SAQUE','DEPOSITO','DEPOSITO'];
+var STOPWORDS_OPERACAO = TIPOS_OPERACAO_BANCARIA.concat([
+  'RECEBIDO','RECEBIMENTO','CREDITO','ENVIADO','ENVIO','ENVIADA','DEBITO',
+  'DE','DA','DO','DAS','DOS','PARA','PRA','P','REF','DOC','NR','N'
+]);
+
+// Distância de Levenshtein — usada para medir o quão parecidas duas
+// strings são (tolerância a pequenas variações de escrita/abreviação).
+function _levenshtein(a, b){
+  var m = a.length, n = b.length;
+  if(m===0) return n;
+  if(n===0) return m;
+  var dp = [];
+  for(var i=0;i<=m;i++) dp.push([i]);
+  for(var j=0;j<=n;j++) dp[0][j]=j;
+  for(var i=1;i<=m;i++){
+    for(var j=1;j<=n;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j-1],dp[i-1][j],dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+function _similaridade(a, b){
+  var dist = _levenshtein(a,b);
+  var maxLen = Math.max(a.length,b.length);
+  return maxLen===0 ? 1 : 1 - dist/maxLen;
+}
+
+// Extrai {tipo, direcao, nome} de uma descrição bancária — a direção
+// (recebido/enviado) usa o tipo C/D do próprio extrato como fonte
+// confiável (mais seguro que só procurar a palavra no texto).
+function extrairAssinaturaOperacao(desc, tipoCD){
+  var normalizado = String(desc||'').toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\d+/g,' ')
+    .replace(/[^\w\s]/g,' ')
+    .replace(/\s+/g,' ').trim();
+
+  var tipo = 'OUTRO';
+  for(var i=0;i<TIPOS_OPERACAO_BANCARIA.length;i++){
+    if(normalizado.indexOf(TIPOS_OPERACAO_BANCARIA[i])!==-1){
+      tipo = TIPOS_OPERACAO_BANCARIA[i]==='TRANSF' ? 'TRANSFERENCIA' : TIPOS_OPERACAO_BANCARIA[i];
+      break;
+    }
+  }
+
+  var direcao = tipoCD==='C' ? 'RECEBIDO' : 'ENVIADO';
+
+  var nome = normalizado.split(' ').filter(function(w){
+    return w.length>1 && STOPWORDS_OPERACAO.indexOf(w)===-1;
+  }).join(' ');
+
+  return { tipo: tipo, direcao: direcao, nome: nome };
+}
+
+// Procura, entre os apelidos já cadastrados, um que corresponda à
+// transação (mesmo tipo + mesma direção + nome igual ou parecido).
+function encontrarApelidoParaTx(tx){
+  if(!APELIDOS.length) return null;
+  var assinatura = extrairAssinaturaOperacao(tx.desc, tx.tipo);
+  var melhor = null, melhorScore = 0;
+  APELIDOS.forEach(function(a){
+    if(a.tipoOperacao !== assinatura.tipo || a.direcao !== assinatura.direcao) return;
+    var score = _similaridade(a.nomeAssinatura, assinatura.nome);
+    if(score > melhorScore){ melhorScore = score; melhor = a; }
+  });
+  return (melhor && melhorScore >= 0.80) ? melhor : null;
+}
+
+function definirApelido(desc, tipoCD, apelidoTexto){
+  var assinatura = extrairAssinaturaOperacao(desc, tipoCD);
+  // Já existe apelido para essa assinatura? Atualiza em vez de duplicar.
+  var existente = APELIDOS.find(function(a){
+    return a.tipoOperacao===assinatura.tipo && a.direcao===assinatura.direcao &&
+           _similaridade(a.nomeAssinatura, assinatura.nome) >= 0.80;
+  });
+  if(existente){
+    existente.apelido = apelidoTexto;
+    existente.atualizadoEm = new Date().toISOString();
+  } else {
+    existente = {
+      id: Date.now(), tipoOperacao: assinatura.tipo, direcao: assinatura.direcao,
+      nomeAssinatura: assinatura.nome, apelido: apelidoTexto,
+      descOriginalExemplo: desc, criadoEm: new Date().toISOString()
+    };
+    APELIDOS.push(existente);
+  }
+  saveApelidos();
+  apiCall('salvarApelido', existente, function(){});
+  return existente;
+}
+
+function removerApelido(id){
+  addTombstone('apelidos', id);
+  APELIDOS = APELIDOS.filter(function(a){ return String(a.id)!==String(id); });
+  saveApelidos();
+  apiCall('deletarApelido', {id:id}, function(){});
+}
+
+function sincronizarApelidos(cb){
+  buscarExclusoesServidor('apelidos', function(exclusoes, sucesso){
+    if(!sucesso){ if(cb) cb(); return; }
+    var exclSet = {};
+    exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
+
+    apiCall('getApelidos', null, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      serverList = serverList.filter(function(a){ return !exclSet[String(a.id)]; });
+      var serverMap = {};
+      serverList.forEach(function(a){ serverMap[String(a.id)] = true; });
+
+      var pendentes = APELIDOS.filter(function(a){
+        return !serverMap[String(a.id)] && !exclSet[String(a.id)];
+      });
+
+      function finalizar(){
+        var pendMap = {};
+        pendentes.forEach(function(a){ pendMap[String(a.id)] = true; });
+        APELIDOS = serverList.concat(APELIDOS.filter(function(a){ return pendMap[String(a.id)]; }));
+        saveApelidos();
+        if(cb) cb();
+      }
+
+      if(pendentes.length === 0){ finalizar(); return; }
+      var enviados = 0;
+      pendentes.forEach(function(a){
+        apiCall('salvarApelido', a, function(){
+          enviados++;
+          if(enviados === pendentes.length) finalizar();
+        });
+      });
+    });
+  });
+}
+
 function sincronizarNotasOfx(cb){
   apiCall('getNotasOfx', null, function(err, d){
     if(!err && d && d.ok && d.data){
@@ -8441,7 +8793,8 @@ function verificarSincronizacao(){
     {nome:'📄 Contratos',               local:CONTRATOS,action:'getContratos',    extrai:function(d){ return d.data||[]; }},
     {nome:'📁 Documentos',              local:DOCS,     action:'getDocs',         extrai:function(d){ return d.data||[]; }},
     {nome:'🏦 Contas Bancárias',        local:CONTAS_BANCO, action:'getContasBanco', extrai:function(d){ return d.data||[]; }},
-    {nome:'📝 Notas de Extrato',        local:Object.keys(NOTAS_OFX), action:'getNotasOfx', extrai:function(d){ return Object.keys(d.data||{}); }}
+    {nome:'📝 Notas de Extrato',        local:Object.keys(NOTAS_OFX), action:'getNotasOfx', extrai:function(d){ return Object.keys(d.data||{}); }},
+    {nome:'🏷️ Apelidos',                local:APELIDOS, action:'getApelidos', extrai:function(d){ return d.data||[]; }}
   ];
 
   // Ativar giro no botão para deixar claro que está rodando
@@ -8651,10 +9004,22 @@ function renderDocs(){
         var meta   = DOC_ICONS[d.type] || DOC_ICONS.link;
         var safeId = String(d.id);
         var indent = sub ? 'margin-left:14px;' : '';
+        var vencBadge = '';
+        if(d.vencimento){
+          var partes = d.vencimento.split('/');
+          if(partes.length===3){
+            var dv = new Date(parseInt(partes[2]),parseInt(partes[1])-1,parseInt(partes[0]));
+            var hojeZero = new Date(); hojeZero.setHours(0,0,0,0);
+            var dias = Math.round((dv-hojeZero)/(1000*60*60*24));
+            var corVenc = dias<0 ? 'var(--red)' : (dias<=15 ? 'var(--yellow)' : 'var(--t3)');
+            var txtVenc = dias<0 ? 'Vencido há '+Math.abs(dias)+'d' : (dias===0?'Vence hoje':'Vence em '+dias+'d');
+            vencBadge = '<span style="font-size:9px;font-weight:800;color:'+corVenc+';border:1px solid '+corVenc+';padding:1px 5px;border-radius:4px;margin-left:6px;vertical-align:middle">'+txtVenc+'</span>';
+          }
+        }
         html += '<div class="doc-card" data-url="'+esc(d.url)+'" data-id="'+safeId+'" style="'+indent+'">'+
           '<div class="doc-ico" style="background:'+meta.bg+'">'+meta.ico+'</div>'+
           '<div class="doc-info">'+
-            '<div class="doc-name">'+esc(d.name)+'</div>'+
+            '<div class="doc-name">'+esc(d.name)+vencBadge+'</div>'+
             '<div class="doc-meta"><span class="doc-type-tag">'+meta.label+'</span></div>'+
           '</div>'+
           '<div class="doc-actions">'+
