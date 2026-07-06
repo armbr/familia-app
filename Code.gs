@@ -84,6 +84,9 @@ function doGetInternal(action, body) {
     case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
     case 'getExclusoes':      return getExclusoes(body.tipo);
     case 'salvarContaBanco':  return salvarItemSheet('ContasBanco', body);
+    case 'salvarApelido':     return salvarItemSheet('Apelidos', body);
+    case 'getApelidos':       return getItemsSheet('Apelidos');
+    case 'deletarApelido':    return deletarItemSheet('Apelidos', body.id);
     case 'getContasBanco':    return getItemsSheet('ContasBanco');
     case 'salvarExtrato':       return salvarExtratoSheet(body);
     case 'adicionarTxsExtrato': return adicionarTxsExtrato(body);
@@ -405,7 +408,8 @@ function getDocs() {
       url:      String(obj.url      || ''),
       type:     String(obj.type     || 'doc'),
       pasta:    String(obj.pasta    || obj.group || 'Outros'),
-      subpasta: String(obj.subpasta || '')
+      subpasta: String(obj.subpasta || ''),
+      vencimento: obj.vencimento ? fmtDate(obj.vencimento) : ''
     };
   }).filter(function(d) { return d.name && d.url; }).reverse();
   return { ok: true, data: data };
@@ -415,20 +419,25 @@ function addDoc(body) {
   var sheet = ss().getSheetByName('Documentos');
   if (!sheet) {
     sheet = ss().insertSheet('Documentos');
-    sheet.appendRow(['id','name','url','type','pasta','subpasta','createdAt']);
+    sheet.appendRow(['id','name','url','type','pasta','subpasta','createdAt','vencimento']);
     sheet.setFrozenRows(1);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#1E2D40').setFontColor('#FFF');
+  } else {
+    // Migração não-destrutiva — adiciona a coluna 'vencimento' se ainda não existir
+    var headerRow = sheet.getRange(1,1,1,Math.max(1,sheet.getLastColumn())).getValues()[0];
+    if (headerRow.indexOf('vencimento') === -1) {
+      sheet.getRange(1, sheet.getLastColumn()+1).setValue('vencimento');
+    }
   }
   var id = Date.now();
-  sheet.appendRow([
-    id,
-    body.name     || '',
-    body.url      || '',
-    body.type     || 'doc',
-    body.pasta    || 'Outros',
-    body.subpasta || '',
-    new Date().toISOString()
-  ]);
+  var headerRow2 = sheet.getRange(1,1,1,sheet.getLastColumn()).getValues()[0];
+  var linhaObj = {
+    id: id, name: body.name||'', url: body.url||'', type: body.type||'doc',
+    pasta: body.pasta||'Outros', subpasta: body.subpasta||'',
+    createdAt: new Date().toISOString(), vencimento: body.vencimento||''
+  };
+  var linha = headerRow2.map(function(h){ return linhaObj.hasOwnProperty(h) ? linhaObj[h] : ''; });
+  sheet.appendRow(linha);
   return { ok: true, id: id };
 }
 
@@ -1151,7 +1160,8 @@ function limparRegistrosOrfaos() {
     txs:          { ssFn: ss,        aba: 'Transações',    col: 0 },
     tasks:        { ssFn: ss,        aba: 'Tarefas',       col: 0 },
     recur:        { ssFn: ss,        aba: 'Recorrentes',   col: 0 },
-    dividas:      { ssFn: dividasSS, aba: 'Dívidas',       col: 0 }
+    dividas:      { ssFn: dividasSS, aba: 'Dívidas',       col: 0 },
+    apelidos:     { ssFn: ss,        aba: 'Apelidos',      col: 0 }
   };
 
   var porTipo = {};
@@ -1192,7 +1202,7 @@ function limparRegistrosOrfaos() {
 var ABA_PARA_TIPO = {
   'Recibos': 'recibos', 'Cartoes': 'cartoes', 'ContasBanco': 'contasbanco',
   'GastosCartao': 'cgastos', 'Pagadores': 'pagadores', 'Aluguéis': 'alugueis',
-  'Contratos': 'contratos'
+  'Contratos': 'contratos', 'Apelidos': 'apelidos'
 };
 
 function deletarItemSheet(nomeAba, id) {
@@ -2940,6 +2950,52 @@ function criarTriggerLembreteFatura() {
   ScriptApp.newTrigger('enviarLembreteFechamentoFatura')
     .timeBased().everyDays(1).atHour(23).nearMinute(59).create();
   Logger.log('✅ Trigger de lembrete de fechamento de fatura criado — roda todo dia perto das 23:59.');
+}
+
+// ════════════════════════════════════════════════════════════
+//  LEMBRETE DE VENCIMENTO DE DOCUMENTOS — roda todo dia de manhã
+//  e avisa por push quando um documento (CNH, seguro, contrato...)
+//  está a 30, 15, 7 ou 1 dia(s) do vencimento, ou já venceu.
+// ════════════════════════════════════════════════════════════
+function enviarLembreteDocumentos() {
+  var resp = getDocs();
+  var docs = (resp && resp.data) ? resp.data.filter(function(d){ return d.vencimento; }) : [];
+  if (!docs.length) { Logger.log('Nenhum documento com vencimento cadastrado.'); return; }
+
+  var hoje = new Date();
+  hoje.setHours(0,0,0,0);
+  var avisosEnviados = 0;
+  var marcos = [30, 15, 7, 1, 0]; // dias antes do vencimento (0 = vence hoje)
+
+  docs.forEach(function(doc){
+    var partes = String(doc.vencimento).split('/'); // fmtDate retorna DD/MM/AAAA
+    if (partes.length !== 3) return;
+    var dataVenc = new Date(parseInt(partes[2]), parseInt(partes[1])-1, parseInt(partes[0]));
+    dataVenc.setHours(0,0,0,0);
+    var diasRestantes = Math.round((dataVenc - hoje) / (1000*60*60*24));
+
+    if (marcos.indexOf(diasRestantes) !== -1) {
+      try {
+        var msg = diasRestantes === 0
+          ? '"' + doc.name + '" vence HOJE!'
+          : diasRestantes < 0
+            ? '"' + doc.name + '" está VENCIDO há ' + Math.abs(diasRestantes) + ' dia(s)!'
+            : '"' + doc.name + '" vence em ' + diasRestantes + ' dia(s) (' + doc.vencimento + ')';
+        enviarPush('📄 Documento a vencer', msg);
+        avisosEnviados++;
+      } catch(e) { Logger.log('Erro ao enviar push de documento: ' + e.message); }
+    }
+  });
+  Logger.log('Lembretes de vencimento de documentos enviados: ' + avisosEnviados);
+}
+
+// Execute esta função UMA VEZ para ativar o lembrete diário (roda junto com o resumo diário, às 8h)
+function criarTriggerLembreteDocumentos() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'enviarLembreteDocumentos') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('enviarLembreteDocumentos').timeBased().everyDays(1).atHour(8).create();
+  Logger.log('✅ Trigger de lembrete de documentos criado — roda todo dia às 8h.');
 }
 
 // ════════════════════════════════════════════════════════════
