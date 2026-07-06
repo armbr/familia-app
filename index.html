@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260705-234653</title>
+<title>Fluxo v20260706-003120</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1934,6 +1934,9 @@ select option{background:#1A2A3A}
           </select>
         </div>
       </div>
+      <div style="margin-bottom:10px"><div class="fl">Apelido da conta <span style="color:var(--t3);font-weight:400">(opcional — ajuda a distinguir contas do mesmo banco)</span></div>
+        <input id="bk-apelido" type="text" placeholder="Ex: Conta da empresa, Conta do João" maxlength="40">
+      </div>
       <div class="row2" style="margin-bottom:10px">
         <div><div class="fl">Agência (opcional)</div>
           <input id="bk-agencia" type="text" placeholder="0001" maxlength="10">
@@ -2095,6 +2098,21 @@ select option{background:#1A2A3A}
     <div style="display:flex;gap:8px">
       <button id="apelido-btn-remover" onclick="confirmarRemoverApelido()" style="display:none;padding:12px 14px;border:1px solid var(--red);border-radius:8px;background:transparent;color:var(--red);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">🗑️</button>
       <button onclick="salvarApelidoModal()" style="flex:1;padding:12px;border:none;border-radius:8px;background:#6D28D9;color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Prévia e compartilhamento de dados bancários -->
+<div id="dadosbancarios-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:210;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800">📋 Dados Bancários</div>
+      <button onclick="closeDadosBancariosModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <pre id="dadosbancarios-preview" style="font-family:inherit;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;background:var(--bg3);padding:14px;border-radius:10px;margin-bottom:16px"></pre>
+    <div style="display:flex;gap:8px">
+      <button onclick="copiarDadosBancarios()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">📋 Copiar</button>
+      <button onclick="compartilharViaShareSheetBancarios()" style="flex:1;padding:12px;border:none;border-radius:8px;background:var(--blue);color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">📤 Compartilhar</button>
     </div>
   </div>
 </div>
@@ -7878,11 +7896,13 @@ function renderContasBanco(){
   el.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px">'+
     CONTAS_BANCO.map(function(c){
       var sel = String(c.id)===String(curBankContaId);
+      var linhaPrincipal = c.apelidoConta || c.titular || c.nome;
+      var linhaSecundaria = (c.apelidoConta || c.titular) ? (c.nome+' · '+TIPO_BANCO_LABEL[c.tipo]) : TIPO_BANCO_LABEL[c.tipo];
       return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:2px solid '+(sel?c.cor:'var(--border)')+';background:'+(sel?'rgba(0,0,0,.08)':'transparent')+';cursor:pointer;min-width:140px;flex:1" onclick="selecionarConta(\''+c.id+'\')">'+
         '<div style="width:12px;height:12px;border-radius:50%;background:'+c.cor+';flex-shrink:0"></div>'+
         '<div style="min-width:0">'+
-          '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.nome)+'</div>'+
-          '<div style="font-size:10px;color:var(--t3)">'+TIPO_BANCO_LABEL[c.tipo]+'</div>'+
+          '<div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(linhaPrincipal)+'</div>'+
+          '<div style="font-size:10px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(linhaSecundaria)+'</div>'+
         '</div>'+
         '<button data-sharedados="'+c.id+'" style="margin-left:auto;background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;padding:2px" title="Compartilhar dados bancários">🔗</button>'+
         '<button data-delconta="'+c.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir conta">🗑️</button>'+
@@ -7895,6 +7915,7 @@ function renderContasBanco(){
 function addContaBanco(){
   var nome   = (document.getElementById('bk-nome').value||'').trim();
   var tipo   = document.getElementById('bk-tipo').value;
+  var apelidoConta = (document.getElementById('bk-apelido').value||'').trim();
   var ag     = (document.getElementById('bk-agencia').value||'').trim();
   var conta  = (document.getElementById('bk-conta').value||'').trim();
   var cor    = document.getElementById('bk-cor').value || '#6D28D9';
@@ -7905,12 +7926,12 @@ function addContaBanco(){
   var codigoBanco  = (document.getElementById('bk-codigo').value||'').trim();
   var chavePix     = (document.getElementById('bk-pix').value||'').trim();
   if(!nome){ toast('⚠️ Informe o nome do banco','err'); return; }
-  var c = {id: Date.now(), nome: nome, tipo: tipo, agencia: ag, conta: conta, cor: cor, saldo: saldo,
+  var c = {id: Date.now(), nome: nome, tipo: tipo, apelidoConta: apelidoConta, agencia: ag, conta: conta, cor: cor, saldo: saldo,
     titular: titular, titularTipo: titularTipo, cpfCnpj: cpfCnpj, codigoBanco: codigoBanco, chavePix: chavePix};
   CONTAS_BANCO.push(c);
   saveContasBanco();
   apiCall('salvarContaBanco', c, function(){});
-  ['bk-nome','bk-agencia','bk-conta','bk-saldo','bk-titular','bk-cpfcnpj','bk-codigo','bk-pix'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['bk-nome','bk-apelido','bk-agencia','bk-conta','bk-saldo','bk-titular','bk-cpfcnpj','bk-codigo','bk-pix'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   renderContasBanco();
   toast('✅ Conta cadastrada!');
 }
@@ -7934,13 +7955,17 @@ function compartilharDadosBancarios(id){
 
   var texto = linhas.join('\n');
 
-  if(navigator.share){
-    navigator.share({ title: 'Dados bancários — '+(c.titular||c.nome), text: texto })
-      .catch(function(err){ if(err && err.name!=='AbortError') console.warn('Erro ao compartilhar:', err); });
-    return;
-  }
+  document.getElementById('dadosbancarios-preview').textContent = texto;
+  document.getElementById('dadosbancarios-modal').setAttribute('data-texto', texto);
+  document.getElementById('dadosbancarios-modal').style.display = 'flex';
+}
 
-  // Fallback: copiar pra área de transferência
+function closeDadosBancariosModal(){
+  document.getElementById('dadosbancarios-modal').style.display = 'none';
+}
+
+function copiarDadosBancarios(){
+  var texto = document.getElementById('dadosbancarios-modal').getAttribute('data-texto') || '';
   if(navigator.clipboard){
     navigator.clipboard.writeText(texto).then(function(){
       toast('📋 Dados copiados! Cole onde quiser enviar.');
@@ -7949,6 +7974,16 @@ function compartilharDadosBancarios(id){
     });
   } else {
     prompt('Copie os dados abaixo:', texto);
+  }
+}
+
+function compartilharViaShareSheetBancarios(){
+  var texto = document.getElementById('dadosbancarios-modal').getAttribute('data-texto') || '';
+  if(navigator.share){
+    navigator.share({ title: 'Dados bancários', text: texto })
+      .catch(function(err){ if(err && err.name!=='AbortError') console.warn('Erro ao compartilhar:', err); });
+  } else {
+    toast('⚠️ Compartilhamento não suportado neste navegador — use Copiar','err');
   }
 }
 
