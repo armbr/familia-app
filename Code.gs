@@ -1810,13 +1810,8 @@ function toggleItemListaPublico(listaId, itemId){
       var item = (lista.itens||[]).filter(function(it){ return String(it.id)===String(itemId); })[0];
       if (!item) return { ok: false, error: 'Item não encontrado' };
 
-      if (lista.tipo === 'projeto') {
-        var ordem = ['pendente','fazendo','feito'];
-        var idx = ordem.indexOf(item.status||'pendente');
-        item.status = ordem[(idx+1) % ordem.length];
-      } else {
-        item.concluido = !item.concluido;
-      }
+      // Só notas do tipo "checklist" têm caixa de marcar
+      item.concluido = !item.concluido;
 
       sheet.getRange(i+1, 2, 1, 2).setValues([[JSON.stringify(lista), new Date().toISOString()]]);
       return { ok: true, lista: lista };
@@ -1849,26 +1844,32 @@ function paginaLista(e){
   }
 
   var scriptUrl = ScriptApp.getService().getUrl();
-  var tipoIcone = { compras:'🛒', notas:'📝', projeto:'📋' }[lista.tipo] || '📝';
-  var isProjeto = lista.tipo === 'projeto';
+  var tipoIcone = { texto:'📄', lista:'📋', checklist:'✅' }[lista.tipo] || '📄';
+  var titulo = lista.titulo || '(sem título)';
+  var isChecklist = lista.tipo === 'checklist';
+  var isTexto = lista.tipo === 'texto';
 
-  var itensHtml = (lista.itens||[]).map(function(it){
-    var concluido = isProjeto ? (it.status==='feito') : !!it.concluido;
-    var statusLabel = isProjeto ? ({pendente:'Pendente',fazendo:'Fazendo',feito:'Feito'}[it.status||'pendente']) : '';
-    return '<div class="item" data-id="'+esc(it.id)+'" onclick="toggleItem(\''+esc(it.id)+'\')" style="display:flex;align-items:center;gap:10px;padding:12px 6px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer">'+
-      (isProjeto
-        ? '<span class="status-badge" style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;'+(it.status==='feito'?'background:#1E7E45;color:#fff':it.status==='fazendo'?'background:#B7791F;color:#fff':'background:rgba(255,255,255,.1);color:#8FA8C4')+'">'+statusLabel+'</span>'
-        : '<span class="checkbox" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(concluido?'#2ECC9A':'#526680')+';background:'+(concluido?'#2ECC9A':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(concluido?'✓':'')+'</span>')+
-      '<span style="font-size:14px;'+(concluido&&!isProjeto?'text-decoration:line-through;color:#526680':'color:#EDF2F7')+'">'+esc(it.texto)+'</span>'+
-    '</div>';
-  }).join('');
+  var corpoHtml;
+  if (isTexto) {
+    corpoHtml = '<div style="font-size:14px;color:#EDF2F7;line-height:1.6;white-space:pre-wrap;word-break:break-word">'+esc(lista.conteudoTexto||'')+'</div>';
+  } else {
+    corpoHtml = (lista.itens||[]).map(function(it){
+      return '<div class="item" data-id="'+esc(it.id)+'" '+(isChecklist?'onclick="toggleItem(\''+esc(it.id)+'\')" style="cursor:pointer"':'')+' style="display:flex;align-items:center;gap:10px;padding:12px 6px;border-bottom:1px solid rgba(255,255,255,.08);'+(isChecklist?'cursor:pointer':'')+'">'+
+        (isChecklist
+          ? '<span class="checkbox" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(it.concluido?'#2ECC9A':'#526680')+';background:'+(it.concluido?'#2ECC9A':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(it.concluido?'✓':'')+'</span>'
+          : '<span style="color:#526680;flex-shrink:0">•</span>')+
+        '<span style="font-size:14px;'+(isChecklist&&it.concluido?'text-decoration:line-through;color:#526680':'color:#EDF2F7')+'">'+esc(it.texto)+'</span>'+
+      '</div>';
+    }).join('') || '<div style="color:#526680;text-align:center;padding:20px">Nenhum item ainda.</div>';
+  }
 
   var totalItens = (lista.itens||[]).length;
-  var concluidos = (lista.itens||[]).filter(function(it){ return isProjeto ? it.status==='feito' : it.concluido; }).length;
+  var concluidos = (lista.itens||[]).filter(function(it){ return it.concluido; }).length;
+  var subHdr = isTexto ? 'Nota de texto' : (concluidos+' de '+totalItens+' concluído(s)');
 
   var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>'+tipoIcone+' '+esc(lista.nome)+'</title>'+
+    '<title>'+tipoIcone+' '+esc(titulo)+'</title>'+
     '<style>*{margin:0;padding:0;box-sizing:border-box}'+
     'body{font-family:Arial,Helvetica,sans-serif;background:#0F1923;display:flex;justify-content:center;padding:20px;min-height:100vh}'+
     '.card{background:#1A2A3A;border-radius:16px;overflow:hidden;width:100%;max-width:480px;border:1px solid rgba(255,255,255,.08)}'+
@@ -1879,9 +1880,10 @@ function paginaLista(e){
     '.item.disabled{opacity:.5;pointer-events:none}'+
     '</style></head><body>'+
     '<div class="card">'+
-      '<div class="hdr"><h1>'+tipoIcone+' '+esc(lista.nome)+'</h1><div class="sub">'+concluidos+' de '+totalItens+' concluído(s)</div></div>'+
-      '<div class="body" id="lista-body">'+itensHtml+'</div>'+
+      '<div class="hdr"><h1>'+tipoIcone+' '+esc(titulo)+'</h1><div class="sub">'+subHdr+'</div></div>'+
+      '<div class="body" id="lista-body">'+corpoHtml+'</div>'+
     '</div>'+
+    (isChecklist ? (
     '<script>'+
     'var SCRIPT_URL = '+JSON.stringify(scriptUrl)+';'+
     'var LISTA_ID = '+JSON.stringify(listaId)+';'+
@@ -1891,11 +1893,11 @@ function paginaLista(e){
       'var url = SCRIPT_URL + "?action=toggleItemListaPublico&payload=" + encodeURIComponent(JSON.stringify({listaId:LISTA_ID, itemId:itemId}));'+
       'fetch(url).then(function(r){return r.text();}).then(function(){ location.reload(); });'+
     '}'+
-    '</script>'+
+    '</script>') : '') +
     '</body></html>';
 
   return HtmlService.createHtmlOutput(html)
-    .setTitle(tipoIcone+' '+lista.nome)
+    .setTitle(tipoIcone+' '+titulo)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
