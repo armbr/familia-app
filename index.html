@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260707-161229</title>
+<title>Fluxo v20260707-190626</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2121,35 +2121,38 @@ select option{background:#1A2A3A}
 
 <div id="sec-notas" style="display:none;padding:0 16px 100px">
 
-  <!-- Submenu: Compras / Notas / Projetos -->
-  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
-    <button type="button" id="lsub-compras" onclick="setListaSubTab('compras')" class="vbtn on" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:12px">🛒 Compras</button>
-    <button type="button" id="lsub-notas" onclick="setListaSubTab('notas')" class="vbtn" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:12px">📝 Notas</button>
-    <button type="button" id="lsub-projeto" onclick="setListaSubTab('projeto')" class="vbtn" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:12px">📋 Projetos</button>
-  </div>
-
-  <!-- Lista de listas (visão geral) -->
-  <div id="listas-overview">
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <input id="nova-lista-nome" type="text" placeholder="Nome da nova lista..." maxlength="60" style="flex:1">
-      <button class="btn" onclick="criarNovaLista()" style="width:auto;padding:0 18px">+ Criar</button>
+  <!-- Grade de notas (visão geral, estilo Google Keep) -->
+  <div id="notas-overview">
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <button type="button" onclick="criarNovaNota('texto')" style="flex:1;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📄 Texto</button>
+      <button type="button" onclick="criarNovaNota('lista')" style="flex:1;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Lista</button>
+      <button type="button" onclick="criarNovaNota('checklist')" style="flex:1;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ Checklist</button>
     </div>
-    <div id="listas-cards"></div>
+    <div id="notas-cards"></div>
   </div>
 
-  <!-- Detalhe de uma lista específica -->
-  <div id="lista-detalhe" style="display:none">
+  <!-- Editor/visualização de uma nota específica -->
+  <div id="nota-detalhe" style="display:none">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <button onclick="fecharDetalheLista()" style="background:none;border:none;color:var(--t2);font-size:20px;cursor:pointer;padding:4px">←</button>
-      <div id="lista-detalhe-titulo" style="font-size:16px;font-weight:800;flex:1"></div>
-      <button onclick="compartilharLista()" style="background:none;border:none;color:var(--blue);font-size:16px;cursor:pointer;padding:4px" title="Compartilhar link">🔗</button>
-      <button onclick="excluirListaAtual()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px" title="Excluir lista">🗑️</button>
+      <button onclick="fecharNota()" style="background:none;border:none;color:var(--t2);font-size:20px;cursor:pointer;padding:4px">←</button>
+      <input id="nota-titulo" type="text" placeholder="Título (opcional)" maxlength="60" style="flex:1;background:transparent;border:none;font-size:16px;font-weight:800;color:var(--t1);padding:6px 0" oninput="salvarNotaAtual()">
+      <button onclick="compartilharNota()" style="background:none;border:none;color:var(--blue);font-size:16px;cursor:pointer;padding:4px" title="Compartilhar link">🔗</button>
+      <button onclick="excluirNotaAtual()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px" title="Excluir nota">🗑️</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:14px">
-      <input id="novo-item-texto" type="text" placeholder="Adicionar item..." maxlength="120" style="flex:1" onkeydown="if(event.key==='Enter')adicionarItemLista()">
-      <button class="btn" onclick="adicionarItemLista()" style="width:auto;padding:0 18px">+</button>
+
+    <!-- Corpo para nota tipo TEXTO -->
+    <div id="nota-corpo-texto" style="display:none">
+      <textarea id="nota-texto-conteudo" placeholder="Escreva sua nota..." rows="12" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--t1);font-size:14px;font-family:inherit;resize:vertical" oninput="salvarNotaAtual()"></textarea>
     </div>
-    <div id="lista-itens"></div>
+
+    <!-- Corpo para nota tipo LISTA / CHECKLIST -->
+    <div id="nota-corpo-lista" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <input id="novo-item-texto" type="text" placeholder="Adicionar item..." maxlength="120" style="flex:1" onkeydown="if(event.key==='Enter')adicionarItemNota()">
+        <button class="btn" onclick="adicionarItemNota()" style="width:auto;padding:0 18px">+</button>
+      </div>
+      <div id="nota-itens"></div>
+    </div>
   </div>
 </div>
 
@@ -2879,191 +2882,179 @@ function sincronizarPatrimonio(cb){
 }
 
 // ════════════════════════════════════════════════════════════
-//  LISTAS — Compras / Notas / Projetos. Estrutura compartilhada
-//  entre os 3 tipos: uma lista tem um array de itens; o que muda
-//  é só a interação (checkbox / texto simples / status por toque).
+//  NOTAS — modelo estilo Google Keep. Uma grade de notas; cada
+//  nota escolhe seu próprio formato ao ser criada: texto livre,
+//  lista simples, ou checklist (com caixa de marcar, tipo lista
+//  de compras). Compartilhável por link, com edição externa.
 // ════════════════════════════════════════════════════════════
 function saveListas(){ localStorage.setItem('ff_listas', JSON.stringify(LISTAS)); }
 
-var curListaSubTab = 'compras';
-var curListaAberta = null;
+var curNotaAberta = null;
 
-function setListaSubTab(tipo){
-  curListaSubTab = tipo;
-  ['compras','notas','projeto'].forEach(function(t){
-    document.getElementById('lsub-'+t).classList.toggle('on', t===tipo);
-  });
-  fecharDetalheLista();
-  renderListasOverview();
-}
+var TIPO_NOTA_ICONE = { texto:'📄', lista:'📋', checklist:'✅' };
 
-function criarNovaLista(){
-  var nomeEl = document.getElementById('nova-lista-nome');
-  var nome = (nomeEl.value||'').trim();
-  if(!nome){ toast('⚠️ Digite um nome pra lista','err'); return; }
-
-  var lista = { id: Date.now(), nome: nome, tipo: curListaSubTab, itens: [], criadoEm: new Date().toISOString() };
-  LISTAS.unshift(lista);
+function criarNovaNota(tipo){
+  var nota = { id: Date.now(), tipo: tipo, titulo: '', conteudoTexto: '', itens: [], criadoEm: new Date().toISOString() };
+  LISTAS.unshift(nota);
   saveListas();
-  apiCall('salvarLista', lista, function(){});
-  nomeEl.value = '';
-  renderListasOverview();
-  abrirDetalheLista(lista.id);
-  toast('✅ Lista criada!');
+  apiCall('salvarLista', nota, function(){});
+  abrirNota(nota.id);
 }
 
 function delLista(id){
-  if(!confirm('Excluir esta lista e todos os itens?')) return;
+  if(!confirm('Excluir esta nota?')) return;
   addTombstone('listas', id);
   LISTAS = LISTAS.filter(function(l){ return String(l.id)!==String(id); });
   saveListas();
   apiCall('deletarLista', {id:id}, function(){});
-  fecharDetalheLista();
-  renderListasOverview();
-  toast('🗑️ Lista removida');
+  fecharNota();
+  renderNotasOverview();
+  toast('🗑️ Nota removida');
 }
 
-function excluirListaAtual(){
-  if(curListaAberta) delLista(curListaAberta);
+function excluirNotaAtual(){
+  if(curNotaAberta) delLista(curNotaAberta);
 }
 
-var TIPO_LISTA_LABEL = { compras:'🛒 Lista de Compras', notas:'📝 Notas', projeto:'📋 Projeto' };
+function notaPreview(n){
+  if(n.tipo==='texto') return esc(n.conteudoTexto||'').substring(0,140);
+  var itens = n.itens||[];
+  if(!itens.length) return '<span style="color:var(--t3)">Vazia</span>';
+  return itens.slice(0,5).map(function(it){
+    var marcado = n.tipo==='checklist' && it.concluido;
+    return '<div style="'+(marcado?'text-decoration:line-through;color:var(--t3)':'')+'">'+(n.tipo==='checklist'?(marcado?'☑ ':'☐ '):'• ')+esc(it.texto)+'</div>';
+  }).join('') + (itens.length>5 ? '<div style="color:var(--t3)">+'+(itens.length-5)+' mais...</div>' : '');
+}
 
-function listaCardHTML(l){
-  var total = (l.itens||[]).length;
-  var concluidos = (l.itens||[]).filter(function(it){
-    return l.tipo==='projeto' ? it.status==='feito' : it.concluido;
-  }).length;
-  var pct = total>0 ? Math.round((concluidos/total)*100) : 0;
-
-  return '<div class="card" data-abrirlista="'+l.id+'" style="margin-bottom:10px;cursor:pointer">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(total>0?'8px':'0')+'">'+
-      '<div style="font-weight:800;font-size:14px">'+esc(l.nome)+'</div>'+
-      '<div style="font-size:11px;color:var(--t3)">'+concluidos+'/'+total+'</div>'+
+function notaCardHTML(n){
+  var titulo = n.titulo || '(sem título)';
+  return '<div class="card" data-abrirlista="'+n.id+'" style="margin-bottom:10px;cursor:pointer">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">'+
+      '<div style="font-weight:800;font-size:14px">'+esc(titulo)+'</div>'+
+      '<div style="font-size:14px;flex-shrink:0">'+TIPO_NOTA_ICONE[n.tipo]+'</div>'+
     '</div>'+
-    (total>0?'<div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden">'+
-      '<div style="height:100%;width:'+pct+'%;background:var(--green);border-radius:3px"></div>'+
-    '</div>':'<div style="font-size:12px;color:var(--t3)">Vazia — toque para adicionar itens</div>')+
+    '<div style="font-size:12px;color:var(--t2);line-height:1.5">'+notaPreview(n)+'</div>'+
   '</div>';
 }
 
-function renderListasOverview(){
-  var el = document.getElementById('listas-cards');
+function renderNotasOverview(){
+  var el = document.getElementById('notas-cards');
   if(!el) return;
-  var filtradas = LISTAS.filter(function(l){ return l.tipo===curListaSubTab; });
-  if(!filtradas.length){
-    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhuma '+TIPO_LISTA_LABEL[curListaSubTab].split(' ').slice(1).join(' ')+' ainda.<br>Crie uma acima.</div>';
+  if(!LISTAS.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhuma nota ainda.<br>Escolha um formato acima pra criar a primeira.</div>';
     return;
   }
-  el.innerHTML = filtradas.map(listaCardHTML).join('');
+  el.innerHTML = LISTAS.map(notaCardHTML).join('');
 }
 
-function abrirDetalheLista(id){
-  var lista = LISTAS.find(function(l){ return String(l.id)===String(id); });
-  if(!lista) return;
-  curListaAberta = id;
-  document.getElementById('listas-overview').style.display = 'none';
-  document.getElementById('lista-detalhe').style.display = 'block';
-  document.getElementById('lista-detalhe-titulo').textContent = lista.nome;
-  renderListaItens();
+function abrirNota(id){
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(id); });
+  if(!nota) return;
+  curNotaAberta = id;
+  document.getElementById('notas-overview').style.display = 'none';
+  document.getElementById('nota-detalhe').style.display = 'block';
+  document.getElementById('nota-titulo').value = nota.titulo || '';
+
+  var isTexto = nota.tipo === 'texto';
+  document.getElementById('nota-corpo-texto').style.display = isTexto ? 'block' : 'none';
+  document.getElementById('nota-corpo-lista').style.display = isTexto ? 'none' : 'block';
+
+  if(isTexto){
+    document.getElementById('nota-texto-conteudo').value = nota.conteudoTexto || '';
+  } else {
+    renderNotaItens();
+  }
 }
 
-function fecharDetalheLista(){
-  curListaAberta = null;
-  document.getElementById('listas-overview').style.display = 'block';
-  document.getElementById('lista-detalhe').style.display = 'none';
+function fecharNota(){
+  curNotaAberta = null;
+  document.getElementById('notas-overview').style.display = 'block';
+  document.getElementById('nota-detalhe').style.display = 'none';
+  renderNotasOverview();
 }
 
-function adicionarItemLista(){
-  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
-  if(!lista) return;
+// Debounce simples pra não disparar uma chamada de rede a cada tecla
+var _salvarNotaTimeout = null;
+function salvarNotaAtual(){
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota) return;
+  nota.titulo = document.getElementById('nota-titulo').value;
+  if(nota.tipo==='texto'){
+    nota.conteudoTexto = document.getElementById('nota-texto-conteudo').value;
+  }
+  saveListas();
+  clearTimeout(_salvarNotaTimeout);
+  _salvarNotaTimeout = setTimeout(function(){
+    apiCall('salvarLista', nota, function(){});
+  }, 600);
+}
+
+function adicionarItemNota(){
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota) return;
   var inputEl = document.getElementById('novo-item-texto');
   var texto = (inputEl.value||'').trim();
   if(!texto) return;
 
   var item = { id: Date.now(), texto: texto };
-  if(lista.tipo==='projeto') item.status = 'pendente';
-  else if(lista.tipo==='compras') item.concluido = false;
+  if(nota.tipo==='checklist') item.concluido = false;
 
-  lista.itens = (lista.itens||[]).concat([item]);
+  nota.itens = (nota.itens||[]).concat([item]);
   saveListas();
-  apiCall('salvarLista', lista, function(){});
+  apiCall('salvarLista', nota, function(){});
   inputEl.value = '';
-  renderListaItens();
-  renderListasOverview();
+  renderNotaItens();
 }
 
 function toggleItemLocal(itemId){
-  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
-  if(!lista) return;
-  var item = (lista.itens||[]).find(function(it){ return String(it.id)===String(itemId); });
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota || nota.tipo!=='checklist') return;
+  var item = (nota.itens||[]).find(function(it){ return String(it.id)===String(itemId); });
   if(!item) return;
-
-  if(lista.tipo==='projeto'){
-    var ordem = ['pendente','fazendo','feito'];
-    var idx = ordem.indexOf(item.status||'pendente');
-    item.status = ordem[(idx+1)%ordem.length];
-  } else {
-    item.concluido = !item.concluido;
-  }
+  item.concluido = !item.concluido;
   saveListas();
-  apiCall('salvarLista', lista, function(){});
-  renderListaItens();
-  renderListasOverview();
+  apiCall('salvarLista', nota, function(){});
+  renderNotaItens();
 }
 
 function delItemLista(itemId){
-  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
-  if(!lista) return;
-  lista.itens = (lista.itens||[]).filter(function(it){ return String(it.id)!==String(itemId); });
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota) return;
+  nota.itens = (nota.itens||[]).filter(function(it){ return String(it.id)!==String(itemId); });
   saveListas();
-  apiCall('salvarLista', lista, function(){});
-  renderListaItens();
-  renderListasOverview();
+  apiCall('salvarLista', nota, function(){});
+  renderNotaItens();
 }
 
-function renderListaItens(){
-  var el = document.getElementById('lista-itens');
-  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
-  if(!el || !lista) return;
+function renderNotaItens(){
+  var el = document.getElementById('nota-itens');
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!el || !nota) return;
 
-  if(!(lista.itens||[]).length){
+  if(!(nota.itens||[]).length){
     el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:20px;font-size:13px">Nenhum item ainda.</div>';
     return;
   }
 
-  var statusInfo = { pendente:{label:'Pendente',cor:'var(--t3)'}, fazendo:{label:'Fazendo',cor:'var(--yellow)'}, feito:{label:'Feito',cor:'var(--green)'} };
-
-  el.innerHTML = lista.itens.map(function(it){
-    if(lista.tipo==='projeto'){
-      var si = statusInfo[it.status||'pendente'];
-      return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
-        '<span data-toggleitem="'+it.id+'" style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+si.cor+';color:'+si.cor+';cursor:pointer;flex-shrink:0">'+si.label+'</span>'+
-        '<span style="flex:1;font-size:13px">'+esc(it.texto)+'</span>'+
-        '<button data-delitem="'+it.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px">🗑️</button>'+
-      '</div>';
-    } else if(lista.tipo==='compras'){
-      return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
-        '<span data-toggleitem="'+it.id+'" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(it.concluido?'var(--green)':'var(--border)')+';background:'+(it.concluido?'var(--green)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;color:#0A1A12;font-weight:800">'+(it.concluido?'✓':'')+'</span>'+
-        '<span style="flex:1;font-size:13px;'+(it.concluido?'text-decoration:line-through;color:var(--t3)':'')+'">'+esc(it.texto)+'</span>'+
-        '<button data-delitem="'+it.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px">🗑️</button>'+
-      '</div>';
-    } else { // notas
-      return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
-        '<span style="flex:1;font-size:13px">'+esc(it.texto)+'</span>'+
-        '<button data-delitem="'+it.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px">🗑️</button>'+
-      '</div>';
-    }
+  var isChecklist = nota.tipo==='checklist';
+  el.innerHTML = nota.itens.map(function(it){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
+      (isChecklist
+        ? '<span data-toggleitem="'+it.id+'" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(it.concluido?'var(--green)':'var(--border)')+';background:'+(it.concluido?'var(--green)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;color:#0A1A12;font-weight:800">'+(it.concluido?'✓':'')+'</span>'
+        : '<span style="color:var(--t3);flex-shrink:0">•</span>')+
+      '<span style="flex:1;font-size:13px;'+(isChecklist&&it.concluido?'text-decoration:line-through;color:var(--t3)':'')+'">'+esc(it.texto)+'</span>'+
+      '<button data-delitem="'+it.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px">🗑️</button>'+
+    '</div>';
   }).join('');
 }
 
-function compartilharLista(){
-  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
-  if(!lista || !API) return;
-  var url = API + '?action=paginaLista&listaId=' + lista.id;
+function compartilharNota(){
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota || !API) return;
+  var url = API + '?action=paginaLista&listaId=' + nota.id;
 
   if(navigator.share){
-    navigator.share({ title: lista.nome, url: url }).catch(function(){});
+    navigator.share({ title: nota.titulo||'Nota', url: url }).catch(function(){});
   } else if(navigator.clipboard){
     navigator.clipboard.writeText(url).then(function(){ toast('🔗 Link copiado!'); });
   } else {
@@ -3534,8 +3525,8 @@ function setSection(s){
     }
   }
   if(s==='notas'){
-    try{ renderListasOverview(); }catch(e){ console.error('notas',e); }
-    if(API) sincronizarListas(function(){ renderListasOverview(); });
+    try{ renderNotasOverview(); }catch(e){ console.error('notas',e); }
+    if(API) sincronizarListas(function(){ renderNotasOverview(); });
   }
 }
 
@@ -5347,7 +5338,7 @@ function initTaskDelegation(){
     var ptupdate = e.target.closest('[data-ptupdate]');
     if(ptupdate){ abrirAtualizarPatrimonio(ptupdate.getAttribute('data-ptupdate')); return; }
     var abrirlista = e.target.closest('[data-abrirlista]');
-    if(abrirlista){ abrirDetalheLista(abrirlista.getAttribute('data-abrirlista')); return; }
+    if(abrirlista){ abrirNota(abrirlista.getAttribute('data-abrirlista')); return; }
     var toggleitem = e.target.closest('[data-toggleitem]');
     if(toggleitem){ toggleItemLocal(toggleitem.getAttribute('data-toggleitem')); return; }
     var delitem = e.target.closest('[data-delitem]');
