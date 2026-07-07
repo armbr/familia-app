@@ -25,6 +25,9 @@ function doGet(e) {
     if (action === 'paginaDivida') {
       return paginaDivida(e);
     }
+    if (action === 'paginaLista') {
+      return paginaLista(e);
+    }
 
     var body = {};
     if (params.payload) {
@@ -84,6 +87,13 @@ function doGetInternal(action, body) {
     case 'deletarItemSheet':  return deletarItemSheet(body.aba, body.id);
     case 'getExclusoes':      return getExclusoes(body.tipo);
     case 'salvarContaBanco':  return salvarItemSheet('ContasBanco', body);
+    case 'salvarPatrimonio':  return salvarItemSheet('Patrimonio', body);
+    case 'salvarLista':       return salvarItemSheet('Listas', body);
+    case 'getListas':         return getItemsSheet('Listas');
+    case 'deletarLista':      return deletarItemSheet('Listas', body.id);
+    case 'toggleItemListaPublico': return toggleItemListaPublico(body.listaId, body.itemId);
+    case 'getPatrimonio':     return getItemsSheet('Patrimonio');
+    case 'deletarPatrimonio': return deletarItemSheet('Patrimonio', body.id);
     case 'salvarApelido':     return salvarItemSheet('Apelidos', body);
     case 'getApelidos':       return getItemsSheet('Apelidos');
     case 'deletarApelido':    return deletarItemSheet('Apelidos', body.id);
@@ -606,7 +616,7 @@ function limparTransacoesAutomaticas() {
 // ════════════════════════════════════════════════════════════
 
 // ★ CONFIGURE SEU E-MAIL AQUI ★
-var EMAIL_DESTINO  = '@gmail.com';
+var EMAIL_DESTINO  = 'armbr258@gmail.com';
 var EMAILS_DESTINO = [EMAIL_DESTINO]; // Para adicionar mais: ['email1@gmail.com', 'email2@gmail.com']
 
 
@@ -1161,7 +1171,9 @@ function limparRegistrosOrfaos() {
     tasks:        { ssFn: ss,        aba: 'Tarefas',       col: 0 },
     recur:        { ssFn: ss,        aba: 'Recorrentes',   col: 0 },
     dividas:      { ssFn: dividasSS, aba: 'Dívidas',       col: 0 },
-    apelidos:     { ssFn: ss,        aba: 'Apelidos',      col: 0 }
+    apelidos:     { ssFn: ss,        aba: 'Apelidos',      col: 0 },
+    patrimonio:   { ssFn: ss,        aba: 'Patrimonio',    col: 0 },
+    listas:       { ssFn: ss,        aba: 'Listas',        col: 0 }
   };
 
   var porTipo = {};
@@ -1202,7 +1214,8 @@ function limparRegistrosOrfaos() {
 var ABA_PARA_TIPO = {
   'Recibos': 'recibos', 'Cartoes': 'cartoes', 'ContasBanco': 'contasbanco',
   'GastosCartao': 'cgastos', 'Pagadores': 'pagadores', 'Aluguéis': 'alugueis',
-  'Contratos': 'contratos', 'Apelidos': 'apelidos'
+  'Contratos': 'contratos', 'Apelidos': 'apelidos', 'Patrimonio': 'patrimonio',
+  'Listas': 'listas'
 };
 
 function deletarItemSheet(nomeAba, id) {
@@ -1779,6 +1792,113 @@ function criarTriggerAtualizarIndices() {
 //  FICHA PÚBLICA DA DÍVIDA / EMPRÉSTIMO — extrato cronológico
 //  completo, compartilhável por link
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  LISTAS (Compras / Notas / Projetos) — CRUD genérico via
+//  salvarItemSheet/getItemsSheet, mais uma ficha pública
+//  INTERATIVA (diferente das outras, que são só leitura) — quem
+//  tiver o link consegue marcar itens como concluídos, sem login,
+//  seguindo o mesmo modelo de confiança do resto do app.
+// ════════════════════════════════════════════════════════════
+function toggleItemListaPublico(listaId, itemId){
+  var sheet = ss().getSheetByName('Listas');
+  if (!sheet) return { ok: false, error: 'Lista não encontrada' };
+  var dados = sheet.getDataRange().getValues();
+  for (var i = 1; i < dados.length; i++) {
+    if (String(dados[i][0]) === String(listaId)) {
+      var lista;
+      try { lista = JSON.parse(dados[i][1]); } catch(e) { return { ok:false, error:'JSON inválido' }; }
+      var item = (lista.itens||[]).filter(function(it){ return String(it.id)===String(itemId); })[0];
+      if (!item) return { ok: false, error: 'Item não encontrado' };
+
+      if (lista.tipo === 'projeto') {
+        var ordem = ['pendente','fazendo','feito'];
+        var idx = ordem.indexOf(item.status||'pendente');
+        item.status = ordem[(idx+1) % ordem.length];
+      } else {
+        item.concluido = !item.concluido;
+      }
+
+      sheet.getRange(i+1, 2, 1, 2).setValues([[JSON.stringify(lista), new Date().toISOString()]]);
+      return { ok: true, lista: lista };
+    }
+  }
+  return { ok: false, error: 'Lista não encontrada' };
+}
+
+function paginaLista(e){
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var listaId = (e.parameter||{}).listaId || '';
+  var sheet = ss().getSheetByName('Listas');
+  var lista = null;
+  if (sheet) {
+    var dados = sheet.getDataRange().getValues();
+    for (var i = 1; i < dados.length; i++) {
+      if (String(dados[i][0]) === String(listaId)) {
+        try { lista = JSON.parse(dados[i][1]); } catch(ex) {}
+        break;
+      }
+    }
+  }
+
+  if (!lista) {
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family:Arial;padding:40px;text-align:center;background:#0F1923;color:#EDF2F7;min-height:100vh">' +
+      '<h2 style="color:#FF6B6B">Lista não encontrada</h2>' +
+      '<p style="color:#8FA8C4">Verifique o link com quem compartilhou.</p></div>'
+    );
+  }
+
+  var scriptUrl = ScriptApp.getService().getUrl();
+  var tipoIcone = { compras:'🛒', notas:'📝', projeto:'📋' }[lista.tipo] || '📝';
+  var isProjeto = lista.tipo === 'projeto';
+
+  var itensHtml = (lista.itens||[]).map(function(it){
+    var concluido = isProjeto ? (it.status==='feito') : !!it.concluido;
+    var statusLabel = isProjeto ? ({pendente:'Pendente',fazendo:'Fazendo',feito:'Feito'}[it.status||'pendente']) : '';
+    return '<div class="item" data-id="'+esc(it.id)+'" onclick="toggleItem(\''+esc(it.id)+'\')" style="display:flex;align-items:center;gap:10px;padding:12px 6px;border-bottom:1px solid rgba(255,255,255,.08);cursor:pointer">'+
+      (isProjeto
+        ? '<span class="status-badge" style="font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;'+(it.status==='feito'?'background:#1E7E45;color:#fff':it.status==='fazendo'?'background:#B7791F;color:#fff':'background:rgba(255,255,255,.1);color:#8FA8C4')+'">'+statusLabel+'</span>'
+        : '<span class="checkbox" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(concluido?'#2ECC9A':'#526680')+';background:'+(concluido?'#2ECC9A':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(concluido?'✓':'')+'</span>')+
+      '<span style="font-size:14px;'+(concluido&&!isProjeto?'text-decoration:line-through;color:#526680':'color:#EDF2F7')+'">'+esc(it.texto)+'</span>'+
+    '</div>';
+  }).join('');
+
+  var totalItens = (lista.itens||[]).length;
+  var concluidos = (lista.itens||[]).filter(function(it){ return isProjeto ? it.status==='feito' : it.concluido; }).length;
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>'+tipoIcone+' '+esc(lista.nome)+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}'+
+    'body{font-family:Arial,Helvetica,sans-serif;background:#0F1923;display:flex;justify-content:center;padding:20px;min-height:100vh}'+
+    '.card{background:#1A2A3A;border-radius:16px;overflow:hidden;width:100%;max-width:480px;border:1px solid rgba(255,255,255,.08)}'+
+    '.hdr{background:#0d1117;padding:20px;border-bottom:2px solid #6D28D9}'+
+    '.hdr h1{color:#fff;font-size:18px;font-weight:900}'+
+    '.hdr .sub{color:#B794F6;font-size:12px;font-weight:700;margin-top:4px}'+
+    '.body{padding:16px 20px}'+
+    '.item.disabled{opacity:.5;pointer-events:none}'+
+    '</style></head><body>'+
+    '<div class="card">'+
+      '<div class="hdr"><h1>'+tipoIcone+' '+esc(lista.nome)+'</h1><div class="sub">'+concluidos+' de '+totalItens+' concluído(s)</div></div>'+
+      '<div class="body" id="lista-body">'+itensHtml+'</div>'+
+    '</div>'+
+    '<script>'+
+    'var SCRIPT_URL = '+JSON.stringify(scriptUrl)+';'+
+    'var LISTA_ID = '+JSON.stringify(listaId)+';'+
+    'function toggleItem(itemId){'+
+      'var el = document.querySelector(\'[data-id="\'+itemId+\'"]\');'+
+      'if(el) el.classList.add("disabled");'+
+      'var url = SCRIPT_URL + "?action=toggleItemListaPublico&payload=" + encodeURIComponent(JSON.stringify({listaId:LISTA_ID, itemId:itemId}));'+
+      'fetch(url).then(function(r){return r.text();}).then(function(){ location.reload(); });'+
+    '}'+
+    '</script>'+
+    '</body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle(tipoIcone+' '+lista.nome)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
 function paginaDivida(e) {
   var divId = e.parameter.divId || '';
   var todos = getDividasEstruturadas();
