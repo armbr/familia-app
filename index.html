@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260706-014150</title>
+<title>Fluxo v20260707-161229</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -898,6 +898,7 @@ select option{background:#1A2A3A}
   <button class="nb"    id="nb-rec"  onclick="setSection('rec')"><span class="ni">🧾</span>Recibos</button>
   <button class="nb"    id="nb-docs" onclick="setSection('docs')"><span class="ni">📁</span>Docs</button>
   <button class="nb"    id="nb-bank" onclick="setSection('bank')"><span class="ni">🏦</span>Bancos</button>
+  <button class="nb"    id="nb-notas" onclick="setSection('notas')"><span class="ni">📝</span>Notas</button>
 </div>
 
 <!-- ══ CONTENT ══ -->
@@ -2118,6 +2119,40 @@ select option{background:#1A2A3A}
 
 </div><!-- /sec-bank -->
 
+<div id="sec-notas" style="display:none;padding:0 16px 100px">
+
+  <!-- Submenu: Compras / Notas / Projetos -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+    <button type="button" id="lsub-compras" onclick="setListaSubTab('compras')" class="vbtn on" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:12px">🛒 Compras</button>
+    <button type="button" id="lsub-notas" onclick="setListaSubTab('notas')" class="vbtn" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:12px">📝 Notas</button>
+    <button type="button" id="lsub-projeto" onclick="setListaSubTab('projeto')" class="vbtn" style="flex:1;min-width:90px;padding:9px 4px;border-radius:9px;font-size:12px">📋 Projetos</button>
+  </div>
+
+  <!-- Lista de listas (visão geral) -->
+  <div id="listas-overview">
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input id="nova-lista-nome" type="text" placeholder="Nome da nova lista..." maxlength="60" style="flex:1">
+      <button class="btn" onclick="criarNovaLista()" style="width:auto;padding:0 18px">+ Criar</button>
+    </div>
+    <div id="listas-cards"></div>
+  </div>
+
+  <!-- Detalhe de uma lista específica -->
+  <div id="lista-detalhe" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <button onclick="fecharDetalheLista()" style="background:none;border:none;color:var(--t2);font-size:20px;cursor:pointer;padding:4px">←</button>
+      <div id="lista-detalhe-titulo" style="font-size:16px;font-weight:800;flex:1"></div>
+      <button onclick="compartilharLista()" style="background:none;border:none;color:var(--blue);font-size:16px;cursor:pointer;padding:4px" title="Compartilhar link">🔗</button>
+      <button onclick="excluirListaAtual()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px" title="Excluir lista">🗑️</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input id="novo-item-texto" type="text" placeholder="Adicionar item..." maxlength="120" style="flex:1" onkeydown="if(event.key==='Enter')adicionarItemLista()">
+      <button class="btn" onclick="adicionarItemLista()" style="width:auto;padding:0 18px">+</button>
+    </div>
+    <div id="lista-itens"></div>
+  </div>
+</div>
+
 <!-- Modal: Atualizar valor do Patrimônio -->
 <div id="patrimonio-update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
@@ -2356,6 +2391,7 @@ var EXTRATOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_
 var NOTAS_OFX    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_notas_ofx')  || '{}') || {}; }catch(e){ localStorage.removeItem('ff_notas_ofx');   return {}; } })();
 var APELIDOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_apelidos')   || '[]') || []; }catch(e){ localStorage.removeItem('ff_apelidos');    return []; } })();
 var PATRIMONIO   = (function(){ try{ return JSON.parse(localStorage.getItem('ff_patrimonio')  || '[]') || []; }catch(e){ localStorage.removeItem('ff_patrimonio');  return []; } })();
+var LISTAS       = (function(){ try{ return JSON.parse(localStorage.getItem('ff_listas')      || '[]') || []; }catch(e){ localStorage.removeItem('ff_listas');      return []; } })();
 var curBankContaId = null;   // conta bancária selecionada atualmente
 var curExtrato     = [];     // transações do extrato em exibição
 var curExtratoSel  = 'todos'; // 'todos' ou 'YYYY-MM' (mês calendário)
@@ -2649,7 +2685,8 @@ function exportarBackupCompleto(){
         extratos:           EXTRATOS,
         notasExtrato:       NOTAS_OFX,
         apelidos:           APELIDOS,
-        patrimonio:         PATRIMONIO
+        patrimonio:         PATRIMONIO,
+        listas:             LISTAS
       }
     };
 
@@ -2841,6 +2878,235 @@ function sincronizarPatrimonio(cb){
   });
 }
 
+// ════════════════════════════════════════════════════════════
+//  LISTAS — Compras / Notas / Projetos. Estrutura compartilhada
+//  entre os 3 tipos: uma lista tem um array de itens; o que muda
+//  é só a interação (checkbox / texto simples / status por toque).
+// ════════════════════════════════════════════════════════════
+function saveListas(){ localStorage.setItem('ff_listas', JSON.stringify(LISTAS)); }
+
+var curListaSubTab = 'compras';
+var curListaAberta = null;
+
+function setListaSubTab(tipo){
+  curListaSubTab = tipo;
+  ['compras','notas','projeto'].forEach(function(t){
+    document.getElementById('lsub-'+t).classList.toggle('on', t===tipo);
+  });
+  fecharDetalheLista();
+  renderListasOverview();
+}
+
+function criarNovaLista(){
+  var nomeEl = document.getElementById('nova-lista-nome');
+  var nome = (nomeEl.value||'').trim();
+  if(!nome){ toast('⚠️ Digite um nome pra lista','err'); return; }
+
+  var lista = { id: Date.now(), nome: nome, tipo: curListaSubTab, itens: [], criadoEm: new Date().toISOString() };
+  LISTAS.unshift(lista);
+  saveListas();
+  apiCall('salvarLista', lista, function(){});
+  nomeEl.value = '';
+  renderListasOverview();
+  abrirDetalheLista(lista.id);
+  toast('✅ Lista criada!');
+}
+
+function delLista(id){
+  if(!confirm('Excluir esta lista e todos os itens?')) return;
+  addTombstone('listas', id);
+  LISTAS = LISTAS.filter(function(l){ return String(l.id)!==String(id); });
+  saveListas();
+  apiCall('deletarLista', {id:id}, function(){});
+  fecharDetalheLista();
+  renderListasOverview();
+  toast('🗑️ Lista removida');
+}
+
+function excluirListaAtual(){
+  if(curListaAberta) delLista(curListaAberta);
+}
+
+var TIPO_LISTA_LABEL = { compras:'🛒 Lista de Compras', notas:'📝 Notas', projeto:'📋 Projeto' };
+
+function listaCardHTML(l){
+  var total = (l.itens||[]).length;
+  var concluidos = (l.itens||[]).filter(function(it){
+    return l.tipo==='projeto' ? it.status==='feito' : it.concluido;
+  }).length;
+  var pct = total>0 ? Math.round((concluidos/total)*100) : 0;
+
+  return '<div class="card" data-abrirlista="'+l.id+'" style="margin-bottom:10px;cursor:pointer">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(total>0?'8px':'0')+'">'+
+      '<div style="font-weight:800;font-size:14px">'+esc(l.nome)+'</div>'+
+      '<div style="font-size:11px;color:var(--t3)">'+concluidos+'/'+total+'</div>'+
+    '</div>'+
+    (total>0?'<div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden">'+
+      '<div style="height:100%;width:'+pct+'%;background:var(--green);border-radius:3px"></div>'+
+    '</div>':'<div style="font-size:12px;color:var(--t3)">Vazia — toque para adicionar itens</div>')+
+  '</div>';
+}
+
+function renderListasOverview(){
+  var el = document.getElementById('listas-cards');
+  if(!el) return;
+  var filtradas = LISTAS.filter(function(l){ return l.tipo===curListaSubTab; });
+  if(!filtradas.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhuma '+TIPO_LISTA_LABEL[curListaSubTab].split(' ').slice(1).join(' ')+' ainda.<br>Crie uma acima.</div>';
+    return;
+  }
+  el.innerHTML = filtradas.map(listaCardHTML).join('');
+}
+
+function abrirDetalheLista(id){
+  var lista = LISTAS.find(function(l){ return String(l.id)===String(id); });
+  if(!lista) return;
+  curListaAberta = id;
+  document.getElementById('listas-overview').style.display = 'none';
+  document.getElementById('lista-detalhe').style.display = 'block';
+  document.getElementById('lista-detalhe-titulo').textContent = lista.nome;
+  renderListaItens();
+}
+
+function fecharDetalheLista(){
+  curListaAberta = null;
+  document.getElementById('listas-overview').style.display = 'block';
+  document.getElementById('lista-detalhe').style.display = 'none';
+}
+
+function adicionarItemLista(){
+  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
+  if(!lista) return;
+  var inputEl = document.getElementById('novo-item-texto');
+  var texto = (inputEl.value||'').trim();
+  if(!texto) return;
+
+  var item = { id: Date.now(), texto: texto };
+  if(lista.tipo==='projeto') item.status = 'pendente';
+  else if(lista.tipo==='compras') item.concluido = false;
+
+  lista.itens = (lista.itens||[]).concat([item]);
+  saveListas();
+  apiCall('salvarLista', lista, function(){});
+  inputEl.value = '';
+  renderListaItens();
+  renderListasOverview();
+}
+
+function toggleItemLocal(itemId){
+  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
+  if(!lista) return;
+  var item = (lista.itens||[]).find(function(it){ return String(it.id)===String(itemId); });
+  if(!item) return;
+
+  if(lista.tipo==='projeto'){
+    var ordem = ['pendente','fazendo','feito'];
+    var idx = ordem.indexOf(item.status||'pendente');
+    item.status = ordem[(idx+1)%ordem.length];
+  } else {
+    item.concluido = !item.concluido;
+  }
+  saveListas();
+  apiCall('salvarLista', lista, function(){});
+  renderListaItens();
+  renderListasOverview();
+}
+
+function delItemLista(itemId){
+  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
+  if(!lista) return;
+  lista.itens = (lista.itens||[]).filter(function(it){ return String(it.id)!==String(itemId); });
+  saveListas();
+  apiCall('salvarLista', lista, function(){});
+  renderListaItens();
+  renderListasOverview();
+}
+
+function renderListaItens(){
+  var el = document.getElementById('lista-itens');
+  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
+  if(!el || !lista) return;
+
+  if(!(lista.itens||[]).length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:20px;font-size:13px">Nenhum item ainda.</div>';
+    return;
+  }
+
+  var statusInfo = { pendente:{label:'Pendente',cor:'var(--t3)'}, fazendo:{label:'Fazendo',cor:'var(--yellow)'}, feito:{label:'Feito',cor:'var(--green)'} };
+
+  el.innerHTML = lista.itens.map(function(it){
+    if(lista.tipo==='projeto'){
+      var si = statusInfo[it.status||'pendente'];
+      return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
+        '<span data-toggleitem="'+it.id+'" style="font-size:9px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+si.cor+';color:'+si.cor+';cursor:pointer;flex-shrink:0">'+si.label+'</span>'+
+        '<span style="flex:1;font-size:13px">'+esc(it.texto)+'</span>'+
+        '<button data-delitem="'+it.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px">🗑️</button>'+
+      '</div>';
+    } else if(lista.tipo==='compras'){
+      return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
+        '<span data-toggleitem="'+it.id+'" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(it.concluido?'var(--green)':'var(--border)')+';background:'+(it.concluido?'var(--green)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;color:#0A1A12;font-weight:800">'+(it.concluido?'✓':'')+'</span>'+
+        '<span style="flex:1;font-size:13px;'+(it.concluido?'text-decoration:line-through;color:var(--t3)':'')+'">'+esc(it.texto)+'</span>'+
+        '<button data-delitem="'+it.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px">🗑️</button>'+
+      '</div>';
+    } else { // notas
+      return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
+        '<span style="flex:1;font-size:13px">'+esc(it.texto)+'</span>'+
+        '<button data-delitem="'+it.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px">🗑️</button>'+
+      '</div>';
+    }
+  }).join('');
+}
+
+function compartilharLista(){
+  var lista = LISTAS.find(function(l){ return String(l.id)===String(curListaAberta); });
+  if(!lista || !API) return;
+  var url = API + '?action=paginaLista&listaId=' + lista.id;
+
+  if(navigator.share){
+    navigator.share({ title: lista.nome, url: url }).catch(function(){});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(function(){ toast('🔗 Link copiado!'); });
+  } else {
+    prompt('Copie o link abaixo:', url);
+  }
+}
+
+function sincronizarListas(cb){
+  buscarExclusoesServidor('listas', function(exclusoes, sucesso){
+    if(!sucesso){ if(cb) cb(); return; }
+    var exclSet = {};
+    exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
+
+    apiCall('getListas', null, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      serverList = serverList.filter(function(l){ return !exclSet[String(l.id)]; });
+      var serverMap = {};
+      serverList.forEach(function(l){ serverMap[String(l.id)] = true; });
+
+      var pendentes = LISTAS.filter(function(l){
+        return !serverMap[String(l.id)] && !exclSet[String(l.id)];
+      });
+
+      function finalizar(){
+        var pendMap = {};
+        pendentes.forEach(function(l){ pendMap[String(l.id)] = true; });
+        LISTAS = serverList.concat(LISTAS.filter(function(l){ return pendMap[String(l.id)]; }));
+        saveListas();
+        if(cb) cb();
+      }
+
+      if(pendentes.length === 0){ finalizar(); return; }
+      var enviados = 0;
+      pendentes.forEach(function(l){
+        apiCall('salvarLista', l, function(){
+          enviados++;
+          if(enviados === pendentes.length) finalizar();
+        });
+      });
+    });
+  });
+}
+
 function ativarNotificacoes(){
   if(typeof window.solicitarPushPermissao === 'function'){
     window.solicitarPushPermissao();
@@ -2970,7 +3236,7 @@ function syncAll(){
     '🏦 Contas Bancárias','📄 Extratos','💳 Cartões','📝 Notas de Extrato',
     '📁 Documentos','💰 Lançamentos (Finanças)','📄 Contratos',
     '👥 Contatos','🏠 Aluguéis','🛍️ Gastos no Cartão','📋 Tarefas / Agenda',
-    '🏷️ Apelidos','📈 Patrimônio'
+    '🏷️ Apelidos','📈 Patrimônio','📝 Listas'
   ];
   var syncFeito = syncNomes.map(function(){ return false; });
 
@@ -2982,7 +3248,7 @@ function syncAll(){
     done++;
     if(idxNome!==undefined) syncFeito[idxNome] = true;
     renderProgressoSync(syncNomes, syncFeito);
-    if(done===16){
+    if(done===17){
       btn.classList.remove('spinning'); load(false); renderAll(); renderHoje();
       toast('✅ Sincronizado!');
       setTimeout(function(){ closeDivHistModal(); }, 900);
@@ -3039,6 +3305,7 @@ function syncAll(){
   setTimeout(function(){ sincronizarNotasOfx(function(){ tick(6); }); }, 750);
   setTimeout(function(){ sincronizarApelidos(function(){ tick(14); }); }, 1950);
   setTimeout(function(){ sincronizarPatrimonio(function(){ tick(15); }); }, 2100);
+  setTimeout(function(){ sincronizarListas(function(){ tick(16); }); }, 2250);
 
   setTimeout(function(){
   apiCall('getDocs',null,function(err,d){
@@ -3221,7 +3488,7 @@ function setSection(s){
   curSection = s;
 
   // Mostrar/ocultar seções
-  var allSecs = ['fin','task','hoje','docs','rec','cc','bank'];
+  var allSecs = ['fin','task','hoje','docs','rec','cc','bank','notas'];
   allSecs.forEach(function(x){
     var el = document.getElementById('sec-'+x);
     if(el) el.style.display = (x===s) ? 'block' : 'none';
@@ -3232,7 +3499,7 @@ function setSection(s){
   if(fhe) fhe.style.display = (s==='fin') ? 'block' : 'none';
 
   // Nav buttons
-  ['hoje','fin','task','rec','docs','bank'].forEach(function(x){
+  ['hoje','fin','task','rec','docs','bank','notas'].forEach(function(x){
     var b = document.getElementById('nb-'+x);
     if(b) b.classList.toggle('on', x===s);
   });
@@ -3265,6 +3532,10 @@ function setSection(s){
       });
       sincronizarPatrimonio(function(){ if(curBankSubTab==='patrimonio') renderPatrimonio(); });
     }
+  }
+  if(s==='notas'){
+    try{ renderListasOverview(); }catch(e){ console.error('notas',e); }
+    if(API) sincronizarListas(function(){ renderListasOverview(); });
   }
 }
 
@@ -5075,6 +5346,12 @@ function initTaskDelegation(){
     if(sharedados){ compartilharDadosBancarios(sharedados.getAttribute('data-sharedados')); return; }
     var ptupdate = e.target.closest('[data-ptupdate]');
     if(ptupdate){ abrirAtualizarPatrimonio(ptupdate.getAttribute('data-ptupdate')); return; }
+    var abrirlista = e.target.closest('[data-abrirlista]');
+    if(abrirlista){ abrirDetalheLista(abrirlista.getAttribute('data-abrirlista')); return; }
+    var toggleitem = e.target.closest('[data-toggleitem]');
+    if(toggleitem){ toggleItemLocal(toggleitem.getAttribute('data-toggleitem')); return; }
+    var delitem = e.target.closest('[data-delitem]');
+    if(delitem){ delItemLista(delitem.getAttribute('data-delitem')); return; }
     var ptdel = e.target.closest('[data-ptdel]');
     if(ptdel){ delPatrimonio(ptdel.getAttribute('data-ptdel')); return; }
     var delconta = e.target.closest('[data-delconta]');
@@ -9091,7 +9368,8 @@ function verificarSincronizacao(){
     {nome:'🏦 Contas Bancárias',        local:CONTAS_BANCO, action:'getContasBanco', extrai:function(d){ return d.data||[]; }},
     {nome:'📝 Notas de Extrato',        local:Object.keys(NOTAS_OFX), action:'getNotasOfx', extrai:function(d){ return Object.keys(d.data||{}); }},
     {nome:'🏷️ Apelidos',                local:APELIDOS, action:'getApelidos', extrai:function(d){ return d.data||[]; }},
-    {nome:'📈 Patrimônio',               local:PATRIMONIO, action:'getPatrimonio', extrai:function(d){ return d.data||[]; }}
+    {nome:'📈 Patrimônio',               local:PATRIMONIO, action:'getPatrimonio', extrai:function(d){ return d.data||[]; }},
+    {nome:'📝 Listas',                   local:LISTAS, action:'getListas', extrai:function(d){ return d.data||[]; }}
   ];
 
   // Ativar giro no botão para deixar claro que está rodando
