@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260706-003120</title>
+<title>Fluxo v20260706-014150</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1913,6 +1913,13 @@ select option{background:#1A2A3A}
 <!-- ══ BANCOS ══ -->
 <div id="sec-bank" style="display:none;padding:0 16px 100px">
 
+  <!-- Submenu: Contas vs Patrimônio -->
+  <div style="display:flex;gap:6px;margin-bottom:14px">
+    <button type="button" id="bsub-contas" onclick="setBankSubTab('contas')" class="vbtn on" style="flex:1;padding:10px 6px;border-radius:10px;font-size:12px">🏦 Contas</button>
+    <button type="button" id="bsub-patrimonio" onclick="setBankSubTab('patrimonio')" class="vbtn" style="flex:1;padding:10px 6px;border-radius:10px;font-size:12px">📈 Patrimônio</button>
+  </div>
+
+  <div id="bank-sub-contas">
   <!-- Cadastro de conta -->
   <div class="card" style="margin-bottom:12px">
     <div class="coll-hdr card-title" onclick="toggleColl('bank-form-body','bank-form-arrow')" style="margin-bottom:0">
@@ -2053,7 +2060,77 @@ select option{background:#1A2A3A}
     <div id="bank-txlist"></div>
   </div>
 
+  </div><!-- /bank-sub-contas -->
+
+  <div id="bank-sub-patrimonio" style="display:none">
+    <div style="text-align:center;padding:18px;background:var(--bg3);border-radius:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Patrimônio Total</div>
+      <div id="patrimonio-total" style="font-size:28px;font-weight:900;color:var(--green);margin-top:4px">R$ 0,00</div>
+      <div id="patrimonio-rentabilidade" style="font-size:12px;color:var(--t3);margin-top:4px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="coll-hdr card-title" onclick="toggleColl('patrimonio-form-body','patrimonio-form-arrow')" style="margin-bottom:0">
+        <span>📈 Novo Item de Patrimônio</span>
+        <span class="coll-arrow" id="patrimonio-form-arrow" style="transform:rotate(-90deg)">▾</span>
+      </div>
+      <div id="patrimonio-form-body" style="display:none;margin-top:12px">
+        <div class="row2" style="margin-bottom:10px">
+          <div><div class="fl">Nome</div>
+            <input id="pt-nome" type="text" placeholder="Ex: CDB Banco X, Ações PETR4" maxlength="60">
+          </div>
+          <div><div class="fl">Tipo</div>
+            <select id="pt-tipo">
+              <option value="poupanca">💰 Poupança</option>
+              <option value="cdb">🏦 CDB/RDB</option>
+              <option value="tesouro">🏛️ Tesouro Direto</option>
+              <option value="acoes">📊 Ações</option>
+              <option value="fundos">📁 Fundos</option>
+              <option value="cripto">₿ Criptomoeda</option>
+              <option value="previdencia">🛡️ Previdência</option>
+              <option value="outro">📦 Outro</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2" style="margin-bottom:10px">
+          <div><div class="fl">Instituição <span style="color:var(--t3);font-weight:400">(opcional)</span></div>
+            <input id="pt-instituicao" type="text" placeholder="Ex: XP, Nubank, B3" maxlength="40">
+          </div>
+          <div><div class="fl">Valor atual (R$)</div>
+            <div class="r-wrap"><input id="pt-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+          </div>
+        </div>
+        <div class="row2" style="margin-bottom:12px">
+          <div><div class="fl">Valor aplicado <span style="color:var(--t3);font-weight:400">(opcional — para calcular rentabilidade)</span></div>
+            <div class="r-wrap"><input id="pt-aplicado" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+          </div>
+          <div><div class="fl">Data da aplicação <span style="color:var(--t3);font-weight:400">(opcional)</span></div>
+            <input id="pt-data" type="date">
+          </div>
+        </div>
+        <button class="btn" onclick="addPatrimonio()">+ Adicionar</button>
+      </div>
+    </div>
+
+    <div class="slbl">Meus investimentos</div>
+    <div id="patrimonio-list"></div>
+  </div><!-- /bank-sub-patrimonio -->
+
 </div><!-- /sec-bank -->
+
+<!-- Modal: Atualizar valor do Patrimônio -->
+<div id="patrimonio-update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:16px;font-weight:800">Atualizar Valor</div>
+      <button onclick="closePatrimonioUpdate()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="margin-bottom:16px"><div class="fl">Novo valor atual (R$)</div>
+      <div class="r-wrap"><input id="pt-novo-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+    </div>
+    <button onclick="salvarAtualizacaoPatrimonio()" style="width:100%;padding:12px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit">💾 Salvar</button>
+  </div>
+</div>
 
 <!-- Modal: Nota OFX -->
 <div id="ofxnota-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
@@ -2278,6 +2355,7 @@ var CONTAS_BANCO = (function(){ try{ return JSON.parse(localStorage.getItem('ff_
 var EXTRATOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_extratos')    || '{}') || {}; }catch(e){ localStorage.removeItem('ff_extratos');    return {}; } })();
 var NOTAS_OFX    = (function(){ try{ return JSON.parse(localStorage.getItem('ff_notas_ofx')  || '{}') || {}; }catch(e){ localStorage.removeItem('ff_notas_ofx');   return {}; } })();
 var APELIDOS     = (function(){ try{ return JSON.parse(localStorage.getItem('ff_apelidos')   || '[]') || []; }catch(e){ localStorage.removeItem('ff_apelidos');    return []; } })();
+var PATRIMONIO   = (function(){ try{ return JSON.parse(localStorage.getItem('ff_patrimonio')  || '[]') || []; }catch(e){ localStorage.removeItem('ff_patrimonio');  return []; } })();
 var curBankContaId = null;   // conta bancária selecionada atualmente
 var curExtrato     = [];     // transações do extrato em exibição
 var curExtratoSel  = 'todos'; // 'todos' ou 'YYYY-MM' (mês calendário)
@@ -2570,7 +2648,8 @@ function exportarBackupCompleto(){
         contasBancarias:    CONTAS_BANCO,
         extratos:           EXTRATOS,
         notasExtrato:       NOTAS_OFX,
-        apelidos:           APELIDOS
+        apelidos:           APELIDOS,
+        patrimonio:         PATRIMONIO
       }
     };
 
@@ -2595,6 +2674,171 @@ function exportarBackupCompleto(){
     console.error('Erro ao exportar backup:', e);
     toast('❌ Erro ao gerar backup','err');
   }
+}
+
+// ════════════════════════════════════════════════════════════
+//  PATRIMÔNIO / INVESTIMENTOS — seção independente, não altera
+//  nenhum cálculo de Finanças/Dívidas/Bancos já existente.
+// ════════════════════════════════════════════════════════════
+var TIPO_PATRIMONIO_LABEL = {
+  poupanca:'💰 Poupança', cdb:'🏦 CDB/RDB', tesouro:'🏛️ Tesouro Direto',
+  acoes:'📊 Ações', fundos:'📁 Fundos', cripto:'₿ Criptomoeda',
+  previdencia:'🛡️ Previdência', outro:'📦 Outro'
+};
+
+function savePatrimonio(){ localStorage.setItem('ff_patrimonio', JSON.stringify(PATRIMONIO)); }
+
+function addPatrimonio(){
+  var nome        = (document.getElementById('pt-nome').value||'').trim();
+  var tipo        = document.getElementById('pt-tipo').value;
+  var instituicao = (document.getElementById('pt-instituicao').value||'').trim();
+  var valor       = parseFloat(document.getElementById('pt-valor').value||0);
+  var aplicado    = parseFloat(document.getElementById('pt-aplicado').value||0);
+  var data        = document.getElementById('pt-data').value || '';
+
+  if(!nome){ toast('⚠️ Informe o nome','err'); return; }
+  if(!valor || valor<=0){ toast('⚠️ Informe o valor atual','err'); return; }
+
+  var item = {
+    id: Date.now(), nome: nome, tipo: tipo, instituicao: instituicao,
+    valorAtual: valor, valorAplicado: aplicado||0, dataAplicacao: data,
+    historico: [{data: ymd(new Date()), valor: valor}],
+    criadoEm: new Date().toISOString()
+  };
+  PATRIMONIO.unshift(item);
+  savePatrimonio();
+  apiCall('salvarPatrimonio', item, function(){});
+
+  ['pt-nome','pt-instituicao','pt-valor','pt-aplicado','pt-data'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  renderPatrimonio();
+  toast('✅ Item adicionado ao patrimônio!');
+}
+
+function delPatrimonio(id){
+  if(!confirm('Excluir este item do patrimônio?')) return;
+  addTombstone('patrimonio', id);
+  PATRIMONIO = PATRIMONIO.filter(function(p){ return String(p.id)!==String(id); });
+  savePatrimonio();
+  apiCall('deletarPatrimonio', {id:id}, function(){});
+  renderPatrimonio();
+  toast('🗑️ Removido');
+}
+
+var patrimonioUpdateId = null;
+function abrirAtualizarPatrimonio(id){
+  var item = PATRIMONIO.find(function(p){ return String(p.id)===String(id); });
+  if(!item) return;
+  patrimonioUpdateId = id;
+  document.getElementById('pt-novo-valor').value = item.valorAtual;
+  document.getElementById('patrimonio-update-modal').style.display = 'flex';
+}
+function closePatrimonioUpdate(){
+  document.getElementById('patrimonio-update-modal').style.display = 'none';
+  patrimonioUpdateId = null;
+}
+function salvarAtualizacaoPatrimonio(){
+  if(!patrimonioUpdateId) return;
+  var item = PATRIMONIO.find(function(p){ return String(p.id)===String(patrimonioUpdateId); });
+  if(!item) return;
+  var novoValor = parseFloat(document.getElementById('pt-novo-valor').value||0);
+  if(!novoValor || novoValor<=0){ toast('⚠️ Informe um valor válido','err'); return; }
+
+  item.valorAtual = novoValor;
+  item.historico = (item.historico||[]).concat([{data: ymd(new Date()), valor: novoValor}]);
+  savePatrimonio();
+  apiCall('salvarPatrimonio', item, function(){});
+  closePatrimonioUpdate();
+  renderPatrimonio();
+  toast('✅ Valor atualizado!');
+}
+
+function patrimonioCardHTML(p){
+  var rentavel = p.valorAplicado > 0;
+  var ganho = rentavel ? p.valorAtual - p.valorAplicado : 0;
+  var ganhoPct = rentavel ? (ganho/p.valorAplicado*100) : 0;
+  var ultimoHist = (p.historico||[]).slice(-1)[0];
+
+  return '<div class="card" style="margin-bottom:10px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px">'+
+      '<div style="min-width:0">'+
+        '<div style="font-weight:800;font-size:14px">'+esc(p.nome)+'</div>'+
+        '<div style="font-size:11px;color:var(--t3)">'+(TIPO_PATRIMONIO_LABEL[p.tipo]||p.tipo)+(p.instituicao?' · '+esc(p.instituicao):'')+'</div>'+
+      '</div>'+
+      '<div style="text-align:right;flex-shrink:0">'+
+        '<div style="font-size:17px;font-weight:900;color:var(--green)">'+fmtBRL(p.valorAtual)+'</div>'+
+        (rentavel?'<div style="font-size:11px;font-weight:700;color:'+(ganho>=0?'var(--green)':'var(--red)')+'">'+(ganho>=0?'+':'')+fmtBRL(ganho)+' ('+ganhoPct.toFixed(1)+'%)</div>':'')+
+      '</div>'+
+    '</div>'+
+    (ultimoHist?'<div style="font-size:10px;color:var(--t3);margin-bottom:10px">Atualizado em '+fmtDate(ultimoHist.data)+'</div>':'')+
+    '<div style="display:flex;gap:6px">'+
+      '<button data-ptupdate="'+p.id+'" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Atualizar valor</button>'+
+      '<button data-ptdel="'+p.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderPatrimonio(){
+  var el = document.getElementById('patrimonio-list');
+  if(!el) return;
+
+  if(!PATRIMONIO.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhum item cadastrado ainda.<br>Adicione seus investimentos acima.</div>';
+    document.getElementById('patrimonio-total').textContent = fmtBRL(0);
+    document.getElementById('patrimonio-rentabilidade').textContent = '';
+    return;
+  }
+
+  el.innerHTML = PATRIMONIO.map(patrimonioCardHTML).join('');
+
+  var total = PATRIMONIO.reduce(function(s,p){ return s+parseFloat(p.valorAtual||0); }, 0);
+  var totalAplicado = PATRIMONIO.reduce(function(s,p){ return s+parseFloat(p.valorAplicado||0); }, 0);
+  document.getElementById('patrimonio-total').textContent = fmtBRL(total);
+
+  var rentEl = document.getElementById('patrimonio-rentabilidade');
+  if(totalAplicado > 0){
+    var ganhoTotal = total - totalAplicado;
+    var ganhoPctTotal = (ganhoTotal/totalAplicado*100);
+    rentEl.innerHTML = (ganhoTotal>=0?'📈 ':'📉 ')+(ganhoTotal>=0?'+':'')+fmtBRL(ganhoTotal)+' ('+ganhoPctTotal.toFixed(1)+'%) sobre '+fmtBRL(totalAplicado)+' aplicado';
+    rentEl.style.color = ganhoTotal>=0 ? 'var(--green)' : 'var(--red)';
+  } else {
+    rentEl.textContent = '';
+  }
+}
+
+function sincronizarPatrimonio(cb){
+  buscarExclusoesServidor('patrimonio', function(exclusoes, sucesso){
+    if(!sucesso){ if(cb) cb(); return; }
+    var exclSet = {};
+    exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
+
+    apiCall('getPatrimonio', null, function(err, d){
+      var serverList = (!err && d && d.ok && d.data) ? d.data : [];
+      serverList = serverList.filter(function(p){ return !exclSet[String(p.id)]; });
+      var serverMap = {};
+      serverList.forEach(function(p){ serverMap[String(p.id)] = true; });
+
+      var pendentes = PATRIMONIO.filter(function(p){
+        return !serverMap[String(p.id)] && !exclSet[String(p.id)];
+      });
+
+      function finalizar(){
+        var pendMap = {};
+        pendentes.forEach(function(p){ pendMap[String(p.id)] = true; });
+        PATRIMONIO = serverList.concat(PATRIMONIO.filter(function(p){ return pendMap[String(p.id)]; }));
+        savePatrimonio();
+        if(cb) cb();
+      }
+
+      if(pendentes.length === 0){ finalizar(); return; }
+      var enviados = 0;
+      pendentes.forEach(function(p){
+        apiCall('salvarPatrimonio', p, function(){
+          enviados++;
+          if(enviados === pendentes.length) finalizar();
+        });
+      });
+    });
+  });
 }
 
 function ativarNotificacoes(){
@@ -2726,7 +2970,7 @@ function syncAll(){
     '🏦 Contas Bancárias','📄 Extratos','💳 Cartões','📝 Notas de Extrato',
     '📁 Documentos','💰 Lançamentos (Finanças)','📄 Contratos',
     '👥 Contatos','🏠 Aluguéis','🛍️ Gastos no Cartão','📋 Tarefas / Agenda',
-    '🏷️ Apelidos'
+    '🏷️ Apelidos','📈 Patrimônio'
   ];
   var syncFeito = syncNomes.map(function(){ return false; });
 
@@ -2738,7 +2982,7 @@ function syncAll(){
     done++;
     if(idxNome!==undefined) syncFeito[idxNome] = true;
     renderProgressoSync(syncNomes, syncFeito);
-    if(done===15){
+    if(done===16){
       btn.classList.remove('spinning'); load(false); renderAll(); renderHoje();
       toast('✅ Sincronizado!');
       setTimeout(function(){ closeDivHistModal(); }, 900);
@@ -2794,6 +3038,7 @@ function syncAll(){
   setTimeout(function(){ sincronizarCartoes(function(){ renderFinCC(); tick(5); }); }, 600);
   setTimeout(function(){ sincronizarNotasOfx(function(){ tick(6); }); }, 750);
   setTimeout(function(){ sincronizarApelidos(function(){ tick(14); }); }, 1950);
+  setTimeout(function(){ sincronizarPatrimonio(function(){ tick(15); }); }, 2100);
 
   setTimeout(function(){
   apiCall('getDocs',null,function(err,d){
@@ -2987,7 +3232,7 @@ function setSection(s){
   if(fhe) fhe.style.display = (s==='fin') ? 'block' : 'none';
 
   // Nav buttons
-  ['hoje','fin','task','rec','docs'].forEach(function(x){
+  ['hoje','fin','task','rec','docs','bank'].forEach(function(x){
     var b = document.getElementById('nb-'+x);
     if(b) b.classList.toggle('on', x===s);
   });
@@ -3018,8 +3263,20 @@ function setSection(s){
           else renderContasBanco();
         });
       });
+      sincronizarPatrimonio(function(){ if(curBankSubTab==='patrimonio') renderPatrimonio(); });
     }
   }
+}
+
+// Submenu dentro da aba Bancos: Contas vs Patrimônio
+var curBankSubTab = 'contas';
+function setBankSubTab(tab){
+  curBankSubTab = tab;
+  document.getElementById('bsub-contas').classList.toggle('on', tab==='contas');
+  document.getElementById('bsub-patrimonio').classList.toggle('on', tab==='patrimonio');
+  document.getElementById('bank-sub-contas').style.display = (tab==='contas') ? 'block' : 'none';
+  document.getElementById('bank-sub-patrimonio').style.display = (tab==='patrimonio') ? 'block' : 'none';
+  if(tab==='patrimonio'){ try{ renderPatrimonio(); }catch(e){ console.error('patrimonio',e); } }
 }
 
 function ftab(t){
@@ -4816,6 +5073,10 @@ function initTaskDelegation(){
     // Bancos
     var sharedados = e.target.closest('[data-sharedados]');
     if(sharedados){ compartilharDadosBancarios(sharedados.getAttribute('data-sharedados')); return; }
+    var ptupdate = e.target.closest('[data-ptupdate]');
+    if(ptupdate){ abrirAtualizarPatrimonio(ptupdate.getAttribute('data-ptupdate')); return; }
+    var ptdel = e.target.closest('[data-ptdel]');
+    if(ptdel){ delPatrimonio(ptdel.getAttribute('data-ptdel')); return; }
     var delconta = e.target.closest('[data-delconta]');
     if(delconta){ delContaBanco(delconta.getAttribute('data-delconta')); return; }
     var delextrato = e.target.closest('[data-delextrato]');
@@ -8829,7 +9090,8 @@ function verificarSincronizacao(){
     {nome:'📁 Documentos',              local:DOCS,     action:'getDocs',         extrai:function(d){ return d.data||[]; }},
     {nome:'🏦 Contas Bancárias',        local:CONTAS_BANCO, action:'getContasBanco', extrai:function(d){ return d.data||[]; }},
     {nome:'📝 Notas de Extrato',        local:Object.keys(NOTAS_OFX), action:'getNotasOfx', extrai:function(d){ return Object.keys(d.data||{}); }},
-    {nome:'🏷️ Apelidos',                local:APELIDOS, action:'getApelidos', extrai:function(d){ return d.data||[]; }}
+    {nome:'🏷️ Apelidos',                local:APELIDOS, action:'getApelidos', extrai:function(d){ return d.data||[]; }},
+    {nome:'📈 Patrimônio',               local:PATRIMONIO, action:'getPatrimonio', extrai:function(d){ return d.data||[]; }}
   ];
 
   // Ativar giro no botão para deixar claro que está rodando
