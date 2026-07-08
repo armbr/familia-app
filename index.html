@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260707-190626</title>
+<title>Fluxo v20260708-132502</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2931,7 +2931,10 @@ function notaCardHTML(n){
   return '<div class="card" data-abrirlista="'+n.id+'" style="margin-bottom:10px;cursor:pointer">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">'+
       '<div style="font-weight:800;font-size:14px">'+esc(titulo)+'</div>'+
-      '<div style="font-size:14px;flex-shrink:0">'+TIPO_NOTA_ICONE[n.tipo]+'</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
+        '<div style="font-size:14px">'+TIPO_NOTA_ICONE[n.tipo]+'</div>'+
+        '<button data-delnotacard="'+n.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir">🗑️</button>'+
+      '</div>'+
     '</div>'+
     '<div style="font-size:12px;color:var(--t2);line-height:1.5">'+notaPreview(n)+'</div>'+
   '</div>';
@@ -5337,6 +5340,8 @@ function initTaskDelegation(){
     if(sharedados){ compartilharDadosBancarios(sharedados.getAttribute('data-sharedados')); return; }
     var ptupdate = e.target.closest('[data-ptupdate]');
     if(ptupdate){ abrirAtualizarPatrimonio(ptupdate.getAttribute('data-ptupdate')); return; }
+    var delnotacard = e.target.closest('[data-delnotacard]');
+    if(delnotacard){ delLista(delnotacard.getAttribute('data-delnotacard')); return; }
     var abrirlista = e.target.closest('[data-abrirlista]');
     if(abrirlista){ abrirNota(abrirlista.getAttribute('data-abrirlista')); return; }
     var toggleitem = e.target.closest('[data-toggleitem]');
