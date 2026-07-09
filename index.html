@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260708-132502</title>
+<title>Fluxo v20260709-000112</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -7516,7 +7516,42 @@ function renderDividas(){
     return;
   }
 
-  el.innerHTML = abertas.map(dividaCardHTML).join('');
+  // Agrupar visualmente dívidas Eu-devo/Me-devem da MESMA pessoa —
+  // cada dívida continua com sua própria taxa/cálculo, só ganha um
+  // cabeçalho de total combinado quando há 2+ com a mesma pessoa.
+  var naoFinanciamento = abertas.filter(function(d){ return d.tipo !== 'financiamento'; });
+  var financeirosParaHtml = abertas.filter(function(d){ return d.tipo === 'financiamento'; });
+
+  var grupos = {};
+  naoFinanciamento.forEach(function(d){
+    if(!d.pagadorId) return;
+    var chave = d.tipo+'|'+d.pagadorId;
+    (grupos[chave] = grupos[chave] || []).push(d);
+  });
+
+  var htmlParts = [];
+  var chavesProcessadas = {};
+  naoFinanciamento.forEach(function(d){
+    if(!d.pagadorId){ htmlParts.push(dividaCardHTML(d)); return; }
+    var chave = d.tipo+'|'+d.pagadorId;
+    if(chavesProcessadas[chave]) return;
+    chavesProcessadas[chave] = true;
+    var grupo = grupos[chave];
+    if(grupo.length >= 2){
+      var pag = PAGADORES.find(function(p){ return String(p.id)===String(d.pagadorId); });
+      var nomePag = pag ? pag.nome : (d.pagadorNome||'—');
+      var idGrupo = 'grupo-total-'+chave.replace(/[^a-zA-Z0-9]/g,'-');
+      var corGrupo = d.tipo==='recebo' ? 'var(--green)' : 'var(--red)';
+      htmlParts.push('<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--bg3);border-radius:10px;margin-bottom:8px">'+
+        '<span style="font-size:12px;font-weight:700;color:var(--t2)">💰 Total combinado — '+esc(nomePag)+'</span>'+
+        '<span id="'+idGrupo+'" style="font-size:15px;font-weight:900;color:'+corGrupo+'">calculando...</span>'+
+      '</div>');
+    }
+    grupo.forEach(function(dd){ htmlParts.push(dividaCardHTML(dd)); });
+  });
+  financeirosParaHtml.forEach(function(d){ htmlParts.push(dividaCardHTML(d)); });
+
+  el.innerHTML = htmlParts.join('');
 
   var comLedger = abertas.filter(function(d){ return d.tipo !== 'financiamento'; });
   var financiamentos = abertas.filter(function(d){ return d.tipo === 'financiamento' && d.sistemaAmortizacao !== 'ROTATIVO'; });
@@ -7558,8 +7593,18 @@ function renderDividas(){
         if(saldoEl) saldoEl.textContent = '⚠️ erro';
       }
       pending--;
-      if(pending===0 && totalEl){
-        totalEl.textContent = 'Total: ' + fmtBRL(totalGeral);
+      if(pending===0){
+        if(totalEl) totalEl.textContent = 'Total: ' + fmtBRL(totalGeral);
+        // Atualizar os totais combinados por pessoa, agora que todos os
+        // saldos individuais (assíncronos) já foram calculados.
+        Object.keys(grupos).forEach(function(chave){
+          var grupo = grupos[chave];
+          if(grupo.length < 2) return;
+          var somaGrupo = grupo.reduce(function(s,dd){ return s + (dd._saldoCache||0); }, 0);
+          var idGrupo = 'grupo-total-'+chave.replace(/[^a-zA-Z0-9]/g,'-');
+          var elGrupo = document.getElementById(idGrupo);
+          if(elGrupo) elGrupo.textContent = fmtBRL(somaGrupo);
+        });
       }
     });
   });
