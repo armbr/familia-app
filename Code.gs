@@ -1823,6 +1823,16 @@ function toggleItemListaPublico(listaId, itemId){
 function paginaLista(e){
   function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   var listaId = (e.parameter||{}).listaId || '';
+  var toggleItemId = (e.parameter||{}).toggleItemId || '';
+
+  // Se veio um toggle junto (navegação direta, sem fetch/CORS), aplica
+  // ANTES de ler os dados pra renderizar já com o estado atualizado —
+  // evita o problema de página em branco que o fetch() causava dentro
+  // do iframe sandboxed do Apps Script.
+  if (toggleItemId) {
+    toggleItemListaPublico(listaId, toggleItemId);
+  }
+
   var sheet = ss().getSheetByName('Listas');
   var lista = null;
   if (sheet) {
@@ -1854,7 +1864,7 @@ function paginaLista(e){
     corpoHtml = '<div style="font-size:14px;color:#EDF2F7;line-height:1.6;white-space:pre-wrap;word-break:break-word">'+esc(lista.conteudoTexto||'')+'</div>';
   } else {
     corpoHtml = (lista.itens||[]).map(function(it){
-      return '<div class="item" data-id="'+esc(it.id)+'" '+(isChecklist?'onclick="toggleItem(\''+esc(it.id)+'\')" style="cursor:pointer"':'')+' style="display:flex;align-items:center;gap:10px;padding:12px 6px;border-bottom:1px solid rgba(255,255,255,.08);'+(isChecklist?'cursor:pointer':'')+'">'+
+      return '<div class="item" data-id="'+esc(it.id)+'" '+(isChecklist?'onclick="toggleItem(\''+esc(it.id)+'\')"':'')+' style="display:flex;align-items:center;gap:10px;padding:12px 6px;border-bottom:1px solid rgba(255,255,255,.08);'+(isChecklist?'cursor:pointer':'')+'">'+
         (isChecklist
           ? '<span class="checkbox" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(it.concluido?'#2ECC9A':'#526680')+';background:'+(it.concluido?'#2ECC9A':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+(it.concluido?'✓':'')+'</span>'
           : '<span style="color:#526680;flex-shrink:0">•</span>')+
@@ -1890,8 +1900,9 @@ function paginaLista(e){
     'function toggleItem(itemId){'+
       'var el = document.querySelector(\'[data-id="\'+itemId+\'"]\');'+
       'if(el) el.classList.add("disabled");'+
-      'var url = SCRIPT_URL + "?action=toggleItemListaPublico&payload=" + encodeURIComponent(JSON.stringify({listaId:LISTA_ID, itemId:itemId}));'+
-      'fetch(url).then(function(r){return r.text();}).then(function(){ location.reload(); });'+
+      // Navegação direta (não fetch) — evita bloqueio de CORS que o
+      // Apps Script impõe quando a página roda num iframe isolado.
+      'window.location.href = SCRIPT_URL + "?action=paginaLista&listaId=" + encodeURIComponent(LISTA_ID) + "&toggleItemId=" + encodeURIComponent(itemId);'+
     '}'+
     '</script>') : '') +
     '</body></html>';
