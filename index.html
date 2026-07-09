@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260709-000112</title>
+<title>Fluxo v20260709-184833</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1817,7 +1817,7 @@ select option{background:#1A2A3A}
     <div class="card" style="margin-bottom:12px">
       <div class="row2">
         <div><div class="fl">Cartão</div>
-          <select id="cf-cartao" onchange="renderFatura()"><option value="">— selecione —</option></select>
+          <select id="cf-cartao" onchange="onCfCartaoChange()"><option value="">— selecione —</option></select>
         </div>
         <div><div class="fl">Mês</div>
           <input id="cf-mes" type="month" onchange="renderFatura()">
@@ -3459,8 +3459,19 @@ function syncAll(){
         fresh.forEach(function(t){ serverIds[String(t.id)] = true; });
         var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !exclTasksSet[String(t.id)]; });
         // Reenviar ao servidor — agora seguro, pois addTask verifica o ID
-        // antes de inserir (não duplica se já existir).
-        localOnly.forEach(function(t){ apiCall('addTask', t, function(){}); });
+        // antes de inserir (não duplica se já existir). Se o servidor
+        // responder que já existia (mesma descrição+mês) com outro ID,
+        // removemos nossa cópia local otimista pra não ficar duplicada.
+        localOnly.forEach(function(t){
+          var localId = t.id;
+          apiCall('addTask', t, function(err, resp){
+            if(!err && resp && (resp.duplicate || resp.alreadyExists) && resp.id && String(resp.id)!==String(localId)){
+              TASKS = TASKS.filter(function(x){ return String(x.id)!==String(localId); });
+              save();
+              try{ renderTasks(); }catch(e){}
+            }
+          });
+        });
 
         TASKS = fresh.concat(localOnly);
         save();
@@ -4915,9 +4926,15 @@ function addTask(){
     if(dotR) dotR.textContent='';
     if(badgeR) badgeR.textContent='inativo';
   }
-  apiCall('addTask',task,function(err){
+  apiCall('addTask',task,function(err, resp){
     if(err){TASKS=TASKS.filter(function(t){return t.id!==tmp;});renderTasks();toast('❌ Erro ao criar','err');}
     else{
+      // Se o servidor detectou duplicata (mesma descrição+mês) e não
+      // criou uma linha nova, remove nossa cópia local otimista com o
+      // ID temporário — senão fica um card fantasma duplicado.
+      if(resp && (resp.duplicate || resp.alreadyExists) && resp.id && String(resp.id)!==String(tmp)){
+        TASKS = TASKS.filter(function(t){ return t.id!==tmp; });
+      }
       // Não chamar syncAll aqui: processRecur geraria uma 2ª task
       // para o mês atual (duplicata). A task já foi criada acima.
       // Processar apenas meses futuros (flag para processRecur ignorar mês atual).
@@ -6486,11 +6503,31 @@ function delAluguel(id){
   saveAlugueis(); apiCall('deletarAluguel',{id:id},function(){});
   renderRecibos(); toast('🗑️ Aluguel removido');
 }
-function faturaDoGasto(dataGasto,diaFech){
+function faturaDoGasto(dataGasto,diaFech,cartaoId){
   var d=new Date(dataGasto);
+  var fatMes;
   if(d.getDate()>diaFech)
-    return new Date(d.getFullYear(),d.getMonth()+1,1).toISOString().substring(0,7);
-  return d.getFullYear()+'-'+pad(d.getMonth()+1);
+    fatMes = new Date(d.getFullYear(),d.getMonth()+1,1).toISOString().substring(0,7);
+  else
+    fatMes = d.getFullYear()+'-'+pad(d.getMonth()+1);
+
+  // Se a fatura desse mês JÁ foi fechada (você fechou manualmente antes do
+  // dia de fechamento configurado, por exemplo), a compra deve ir pro mês
+  // seguinte — não faz sentido reabrir uma fatura já fechada.
+  if(cartaoId && faturaJaFechada(cartaoId, fatMes)){
+    var partes = fatMes.split('-');
+    var proxData = new Date(parseInt(partes[0],10), parseInt(partes[1],10), 1); // já é o mês seguinte (0-indexed +1)
+    fatMes = proxData.getFullYear()+'-'+pad(proxData.getMonth()+1);
+  }
+  return fatMes;
+}
+
+// Considera uma fatura "fechada" se existe pelo menos um gasto pago=true
+// naquele mês/cartão — sinal de que "Fechar Fatura" já rodou pra ela.
+function faturaJaFechada(cartaoId, fatMes){
+  return CGASTOS.some(function(g){
+    return String(g.cartaoId)===String(cartaoId) && g.fatMes===fatMes && g.pago===true;
+  });
 }
 function registrarPagamento(alugId,mesAno,valorCustom){
   var a=ALUGUEIS.find(function(x){return String(x.id)===String(alugId);});
@@ -6693,7 +6730,7 @@ function registrarGastoCartao(cartaoId, data, desc, val, cat, parc){
   var compraId = Date.now(); // vincula todas as parcelas desta mesma compra
   for(var p=0; p<parc; p++){
     var d = new Date(baseDate.getFullYear(), baseDate.getMonth()+p, baseDate.getDate());
-    var fatMes = faturaDoGasto(d, cartao.fech);
+    var fatMes = faturaDoGasto(d, cartao.fech, cartao.id);
     var g = {id:compraId+p, cartaoId:String(cartao.id), cartao:cartao.nome,
       desc:desc, val:valParc, cat:cat, data:ymd(d), fatMes:fatMes, pago:false,
       compraId:compraId, parcelaAtual:p+1, parcelaTotal:parc, valorCompraTotal:val};
@@ -6703,7 +6740,7 @@ function registrarGastoCartao(cartaoId, data, desc, val, cat, parc){
   saveCGastos();
 
   // Atualizar tasks recorrentes vinculadas ao cartão com novo total
-  var fatMesAtual = faturaDoGasto(new Date(data+'T12:00:00'), cartao.fech);
+  var fatMesAtual = faturaDoGasto(new Date(data+'T12:00:00'), cartao.fech, cartao.id);
   var novoTotal = totalFaturaCartao(String(cartaoId));
   TASKS.forEach(function(t){
     var r = RECUR.find(function(x){ return String(x.cartaoId)===String(cartaoId); });
@@ -6809,8 +6846,17 @@ function criarLembreteFatura(cartao, mesAno, total){
   };
   TASKS.unshift(task);
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
-  apiCall('addTask', task, function(err){
-    if(err) console.warn('Lembrete de fatura não sincronizado:', err);
+  apiCall('addTask', task, function(err, resp){
+    if(err){ console.warn('Lembrete de fatura não sincronizado:', err); return; }
+    // O servidor pode ter detectado que esse lembrete já existia (mesma
+    // descrição + mês) e não criado uma linha nova — mas a nossa cópia
+    // local otimista continua lá, com um ID diferente do canônico. Sem
+    // essa checagem, ficaríamos com dois cards mostrando o mesmo lembrete.
+    if(resp && (resp.duplicate || resp.alreadyExists) && resp.id && String(resp.id)!==String(tmp)){
+      TASKS = TASKS.filter(function(t){ return String(t.id)!==String(tmp); });
+      localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+      try{ renderTasks(); }catch(e){}
+    }
   });
 }
 
@@ -6870,6 +6916,36 @@ function renderListaGastos(){
     '</div>';
   }).join('');
 }
+// Determina qual mês de fatura deve aparecer por padrão pra um cartão:
+// se o mês atual já está com a fatura fechada (tudo pago) E a data de
+// vencimento já passou, avança pro mês seguinte (a fatura em aberto).
+function mesFaturaAberta(cartao){
+  var hoje = new Date();
+  var mesAtual = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1);
+  var gastosNoMes = CGASTOS.filter(function(g){ return String(g.cartaoId)===String(cartao.id) && g.fatMes===mesAtual; });
+  var fechada = gastosNoMes.length>0 && gastosNoMes.every(function(g){ return g.pago; });
+  if(!fechada) return mesAtual;
+
+  var venc = parseInt(cartao.venc)||10;
+  var ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate();
+  var diaVenc = Math.min(venc, ultimoDiaMes);
+  var dataVenc = new Date(hoje.getFullYear(), hoje.getMonth(), diaVenc);
+
+  if(hoje > dataVenc){
+    var prox = new Date(hoje.getFullYear(), hoje.getMonth()+1, 1);
+    return prox.getFullYear()+'-'+pad(prox.getMonth()+1);
+  }
+  return mesAtual;
+}
+
+function onCfCartaoChange(){
+  var cartaoId = (document.getElementById('cf-cartao')||{}).value||'';
+  var cartao = CARTOES.find(function(c){ return String(c.id)===cartaoId; });
+  var mfEl = document.getElementById('cf-mes');
+  if(cartao && mfEl) mfEl.value = mesFaturaAberta(cartao);
+  renderFatura();
+}
+
 function renderFatura(){
   var cartaoId=(document.getElementById('cf-cartao')||{}).value||'';
   var mesAno=(document.getElementById('cf-mes')||{}).value||'';
@@ -6885,7 +6961,10 @@ function renderFatura(){
   var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
   var porCat={};
   gastos.forEach(function(g){porCat[g.cat]=(porCat[g.cat]||0)+g.val;});
-  var html='<div class="fatura-total"><div class="ft-lbl">'+esc(cartao.nome)+' — '+mesLabel+'</div>'+
+  var faturaFechada = gastos.length>0 && pendentes.length===0;
+  var html='<div class="fatura-total"><div class="ft-lbl">'+esc(cartao.nome)+' — '+mesLabel+
+    (faturaFechada?' <span style="font-size:10px;font-weight:800;color:var(--green);border:1px solid var(--green);padding:2px 7px;border-radius:5px;vertical-align:middle;margin-left:4px">FECHADA</span>':'')+
+    '</div>'+
     '<div class="ft-val">'+fmtBRL(total)+'</div></div>';
   if(Object.keys(porCat).length){
     html+='<div style="margin-bottom:10px">';
@@ -6922,7 +7001,10 @@ function renderCC(){
   });
   var dgEl=document.getElementById('cg-data'); if(dgEl&&!dgEl.value) dgEl.value=ymd(new Date());
   var mfEl=document.getElementById('cf-mes');
-  if(mfEl&&!mfEl.value){var n=new Date();mfEl.value=n.getFullYear()+'-'+pad(n.getMonth()+1);}
+  if(mfEl&&!mfEl.value){
+    var cartaoSelecionado = CARTOES.find(function(c){ return String(c.id)===((document.getElementById('cf-cartao')||{}).value||''); });
+    mfEl.value = cartaoSelecionado ? mesFaturaAberta(cartaoSelecionado) : (function(){ var n=new Date(); return n.getFullYear()+'-'+pad(n.getMonth()+1); })();
+  }
   renderListaCartoes(); renderListaGastos();
   if(curCCTab==='fatura') renderFatura();
 }
