@@ -3121,6 +3121,83 @@ function criarTriggerLembreteDocumentos() {
 }
 
 // ════════════════════════════════════════════════════════════
+//  LEMBRETE DE COMPROMISSO COM HORÁRIO — roda a cada 30 minutos
+//  e avisa quando um compromisso de HOJE, com horário cadastrado,
+//  está prestes a acontecer (aviso entre 5 e 35 minutos antes,
+//  dependendo de quando a verificação cair na grade de 30 em 30).
+//  Usa 1 único gatilho fixo — não cria um gatilho por compromisso,
+//  o que evitaria estourar o limite de 20 gatilhos do Apps Script.
+// ════════════════════════════════════════════════════════════
+function enviarLembretesHorario() {
+  var sheet = ss().getSheetByName('Tarefas');
+  if (!sheet) { Logger.log('Aba Tarefas não encontrada.'); return; }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (headers.indexOf('lembreteHorarioEnviado') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('lembreteHorarioEnviado');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+
+  var idxDesc     = headers.indexOf('desc');
+  var idxDeadline = headers.indexOf('deadline');
+  var idxStatus   = headers.indexOf('status');
+  var idxTime     = headers.indexOf('time');
+  var idxLembrete = headers.indexOf('lembreteHorarioEnviado');
+
+  if (sheet.getLastRow() <= 1) { Logger.log('Nenhuma tarefa cadastrada.'); return; }
+
+  var dados = sheet.getRange(2, 1, sheet.getLastRow()-1, headers.length).getValues();
+  var agora = new Date();
+  var hojeStr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var avisosEnviados = 0;
+
+  for (var i = 0; i < dados.length; i++) {
+    var row = dados[i];
+    var status = String(row[idxStatus] || '');
+    var time = String(row[idxTime] || '').trim();
+    var deadlineRaw = row[idxDeadline];
+    var deadlineStr = deadlineRaw instanceof Date
+      ? Utilities.formatDate(deadlineRaw, 'America/Sao_Paulo', 'yyyy-MM-dd')
+      : String(deadlineRaw || '').substring(0,10);
+    var jaEnviado = row[idxLembrete];
+
+    if (status === 'done') continue;
+    if (!time || !deadlineStr) continue;
+    if (deadlineStr !== hojeStr) continue;
+    if (jaEnviado === true || jaEnviado === 'true') continue;
+
+    var partesHora = time.split(':');
+    if (partesHora.length < 2) continue;
+    var dataCompromisso = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), parseInt(partesHora[0],10), parseInt(partesHora[1],10));
+    var diffMin = (dataCompromisso - agora) / 60000;
+
+    // Janela: entre 35 minutos antes e 5 minutos depois do horário
+    // (cobre a verificação de 30 em 30 min sem perder o aviso).
+    if (diffMin <= 35 && diffMin >= -5) {
+      try {
+        var minutosRestantes = Math.max(0, Math.round(diffMin));
+        var msg = minutosRestantes <= 1
+          ? 'Está começando agora! (' + time + ')'
+          : 'Em ' + minutosRestantes + ' minuto(s) — ' + time;
+        enviarPush('⏰ ' + (row[idxDesc]||'Compromisso'), msg);
+        sheet.getRange(i+2, idxLembrete+1).setValue(true);
+        avisosEnviados++;
+      } catch(e) { Logger.log('Erro ao enviar lembrete de horário: ' + e.message); }
+    }
+  }
+  Logger.log('Lembretes de horário enviados: ' + avisosEnviados);
+}
+
+// Execute esta função UMA VEZ para ativar a verificação a cada 30 minutos
+function criarTriggerLembretesHorario() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'enviarLembretesHorario') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('enviarLembretesHorario').timeBased().everyMinutes(30).create();
+  Logger.log('✅ Trigger de lembrete de horário criado — roda a cada 30 minutos.');
+}
+
+// ════════════════════════════════════════════════════════════
 //  FUNÇÕES DE TESTE — Execute manualmente no editor
 // ════════════════════════════════════════════════════════════
 
