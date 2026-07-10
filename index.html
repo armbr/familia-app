@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260709-184833</title>
+<title>Fluxo v20260710-194741</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3053,7 +3053,23 @@ function renderNotaItens(){
 
 function compartilharNota(){
   var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
-  if(!nota || !API) return;
+  if(!nota) return;
+
+  if(nota.tipo === 'texto'){
+    // Notas de texto: em vez de um link, oferece copiar/compartilhar o
+    // CONTEÚDO em si — assim dá pra colar em outro lugar (WhatsApp,
+    // e-mail...) e remover/editar partes antes de enviar, exatamente
+    // como no compartilhamento de dados bancários.
+    var texto = (nota.titulo ? nota.titulo+'\n\n' : '') + (nota.conteudoTexto||'');
+    document.getElementById('dadosbancarios-preview').textContent = texto;
+    document.getElementById('dadosbancarios-modal').setAttribute('data-texto', texto);
+    document.getElementById('dadosbancarios-modal').style.display = 'flex';
+    return;
+  }
+
+  // Listas e checklists continuam compartilhando por link (colaborativo
+  // — quem recebe consegue marcar itens direto na página).
+  if(!API) return;
   var url = API + '?action=paginaLista&listaId=' + nota.id;
 
   if(navigator.share){
