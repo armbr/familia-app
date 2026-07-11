@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260711-195433</title>
+<title>Fluxo v20260711-200623</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1978,15 +1978,10 @@ select option{background:#1A2A3A}
         <input id="bk-pix" type="text" placeholder="CPF, e-mail, telefone ou aleatória" maxlength="80">
       </div>
 
-      <div class="row2" style="margin-bottom:12px">
-        <div><div class="fl">Cor de identificação</div>
-          <input id="bk-cor" type="color" value="#6D28D9" style="height:38px;width:100%;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer">
-        </div>
-        <div><div class="fl">Saldo atual (R$)</div>
-          <div class="r-wrap"><input id="bk-saldo" type="number" placeholder="0,00" step="0.01" inputmode="decimal"></div>
-        </div>
+      <div style="margin-bottom:12px"><div class="fl">Cor de identificação</div>
+        <input id="bk-cor" type="color" value="#6D28D9" style="height:38px;width:100%;border-radius:8px;border:1px solid var(--border);background:transparent;cursor:pointer">
       </div>
-      <button class="btn" onclick="addContaBanco()">+ Cadastrar Conta</button>
+      <button class="btn" id="bk-btn-salvar" onclick="addContaBanco()">+ Cadastrar Conta</button>
     </div>
   </div>
 
@@ -8589,6 +8584,8 @@ function renderContasBanco(){
 }
 
 // ── Cadastro de contas ────────────────────────────────────
+var contaEmEdicaoId = null;
+
 function addContaBanco(){
   var nome   = (document.getElementById('bk-nome').value||'').trim();
   var tipo   = document.getElementById('bk-tipo').value;
@@ -8596,21 +8593,71 @@ function addContaBanco(){
   var ag     = (document.getElementById('bk-agencia').value||'').trim();
   var conta  = (document.getElementById('bk-conta').value||'').trim();
   var cor    = document.getElementById('bk-cor').value || '#6D28D9';
-  var saldo  = parseFloat(document.getElementById('bk-saldo').value||0);
   var titular      = (document.getElementById('bk-titular').value||'').trim();
   var titularTipo  = document.getElementById('bk-titular-tipo').value;
   var cpfCnpj      = (document.getElementById('bk-cpfcnpj').value||'').trim();
   var codigoBanco  = (document.getElementById('bk-codigo').value||'').trim();
   var chavePix     = (document.getElementById('bk-pix').value||'').trim();
   if(!nome){ toast('⚠️ Informe o nome do banco','err'); return; }
-  var c = {id: Date.now(), nome: nome, tipo: tipo, apelidoConta: apelidoConta, agencia: ag, conta: conta, cor: cor, saldo: saldo,
+
+  if(contaEmEdicaoId){
+    // Modo edição — atualiza a conta existente em vez de criar uma nova
+    var existente = CONTAS_BANCO.find(function(x){ return String(x.id)===String(contaEmEdicaoId); });
+    if(!existente){ toast('⚠️ Conta não encontrada','err'); cancelarEdicaoConta(); return; }
+    existente.nome = nome; existente.tipo = tipo; existente.apelidoConta = apelidoConta;
+    existente.agencia = ag; existente.conta = conta; existente.cor = cor;
+    existente.titular = titular; existente.titularTipo = titularTipo;
+    existente.cpfCnpj = cpfCnpj; existente.codigoBanco = codigoBanco; existente.chavePix = chavePix;
+    saveContasBanco();
+    apiCall('salvarContaBanco', existente, function(){});
+    cancelarEdicaoConta();
+    renderContasBanco();
+    if(String(curBankContaId)===String(existente.id)) selecionarConta(existente.id);
+    toast('✅ Conta atualizada!');
+    return;
+  }
+
+  var c = {id: Date.now(), nome: nome, tipo: tipo, apelidoConta: apelidoConta, agencia: ag, conta: conta, cor: cor,
     titular: titular, titularTipo: titularTipo, cpfCnpj: cpfCnpj, codigoBanco: codigoBanco, chavePix: chavePix};
   CONTAS_BANCO.push(c);
   saveContasBanco();
   apiCall('salvarContaBanco', c, function(){});
-  ['bk-nome','bk-apelido','bk-agencia','bk-conta','bk-saldo','bk-titular','bk-cpfcnpj','bk-codigo','bk-pix'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['bk-nome','bk-apelido','bk-agencia','bk-conta','bk-titular','bk-cpfcnpj','bk-codigo','bk-pix'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   renderContasBanco();
   toast('✅ Conta cadastrada!');
+}
+
+function abrirEditarConta(id){
+  var c = CONTAS_BANCO.find(function(x){ return String(x.id)===String(id); });
+  if(!c) return;
+  contaEmEdicaoId = id;
+
+  document.getElementById('bk-nome').value = c.nome || '';
+  document.getElementById('bk-tipo').value = c.tipo || 'corrente';
+  document.getElementById('bk-apelido').value = c.apelidoConta || '';
+  document.getElementById('bk-agencia').value = c.agencia || '';
+  document.getElementById('bk-conta').value = c.conta || '';
+  document.getElementById('bk-cor').value = c.cor || '#6D28D9';
+  document.getElementById('bk-titular').value = c.titular || '';
+  document.getElementById('bk-titular-tipo').value = c.titularTipo || 'pf';
+  document.getElementById('bk-cpfcnpj').value = c.cpfCnpj || '';
+  document.getElementById('bk-codigo').value = c.codigoBanco || '';
+  document.getElementById('bk-pix').value = c.chavePix || '';
+
+  var btn = document.getElementById('bk-btn-salvar');
+  btn.textContent = '💾 Salvar Alterações';
+
+  // Abrir o formulário (caso esteja recolhido) e rolar até ele
+  var body = document.getElementById('bank-form-body');
+  if(body && body.style.display==='none') toggleColl('bank-form-body','bank-form-arrow');
+  body.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function cancelarEdicaoConta(){
+  contaEmEdicaoId = null;
+  var btn = document.getElementById('bk-btn-salvar');
+  if(btn) btn.textContent = '+ Cadastrar Conta';
+  ['bk-nome','bk-apelido','bk-agencia','bk-conta','bk-titular','bk-cpfcnpj','bk-codigo','bk-pix'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
 }
 
 function compartilharDadosBancarios(id){
@@ -8817,13 +8864,10 @@ function selecionarConta(id){
 
   var c = CONTAS_BANCO.find(function(x){ return String(x.id)===String(id); });
   if(c){
-    // Efeito visual mais nítido — a borda do painel usa a mesma cor da
-    // conta selecionada, deixando claro que essas informações pertencem
-    // ao card destacado acima.
-    area.style.border = '2px solid '+c.cor;
-    area.style.borderRadius = '14px';
-    area.style.padding = '12px';
-    area.style.background = 'rgba(255,255,255,.02)';
+    // Continuação do detalhe colorido que já existe no card da conta —
+    // uma faixa fina na borda esquerda, não uma moldura ao redor de tudo.
+    area.style.borderLeft = '4px solid '+c.cor;
+    area.style.paddingLeft = '12px';
   }
   var hdr = document.getElementById('bank-extrato-header');
   if(c && hdr){
@@ -8834,10 +8878,7 @@ function selecionarConta(id){
       '<div style="font-size:12px;color:var(--t3)">'+(mostrarBancoEmbaixo?esc(c.nome)+' · ':'')+TIPO_BANCO_LABEL[c.tipo]+
       (c.agencia?' · Ag: '+esc(c.agencia):'')+(c.conta?' · Cc: '+esc(c.conta):'')+
       '</div></div>'+
-      '<div style="margin-left:auto;text-align:right">'+
-        '<div style="font-size:12px;color:var(--t3)">Saldo cadastrado</div>'+
-        '<div style="font-weight:800;font-size:14px">'+fmtBRL(c.saldo)+'</div>'+
-      '</div>'+
+      '<button onclick="abrirEditarConta(\''+c.id+'\')" style="margin-left:auto;background:none;border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;padding:6px 10px;font-family:inherit">✏️ Editar</button>'+
     '</div>';
   }
 
