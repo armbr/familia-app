@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260712-132056</title>
+<title>Fluxo v20260712-133910</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -384,7 +384,7 @@ select option{background:#1A2A3A}
   background:var(--bg3);border-radius:10px;padding:4px;
   margin-bottom:12px;
 }
-.info-ico{display:inline-block;width:15px;height:15px;border-radius:50%;border:1px solid var(--t3);color:var(--t3);font-size:10px;line-height:14px;text-align:center;cursor:pointer;font-weight:700;vertical-align:middle;margin-left:2px}
+.info-ico{display:inline-block;width:15px;height:15px;border-radius:50%;border:1px solid var(--t3);color:var(--t3);font-size:10px;line-height:14px;text-align:center;cursor:pointer;font-weight:700;font-style:italic;font-family:Georgia,serif;vertical-align:middle;margin-left:2px}
 .info-ico:hover{border-color:var(--blue);color:var(--blue)}
 .vbtn{
   padding:7px 3px;border:none;background:transparent;
@@ -1549,7 +1549,7 @@ select option{background:#1A2A3A}
         <div id="dv-campos-financiamento" style="display:none">
 
           <div style="margin-bottom:10px">
-            <div class="fl">Sistema de amortização <span class="info-ico" onclick="mostrarInfo('sistemas')">ⓘ</span></div>
+            <div class="fl">Sistema de amortização <span class="info-ico" onclick="mostrarInfo('sistemas')">i</span></div>
 
             <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin:6px 0 4px">📄 Financiamento tradicional</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
@@ -1611,7 +1611,7 @@ select option{background:#1A2A3A}
           </div>
 
           <div style="margin-bottom:10px">
-            <div class="fl">Tipo de taxa <span class="info-ico" onclick="mostrarInfo('taxatipo')">ⓘ</span></div>
+            <div class="fl">Tipo de taxa <span class="info-ico" onclick="mostrarInfo('taxatipo')">i</span></div>
             <div style="display:flex;gap:6px">
               <button type="button" id="dv-fin-taxatipo-fixa" onclick="setFinTaxaTipo('fixa')" class="vbtn on" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📌 Pré-fixada</button>
               <button type="button" id="dv-fin-taxatipo-indexada" onclick="setFinTaxaTipo('indexada')" class="vbtn" style="flex:1;padding:9px 6px;border-radius:9px;font-size:12px">📊 Pós-fixada (Selic/CDI)</button>
@@ -1619,7 +1619,7 @@ select option{background:#1A2A3A}
             <input type="hidden" id="dv-fin-taxatipo" value="fixa">
           </div>
           <div id="dv-fin-indexador-wrap" style="display:none;margin-bottom:10px">
-            <div class="fl">Indexador <span class="info-ico" onclick="mostrarInfo('indexador')">ⓘ</span></div>
+            <div class="fl">Indexador <span class="info-ico" onclick="mostrarInfo('indexador')">i</span></div>
             <select id="dv-fin-indexador">
               <option value="CDI">CDI</option>
               <option value="SELIC">Selic</option>
@@ -7416,11 +7416,12 @@ var TEXTOS_INFO = {
   },
   sistemas: {
     titulo: 'Sistemas de amortização',
-    corpo: '<p style="margin-bottom:10px"><b>Price:</b> parcela <b>fixa</b> do início ao fim. No começo você paga mais juros e menos principal; com o tempo, isso se inverte.</p>'+
-      '<p style="margin-bottom:10px"><b>SAC:</b> a parte que abate o principal é sempre a <b>mesma</b> — por isso a parcela começa mais alta e vai <b>diminuindo</b> mês a mês. No total, paga menos juros que o Price.</p>'+
-      '<p style="margin-bottom:10px"><b>SPV</b> (Pagamentos Variáveis): não existe parcela fixa nem tabela pré-definida — todo mês você registra quanto pagou, e o app calcula os juros sobre o saldo devedor automaticamente. A única regra é que os juros do período sempre precisam ser cobertos.</p>'+
-      '<p style="margin-bottom:10px"><b>💵 Pagamento Único:</b> você paga só os juros todo mês, e devolve o valor emprestado inteiro de uma vez, na última parcela.</p>'+
-      '<p><b>🔄 Rotativo (Conta Garantida):</b> uma linha de crédito onde você pode sacar e devolver livremente, pagando juros sobre o que estiver usando no momento — o valor utilizado pode mudar mês a mês.</p>'
+    corpo: '<p style="margin-bottom:10px"><b>Price:</b> parcela <b>fixa</b> do início ao fim. No começo você paga mais juros e menos principal; com o tempo, isso se inverte. <span style="color:var(--t3)">Onde aparece: financiamento de veículo, crédito consignado, empréstimo pessoal, CDC, e também o <b>Pronampe</b> (geralmente Price, conforme o contrato padrão — alguns bancos usam SAC).</span></p>'+
+      '<p style="margin-bottom:10px"><b>SAC:</b> a parte que abate o principal é sempre a <b>mesma</b> — por isso a parcela começa mais alta e vai <b>diminuindo</b> mês a mês. No total, paga menos juros que o Price. <span style="color:var(--t3)">Onde aparece: é o mais comum em <b>financiamento imobiliário</b> (Casa Verde e Amarela, SFH, crédito Caixa/bancos), por resultar em menos juros no total e permitir quitar mais rápido com amortizações extras.</span></p>'+
+      '<p style="margin-bottom:10px"><b>SPV</b> (Pagamentos Variáveis): não existe parcela fixa nem tabela pré-definida — todo mês você registra quanto pagou, e o app calcula os juros sobre o saldo devedor automaticamente. A única regra é que os juros do período sempre precisam ser cobertos. <span style="color:var(--t3)">Onde aparece: linhas de <b>capital de giro</b> negociadas caso a caso com o banco, financiamentos entre pessoas físicas/empresas com pagamento flexível.</span></p>'+
+      '<p style="margin-bottom:10px"><b>💵 Pagamento Único:</b> você paga só os juros todo mês, e devolve o valor emprestado inteiro de uma vez, na última parcela. <span style="color:var(--t3)">Onde aparece: capital de giro com <b>vencimento único (bullet)</b>, financiamentos ponte, algumas linhas de crédito empresarial de curto prazo.</span></p>'+
+      '<p><b>🔄 Rotativo (Conta Garantida):</b> uma linha de crédito onde você pode sacar e devolver livremente, pagando juros sobre o que estiver usando no momento — o valor utilizado pode mudar mês a mês. <span style="color:var(--t3)">Onde aparece: <b>conta garantida</b> empresarial, <b>cheque especial</b>, cartão de crédito rotativo, linhas de capital de giro renovável.</span></p>'+
+      '<p style="margin-top:12px;font-size:11px;color:var(--t3);border-top:1px solid var(--border);padding-top:10px">💡 Na dúvida, veja no seu contrato o termo "sistema de amortização" ou pergunte ao gerente — geralmente está descrito nas condições gerais.</p>'
   }
 };
 
