@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260712-133910</title>
+<title>Fluxo v20260712-143056</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1163,6 +1163,7 @@ select option{background:#1A2A3A}
         <div class="wnav-lbl" id="tw-lbl"></div>
         <button class="wnav-btn" onclick="shiftTW(1)">Próx ›</button>
       </div>
+      <div id="tw-sub" style="text-align:center;font-size:12px;font-weight:700;margin:-8px 0 10px"></div>
       <div class="wstrip" id="tw-strip"></div>
       <div id="tw-list"></div>
     </div>
@@ -5485,6 +5486,8 @@ function initTaskDelegation(){
     if(pgtalug){ abrirRegistrarPagamento(pgtalug.getAttribute('data-pgtalug')); return; }
     var fichalug = e.target.closest('[data-fichalug]');
     if(fichalug){ abrirFichaAluguel(fichalug.getAttribute('data-fichalug')); return; }
+    var sharealug = e.target.closest('[data-sharealug]');
+    if(sharealug){ compartilharFichaAluguel(sharealug.getAttribute('data-sharealug')); return; }
     var parcBtn = e.target.closest('[data-parc-alug]');
     if(parcBtn && parcBtn.getAttribute('data-parc-done')==='1'){
       var mo = parcBtn.getAttribute('data-parc-mo');
@@ -5634,10 +5637,17 @@ function renderTD(){
   if(tdDate2) tdDate2.textContent = dStr;
   if(tdSub) tdSub.textContent = '';
   var tasks=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
-  var alugDia=(typeof projecoesAluguel==='function') ? projecoesAluguel(mo).filter(function(t){return t.deadline===dy;}) : [];
-  var all=tasks.map(function(t){return {t:t,isA:false};}).concat(
-    alugDia.filter(function(a){return !tasks.some(function(t){return String(t.id)===String(a.id);});}).map(function(a){return {t:a,isA:true};})
-  );
+  var all=tasks.map(function(t){return {t:t,isA:false};});
+  // Totais do dia (só pendentes) — pagamentos e recebimentos agendados
+  var pendDia = all.map(function(x){return x.t;}).filter(function(t){return t.status!=='done';});
+  var totalPagarDia = pendDia.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+  var totalReceberDia = pendDia.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+  if(tdSub){
+    var subParts=[];
+    if(totalPagarDia>0) subParts.push('<span style="color:var(--red)">Pagar: '+fmtBRL(totalPagarDia)+'</span>');
+    if(totalReceberDia>0) subParts.push('<span style="color:var(--green)">Receber: '+fmtBRL(totalReceberDia)+'</span>');
+    tdSub.innerHTML = subParts.join(' · ');
+  }
   // Também mostrar transações do dia como referência
   var txsDia = validTxs().filter(function(t){return ymds(t.date)===dy;});
   var txHtml = txsDia.length ?
@@ -5656,6 +5666,7 @@ function renderTW(){
     twStart.toLocaleDateString('pt-BR',{day:'numeric',month:'short'})+' – '+
     we.toLocaleDateString('pt-BR',{day:'numeric',month:'short'});
   var dates=[]; var sh=''; var total=0;
+  var totalPagarSemana=0, totalReceberSemana=0;
   for(var i=0;i<7;i++){
     var d=new Date(twStart); d.setDate(d.getDate()+i);
     var dy=ymd(d); dates.push(dy);
@@ -5663,17 +5674,24 @@ function renderTW(){
     sh+='<div class="wdc"><div class="wdc-lbl">'+days[i]+'</div>'+
       '<div class="wdc-num'+(dy===tod?' today':'')+'" onclick="taskWkDay(\''+dy+'\')">'+d.getDate()+'</div>'+
       '<div class="wdc-dots">'+(has?'<div class="dot" style="background:var(--yellow)"></div>':'')+'</div></div>';
+    var diaPend=TASKS.filter(function(t){return ymds(t.deadline)===dy && t.status!=='done';});
+    totalPagarSemana += diaPend.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+    totalReceberSemana += diaPend.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
   }
   document.getElementById('tw-strip').innerHTML=sh;
+  var twSubParts=[];
+  if(totalPagarSemana>0) twSubParts.push('<span style="color:var(--red)">Pagar: '+fmtBRL(totalPagarSemana)+'</span>');
+  if(totalReceberSemana>0) twSubParts.push('<span style="color:var(--green)">Receber: '+fmtBRL(totalReceberSemana)+'</span>');
+  var twSubEl = document.getElementById('tw-sub');
+  if(twSubEl) twSubEl.innerHTML = twSubParts.join(' · ');
   var h='';
   dates.forEach(function(dy){
-    var alugDy=projecoesAluguelRange(dy,dy);
-    var dt=TASKS.filter(function(t){return ymds(t.deadline)===dy;}).concat(alugDy);
+    var dt=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
     if(!dt.length)return; total+=dt.length;
     var p=dy.split('-');
     var lbl=new Date(p[0],parseInt(p[1])-1,parseInt(p[2])).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
     var isT=dy===tod;
-    h+='<div class="glbl'+(isT?' g-today':'')+'">'+( isT?'☀️ ':'')+lbl+' <span class="gbadge">'+dt.length+'</span></div>'+dt.map(function(t){return taskCardComAlug(t);}).join('');
+    h+='<div class="glbl'+(isT?' g-today':'')+'">'+( isT?'☀️ ':'')+lbl+' <span class="gbadge">'+dt.length+'</span></div>'+dt.map(function(t){return taskCard(t);}).join('');
   });
   if(!total) h=emptyHTML('📅','Semana livre!','Nenhum compromisso nesta semana');
   document.getElementById('tw-list').innerHTML=h;
@@ -5771,10 +5789,8 @@ function renderTM(){
     var d=new Date(yr,mo,dn); var dy=ymd(d);
     var isT=dy===tod;
     var dTasks=TASKS.filter(function(t){return ymds(t.deadline)===dy&&t.status!=='done';});
-    var dAlug=projecoesAluguelRange(dy,dy).filter(function(t){return !t._pago;});
-    var allDots=dTasks.concat(dAlug);
-    var dots=allDots.slice(0,3).map(function(t){
-      var col=t._isAlug?'var(--green)':t.status==='done'?'var(--green)':'var(--yellow)';
+    var dots=dTasks.slice(0,3).map(function(t){
+      var col=t.status==='done'?'var(--green)':'var(--yellow)';
       return '<div class="dot" style="background:'+col+'"></div>';
     }).join('');
     gh+='<div class="mgc'+(isT?' today':'')+'" onclick="taskMoDay(\''+dy+'\')">'+
@@ -5783,12 +5799,7 @@ function renderTM(){
   }
   document.getElementById('tm-grid').innerHTML=gh;
   var ms=yr+'-'+pad(mo+1);
-  var moTasks=TASKS.filter(function(t){return t.deadline&&ymds(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
-  // Adicionar projeções de aluguel
-  var moAlug = projecoesAluguel(ms);
-  var allTasks = moTasks.concat(moAlug).sort(function(a,b){
-    return String(a.deadline).localeCompare(String(b.deadline));
-  });
+  var allTasks=TASKS.filter(function(t){return t.deadline&&ymds(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
   var h='';
   if(allTasks.length){
     var fd2=new Date(yr,mo,1);
@@ -5800,20 +5811,8 @@ function renderTM(){
     });
     Object.entries(byW).forEach(function(e){
       h+='<div class="glbl g-soon">Semana '+e[0]+' <span class="gbadge">'+e[1].length+'</span></div>'+
-        e[1].map(function(t){return taskCardComAlug(t);}).join('');
+        e[1].map(function(t){return taskCard(t);}).join('');
     });
-    // Resumo financeiro do mês
-    var totalAlug = moAlug.reduce(function(s,t){return s+t.value;},0);
-    var pagoAlug  = moAlug.filter(function(t){return t._pago;}).reduce(function(s,t){return s+t.value;},0);
-    if(totalAlug>0){
-      h='<div class="taski" style="background:rgba(46,204,154,.08);border-color:var(--green2);margin-bottom:10px">'+
-        '<div style="font-size:11px;font-weight:800;color:var(--t3);margin-bottom:4px">💰 ALUGUÉIS DO MÊS</div>'+
-        '<div style="display:flex;gap:16px">'+
-          '<span style="font-size:13px;font-weight:800;color:var(--green)">Recebido: '+fmtBRL(pagoAlug)+'</span>'+
-          '<span style="font-size:13px;color:var(--t3)">Total: '+fmtBRL(totalAlug)+'</span>'+
-        '</div>'+
-      '</div>'+h;
-    }
   } else {
     h=emptyHTML('📆','Nenhum compromisso neste mês','');
   }
@@ -5834,30 +5833,30 @@ function renderTP(){
     var ld=new Date(yr,mo+1,0).getDate();
     var isCur=mOff===0;
 
-    // tarefas do mês + projeções de aluguel
+    // tarefas do mês
     var moTasks=TASKS.filter(function(t){
       return t.deadline && ymds(t.deadline).startsWith(ms) && t.status!=='done';
     });
     var doneCount=TASKS.filter(function(t){
       return t.deadline && ymds(t.deadline).startsWith(ms) && t.status==='done';
     }).length;
-    // Aluguéis: só mostrar meses futuros e atual (não passados já tratados)
-    var moAlugTP = (mOff >= 0) ? projecoesAluguel(ms) : [];
-    var totalAlugMo = moAlugTP.reduce(function(s,t){return s+t.value;},0);
-    var moTasks = moTasks.concat(moAlugTP.filter(function(t){return !t._pago;}));
     var totalCount=moTasks.length+doneCount;
 
     var mLabel=mDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-    var taskPend = moTasks.filter(function(t){return !t._isAlug;}).length;
+    var taskPend = moTasks.length;
     var summary=taskPend+' pendente'+(taskPend!==1?'s':'')+
       (doneCount?' · '+doneCount+' concluída'+(doneCount!==1?'s':''):'');
-    var alugSuffix = totalAlugMo>0 ? ' · 🏠 '+fmtBRL(totalAlugMo) : '';
+    var totalPagarMo = moTasks.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+    var totalReceberMo = moTasks.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+    var valoresSuffix='';
+    if(totalPagarMo>0) valoresSuffix += ' · <span style="color:var(--red)">Pagar '+fmtBRL(totalPagarMo)+'</span>';
+    if(totalReceberMo>0) valoresSuffix += ' · <span style="color:var(--green)">Receber '+fmtBRL(totalReceberMo)+'</span>';
 
     // cabeçalho do mês
     html+='<div class="fmb">'+
       '<div class="fmb-title">'+
       '<span>'+(isCur?'☀️ ':'')+mLabel+'</span>'+
-      '<span style="font-size:11px;color:var(--t2)">'+summary+alugSuffix+'</span>'+
+      '<span style="font-size:11px;color:var(--t2)">'+summary+valoresSuffix+'</span>'+
       '</div>';
 
     // semanas do mês
@@ -5871,11 +5870,10 @@ function renderTP(){
       // só mostrar semanas a partir de hoje no mês atual
       if(isCur && to < ymd(now)) { wNum++; continue; }
 
-      var wAlug=projecoesAluguelRange(from,to).filter(function(t){return !t._pago;});
       var wTasks=TASKS.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status!=='done';
-      }).concat(wAlug);
+      });
       var wDone=TASKS.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status==='done';
@@ -5883,6 +5881,11 @@ function renderTP(){
 
       var dayLabel=pad(day)+'/'+pad(mo+1)+' – '+pad(wEnd)+'/'+pad(mo+1);
       var hasOv=wTasks.some(function(t){ return ymds(t.deadline)<ymd(now); });
+      var wPagar = wTasks.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+      var wReceber = wTasks.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+      var wValores=[];
+      if(wPagar>0) wValores.push('<span style="color:var(--red);font-size:11px">'+fmtBRL(wPagar)+'</span>');
+      if(wReceber>0) wValores.push('<span style="color:var(--green);font-size:11px">'+fmtBRL(wReceber)+'</span>');
 
       // cabeçalho da semana — clicável para ir para view semana
       whtml+='<div class="fwr" onclick="taskWkFrom(\'' +from+ '\')" style="'+(hasOv?'border-color:rgba(255,107,107,.3)':'')+'">'+
@@ -5892,11 +5895,12 @@ function renderTP(){
           ?'<span style="color:var(--yellow)">'+wTasks.length+' pendente'+(wTasks.length!==1?'s':'')+'</span>'+
            (wDone?'<span style="color:var(--green)">'+wDone+' ✅</span>':'')
           :'<span style="color:var(--t3);font-size:11px">sem tarefas</span>')+
+        (wValores.length?'<br>'+wValores.join(' · '):'')+
         '</div></div>';
 
       // listar tarefas desta semana expandidas (só mês atual / próxima semana)
       if(wTasks.length && mOff<=1){
-        whtml+=wTasks.map(function(t){return taskCardComAlug(t);}).join('');
+        whtml+=wTasks.map(function(t){return taskCard(t);}).join('');
       }
       wNum++;
     }
@@ -6521,7 +6525,7 @@ function abrirRecibo(r){
       '"Data: '+dataFmt+'","Emitido via Fluxo App"];'+
       'window.open("https://wa.me/'+(r.tel?r.tel.replace(/\D/g,''):'')+'"+"?text="+encodeURIComponent(linhas.join("\n")),"_blank");}'+
     '<\/script></body></html>';
-  var w=window.open('','_blank','width=600,height=800');
+  var w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();}
   else toast('⚠️ Permita pop-ups','err');
 }
@@ -6698,7 +6702,21 @@ function renderAluguelCard(a){
       (!jaPagei?'<button class="alug-btn" style="background:var(--green);color:#0A1A12" data-pgtalug="'+a.id+'">💰 Registrar pagamento</button>':
        '<button class="alug-btn" style="background:var(--bg3);color:var(--t3);cursor:default">✅ Pago este mês</button>')+
       '<button class="alug-btn" style="background:var(--bg3);color:var(--t2)" data-fichalug="'+a.id+'">📋 Ver ficha</button>'+
+      '<button class="alug-btn" style="background:var(--bg3);color:var(--blue)" data-sharealug="'+a.id+'">🔗 Compartilhar</button>'+
     '</div></div>';
+}
+function compartilharFichaAluguel(alugId){
+  var a = ALUGUEIS.find(function(x){ return String(x.id)===String(alugId); });
+  if(!a || !API) return;
+  var url = API + '?action=paginaAluguel&alugId=' + a.id;
+
+  if(navigator.share){
+    navigator.share({ title: 'Ficha de aluguel — '+a.nome, url: url }).catch(function(){});
+  } else if(navigator.clipboard){
+    navigator.clipboard.writeText(url).then(function(){ toast('🔗 Link copiado! Envie pro inquilino.'); });
+  } else {
+    prompt('Copie o link abaixo:', url);
+  }
 }
 function abrirFichaAluguel(alugId){
   var a=ALUGUEIS.find(function(x){return String(x.id)===String(alugId);});
@@ -6755,7 +6773,7 @@ function abrirFichaAluguel(alugId){
     '<table>'+linhas+'</table></div>'+
     '<button onclick="window.print()">🖨️ Imprimir / PDF</button>'+
     '</body></html>';
-  var w=window.open('','_blank','width=640,height=860');
+  var w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();}
   else toast('⚠️ Permita pop-ups','err');
 }
