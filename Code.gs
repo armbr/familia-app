@@ -28,6 +28,9 @@ function doGet(e) {
     if (action === 'paginaLista') {
       return paginaLista(e);
     }
+    if (action === 'paginaAluguel') {
+      return paginaAluguel(e);
+    }
 
     var body = {};
     if (params.payload) {
@@ -1843,6 +1846,87 @@ function toggleItemListaPublico(listaId, itemId){
     }
   }
   return { ok: false, error: 'Lista não encontrada' };
+}
+
+// ════════════════════════════════════════════════════════════
+//  FICHA PÚBLICA DE ALUGUEL — ao contrário do popup gerado no
+//  app (que é uma foto do momento), essa página é gerada ao vivo
+//  a partir dos dados atuais, então o inquilino sempre vê o status
+//  atualizado de pagamentos ao reabrir o link.
+// ════════════════════════════════════════════════════════════
+function paginaAluguel(e){
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var alugId = (e.parameter||{}).alugId || '';
+  var resp = getItemsSheet('Aluguéis');
+  var a = null;
+  if (resp && resp.data) {
+    a = resp.data.filter(function(x){ return String(x.id)===String(alugId); })[0];
+  }
+
+  if (!a) {
+    return HtmlService.createHtmlOutput(
+      '<div style="font-family:Arial;padding:40px;text-align:center;background:#0a0a14;color:#eee;min-height:100vh">' +
+      '<h2 style="color:#FF6B6B">Ficha não encontrada</h2>' +
+      '<p style="color:#888">Verifique o link com quem compartilhou.</p></div>'
+    );
+  }
+
+  var parcMap = {};
+  (a.parcelas||[]).forEach(function(p){ parcMap[p.mesAno] = p; });
+  var inicio = new Date(a.criadoEm || new Date());
+  var agora = new Date();
+  var meses = [];
+  var d = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
+  while (d <= agora) { meses.push(d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)); d.setMonth(d.getMonth()+1); }
+  var totalPago = (a.parcelas||[]).reduce(function(s,p){ return s+p.valor; }, 0);
+
+  var MESES_BR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var linhas = meses.map(function(mo){
+    var p = parcMap[mo];
+    var mes = MESES_BR[parseInt(mo.split('-')[1])-1]+'/'+mo.split('-')[0];
+    var venc = mo+'-'+('0'+a.dia).slice(-2);
+    var agr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
+    var status, cor, ico;
+    if (p) { status = 'Pago em '+String(p.dataPgto).split('-').reverse().join('/'); cor='#2ecc9a'; ico='✅'; }
+    else if (venc < agr) { status='Vencido'; cor='#FF6B6B'; ico='⚠️'; }
+    else { status='Pendente'; cor='#888'; ico='⏳'; }
+    return '<tr><td style="padding:10px 12px;border-bottom:1px solid #222">'+ico+' '+mes+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-weight:700">R$ '+(p?p.valor:a.valorBase).toFixed(2).replace('.',',')+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;color:'+cor+';font-size:12px">'+status+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Ficha — '+esc(a.nome)+'</title>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#0a0a14;color:#eee;padding:20px;min-height:100vh}'+
+    '.f{max-width:600px;margin:0 auto;background:#111;border-radius:12px;overflow:hidden;border:1px solid #222}'+
+    '.fh{background:#1a1a2e;padding:20px;border-bottom:1px solid #222}'+
+    '.ft{display:flex;border-bottom:1px solid #222}'+
+    '.ftot{flex:1;padding:14px;text-align:center;border-right:1px solid #222}'+
+    '.ftot:last-child{border:none}'+
+    '.ftv{font-size:18px;font-weight:900;margin-bottom:2px}'+
+    '.ftl{font-size:10px;color:#888;text-transform:uppercase}'+
+    'table{width:100%;border-collapse:collapse}td{font-size:13px}'+
+    '.footer{padding:14px 20px;text-align:center;color:#526680;font-size:11px}'+
+    '</style></head><body>'+
+    '<div class="f"><div class="fh">'+
+      '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">⚡ Fluxo App</div>'+
+      '<div style="font-size:17px;font-weight:900">'+esc(a.nome)+'</div>'+
+      '<div style="font-size:12px;color:#888;margin-top:2px">'+(a.ref?esc(a.ref)+' · ':'')+
+        'Vence dia '+a.dia+' · R$ '+parseFloat(a.valorBase||0).toFixed(2).replace('.',',')+'/mês</div>'+
+    '</div>'+
+    '<div class="ft">'+
+      '<div class="ftot"><div class="ftv" style="color:#2ecc9a">R$ '+totalPago.toFixed(2).replace('.',',')+'</div><div class="ftl">Recebido</div></div>'+
+      '<div class="ftot"><div class="ftv">'+meses.length+'</div><div class="ftl">Meses</div></div>'+
+    '</div>'+
+    '<table>'+linhas+'</table></div>'+
+    '<div class="footer">Página atualizada automaticamente — recarregue pra ver o status mais recente</div>'+
+    '</body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle('Ficha — ' + a.nome)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function paginaLista(e){
