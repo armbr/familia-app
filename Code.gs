@@ -1290,7 +1290,8 @@ function garantirEstruturaDividas() {
                  'sistemaAmortizacao','numParcelas','parcelasPagas','extrasJSON',
                  'tipoTaxa','historicoTaxasJSON',
                  'valorLiberado','dataUltimaParcela','iofTotal',
-                 'valorUtilizado','iofBasicoPct','iofAdicionalPct'];
+                 'valorUtilizado','iofBasicoPct','iofAdicionalPct','parcelaFixaInformada',
+                 'valoresPagosJSON'];
   var eraNova = !sh;
   if (!sh) sh = sp.insertSheet('Dívidas');
   var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
@@ -1502,6 +1503,7 @@ function salvarDividaEstruturada(body) {
   //    Capital de Giro Rotativo — usa ledger de movimentos (saque/juros/amortização)
   if (body.tipo === 'financiamento') {
     var isRotativo = body.sistemaAmortizacao === 'ROTATIVO';
+    var isSpv = body.sistemaAmortizacao === 'SPV';
     var valorUtilizadoCalc = parseFloat(body.valorUtilizado) || 0;
 
     if (isRotativo) {
@@ -1514,6 +1516,17 @@ function salvarDividaEstruturada(body) {
           return saldo; // jurosrotativo não altera o principal
         }, 0);
       }
+    } else if (isSpv) {
+      // Recalcular saldo do SPV a partir do ledger de pagamentos: cada
+      // pagamento cobre os juros do período e o resto abate o principal.
+      var movsSpv = body.movimentos || [];
+      var saldoSpv = parseFloat(body.valorOriginal) || 0;
+      movsSpv.forEach(function(m){
+        var juros = (m.jurosCalculado !== undefined) ? parseFloat(m.jurosCalculado)||0 : 0;
+        var amort = (parseFloat(m.valor)||0) - juros;
+        saldoSpv = Math.max(0, saldoSpv - amort);
+      });
+      valorUtilizadoCalc = saldoSpv;
     }
 
     var valuesByHeader = {
@@ -1526,11 +1539,11 @@ function salvarDividaEstruturada(body) {
       dataOriginal:          body.dataOriginal ? new Date(body.dataOriginal + 'T12:00:00') : '',
       metodoJuros:           body.sistemaAmortizacao || '',
       taxaMensal:            parseFloat(body.taxaMensal) || 0,
-      indexador:             '',
-      valorPrincipalAtual:   isRotativo ? valorUtilizadoCalc : (parseFloat(body.saldoAtual) || 0),
+      indexador:             body.indexador || '',
+      valorPrincipalAtual:   (isRotativo||isSpv) ? valorUtilizadoCalc : (parseFloat(body.saldoAtual) || 0),
       dataBaseAtual:         hoje ? new Date(hoje + 'T12:00:00') : '',
       diasEmAtraso:          0,
-      saldoDevedorEstimado:  isRotativo ? valorUtilizadoCalc : (parseFloat(body.saldoAtual) || 0),
+      saldoDevedorEstimado:  (isRotativo||isSpv) ? valorUtilizadoCalc : (parseFloat(body.saldoAtual) || 0),
       status:                body.status || 'pendente',
       criadoEm:              body.criadoEm ? new Date(body.criadoEm) : now,
       atualizadoEm:          now,
@@ -1545,15 +1558,22 @@ function salvarDividaEstruturada(body) {
       iofTotal:              parseFloat(body.iofTotal) || 0,
       valorUtilizado:        valorUtilizadoCalc,
       iofBasicoPct:          parseFloat(body.iofBasicoPct) || 0,
-      iofAdicionalPct:       parseFloat(body.iofAdicionalPct) || 0
+      iofAdicionalPct:       parseFloat(body.iofAdicionalPct) || 0,
+      parcelaFixaInformada:  parseFloat(body.parcelaFixaInformada) || 0,
+      valoresPagosJSON:      JSON.stringify(body.valoresPagos || {})
     };
     _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader);
 
     // Salvar o ledger de movimentos do Rotativo (saque/juros/amortização)
-    // Reaproveita as colunas jurosNoPeriodo/saldoApos para guardar o
-    // detalhamento do IOF (adicional/básico) de cada pagamento de juros.
-    if (isRotativo && body.movimentos) {
+    // ou do SPV (pagamento) — reaproveita as colunas jurosNoPeriodo/
+    // saldoApos pra guardar detalhes (IOF do Rotativo, juros do SPV).
+    if ((isRotativo || isSpv) && body.movimentos) {
       sincronizarSubArrayDivida(sheets.movimentos, body.id, body.movimentos, function(m) {
+        if (isSpv) {
+          return [String(m.id), String(body.id), body.pagadorNome || '', 'pagamento',
+                  m.data ? new Date(m.data + 'T12:00:00') : '', parseFloat(m.valor) || 0,
+                  m.obs || '', parseFloat(m.jurosCalculado)||0, 0];
+        }
         return [String(m.id), String(body.id), body.pagadorNome || '', m.tipo || '',
                 m.data ? new Date(m.data + 'T12:00:00') : '', parseFloat(m.valor) || 0,
                 m.obs || '', parseFloat(m.iofAdicional)||0, parseFloat(m.iofBasico)||0];
@@ -1646,12 +1666,15 @@ function getDividasEstruturadas() {
     (movPorDivida[did] = movPorDivida[did] || []).push({
       id: mDados[i][0], data: fmtDate(mDados[i][4]), tipo: mDados[i][3],
       valor: parseFloat(mDados[i][5]) || 0, obs: mDados[i][6] || '',
-      // Para Rotativo: col7=iofAdicional, col8=iofBasico (reaproveitando
-      // jurosNoPeriodo/saldoApos). Para devo/recebo, esses mesmos campos
-      // guardam seu significado original (juros do período / saldo após).
+      // Para Rotativo: col7=iofAdicional, col8=iofBasico. Para SPV,
+      // col7 guarda o juros calculado daquele pagamento (mesmo campo
+      // físico, com apelido "jurosCalculado" pra bater com o que o
+      // motor de cálculo do SPV espera). Para devo/recebo, esses mesmos
+      // campos guardam seu significado original (juros do período / saldo após).
       iofAdicional: parseFloat(mDados[i][7]) || 0,
       iofBasico: parseFloat(mDados[i][8]) || 0,
-      iof: (parseFloat(mDados[i][7])||0) + (parseFloat(mDados[i][8])||0)
+      iof: (parseFloat(mDados[i][7])||0) + (parseFloat(mDados[i][8])||0),
+      jurosCalculado: parseFloat(mDados[i][7]) || 0
     });
   }
 
@@ -1696,6 +1719,8 @@ function getDividasEstruturadas() {
       item.valorUtilizado    = parseFloat(obj.valorUtilizado) || 0;
       item.iofBasicoPct       = parseFloat(obj.iofBasicoPct) || 0;
       item.iofAdicionalPct    = parseFloat(obj.iofAdicionalPct) || 0;
+      item.parcelaFixaInformada = parseFloat(obj.parcelaFixaInformada) || 0;
+      try { item.valoresPagos = JSON.parse(obj.valoresPagosJSON || '{}'); } catch(e3) { item.valoresPagos = {}; }
     }
 
     result.push(item);
@@ -1926,6 +1951,9 @@ function paginaDivida(e) {
   }
 
   if (d.tipo === 'financiamento') {
+    if (d.sistemaAmortizacao === 'ROTATIVO' || d.sistemaAmortizacao === 'SPV') {
+      return paginaFinanciamentoLedger(d);
+    }
     return paginaFinanciamento(d);
   }
 
@@ -2071,7 +2099,9 @@ function gerarTabelaAmortizacaoServer(fin){
   var saldo = pv;
   var amortConstante = n>0 ? pv/n : 0;
   var taxaAnterior = isIndexada ? taxaAplicavelNaDataServer(historico, dataIni, iPctBase) : iPctBase;
-  var parcelaFixa = n>0 ? calcularParcelaPriceServer(pv, taxaAnterior, n) : 0;
+  var parcelaFixa = (sistema==='PRICE' && parseFloat(fin.parcelaFixaInformada)>0)
+    ? parseFloat(fin.parcelaFixaInformada)
+    : (n>0 ? calcularParcelaPriceServer(pv, taxaAnterior, n) : 0);
 
   for (var k=1; k<=n && saldo>0.005; k++){
     var dataParcela = addMesesServer(dataIni, k-1);
@@ -2204,6 +2234,106 @@ function paginaFinanciamento(d){
 
   return HtmlService.createHtmlOutput(html)
     .setTitle('Financiamento — ' + d.desc)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ════════════════════════════════════════════════════════════
+//  FICHA PÚBLICA — Capital de Giro Rotativo e SPV. Diferente do
+//  Price/SAC/Bullet (tabela fixa), esses dois usam um ledger de
+//  movimentos — a ficha mostra o extrato cronológico, não uma
+//  tabela pré-calculada.
+// ════════════════════════════════════════════════════════════
+function diasEntreServer(d1, d2){
+  var a = new Date(d1+'T12:00:00'), b = new Date(d2+'T12:00:00');
+  return Math.max(0, Math.round((b-a)/(1000*60*60*24)));
+}
+
+function resumoRotativoServer(d){
+  var movs = (d.movimentos||[]).slice().sort(function(a,b){ return a.data<b.data?-1:1; });
+  var valorUtilizado = 0, dataUltimoJuros = d.dataOriginal;
+  movs.forEach(function(m){
+    if(m.tipo==='saque') valorUtilizado += parseFloat(m.valor)||0;
+    else if(m.tipo==='amortizacao') valorUtilizado = Math.max(0, valorUtilizado-(parseFloat(m.valor)||0));
+    else if(m.tipo==='jurosrotativo') dataUltimoJuros = m.data;
+  });
+  return { saldoAtual: valorUtilizado, movimentos: movs, quitado: valorUtilizado<=0.01 && movs.length>0 };
+}
+
+function resumoSPVServer(d){
+  var movs = (d.movimentos||[]).slice().sort(function(a,b){ return a.data<b.data?-1:1; });
+  var saldo = parseFloat(d.valorOriginal)||0;
+  var totalPago=0, totalJuros=0;
+  var dataAnterior = d.dataOriginal;
+  movs.forEach(function(m){
+    var juros = (m.jurosCalculado!==undefined) ? m.jurosCalculado : 0;
+    var amort = (parseFloat(m.valor)||0) - juros;
+    saldo = Math.max(0, saldo - amort);
+    totalPago += parseFloat(m.valor)||0;
+    totalJuros += juros;
+    dataAnterior = m.data;
+  });
+  return { saldoAtual: saldo, totalPago: totalPago, totalJuros: totalJuros, movimentos: movs, quitado: saldo<=0.01 && movs.length>0 };
+}
+
+function paginaFinanciamentoLedger(d){
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function brl(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function brDate(iso){ return iso ? String(iso).split('-').reverse().join('/') : '—'; }
+
+  var isRotativo = d.sistemaAmortizacao === 'ROTATIVO';
+  var r = isRotativo ? resumoRotativoServer(d) : resumoSPVServer(d);
+  var tipoIcone = isRotativo ? '🔄' : '📊';
+  var tipoLabel = isRotativo ? 'Capital de Giro Rotativo' : 'SPV — Pagamentos Variáveis';
+  var statusLabel = r.quitado ? 'QUITADO' : (r.movimentos.length>0 ? 'EM ANDAMENTO' : 'INICIADO');
+
+  var linhasMov = r.movimentos.map(function(m){
+    var label, sinal, cor;
+    if(isRotativo){
+      label = {saque:'📥 Saque', jurosrotativo:'💵 Pagamento de juros', amortizacao:'📤 Amortização'}[m.tipo] || m.tipo;
+      sinal = m.tipo==='saque' ? '+' : (m.tipo==='amortizacao' ? '−' : '');
+      cor = m.tipo==='saque' ? '#F0A868' : (m.tipo==='amortizacao' ? '#5CA8E0' : '#2ECC9A');
+    } else {
+      label = '💵 Pagamento'; sinal=''; cor='#2ECC9A';
+    }
+    var detalhe = fmtDate = brDate(m.data);
+    var extraInfo = isRotativo && m.iof ? (' · IOF: '+brl(m.iof)) : (!isRotativo ? (' · juros do período: '+brl(m.jurosCalculado||0)) : '');
+    return '<tr><td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;color:'+cor+';font-weight:700">'+label+'</td>'+
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;text-align:right;font-weight:700">'+sinal+' '+brl(m.valor)+'</td>'+
+      '<td style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.06);font-size:11px;color:#8FA8C4">'+brDate(m.data)+extraInfo+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>' + tipoIcone + ' ' + esc(d.desc) + '</title>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:Arial,Helvetica,sans-serif;background:#0F1923;display:flex;justify-content:center;padding:20px;min-height:100vh}' +
+    '.card{background:#1A2A3A;border-radius:16px;overflow:hidden;width:100%;max-width:640px;border:1px solid rgba(255,255,255,.08)}' +
+    '.hdr{background:#0d1117;padding:22px 20px;border-bottom:2px solid #C2680C}' +
+    '.hdr h1{color:#fff;font-size:18px;font-weight:900}' +
+    '.hdr .sub{color:#F0A868;font-size:12px;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}' +
+    '.body{padding:20px}' +
+    '.saldo-box{background:#2A1D0F;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px}' +
+    '.saldo-box .lbl{color:#F0A868;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}' +
+    '.saldo-box .amt{font-size:32px;font-weight:900;color:#fff;margin-top:6px}' +
+    'table{width:100%;border-collapse:collapse}' +
+    'th{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#526680;text-align:left;padding:8px 6px;border-bottom:2px solid rgba(255,255,255,.1)}' +
+    '.footer{padding:14px 20px;text-align:center;color:#526680;font-size:11px;border-top:1px solid rgba(255,255,255,.06)}' +
+    '</style></head><body>' +
+    '<div class="card">' +
+      '<div class="hdr"><h1>' + tipoIcone + ' ' + esc(d.desc) + '</h1><div class="sub">' + statusLabel + ' · ' + tipoLabel + '</div></div>' +
+      '<div class="body">' +
+        '<div class="saldo-box"><div class="lbl">Saldo devedor atual</div><div class="amt">' + brl(r.saldoAtual) + '</div></div>' +
+        '<table><thead><tr><th>Movimento</th><th style="text-align:right">Valor</th><th>Data</th></tr></thead>' +
+        '<tbody>' + (linhasMov || '<tr><td colspan="3" style="padding:16px;text-align:center;color:#526680">Nenhum movimento registrado ainda.</td></tr>') + '</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div class="footer">Gerado em ' + brDate(Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd')) + ' · via Fluxo App</div>' +
+    '</div>' +
+    '</body></html>';
+
+  return HtmlService.createHtmlOutput(html)
+    .setTitle(tipoIcone + ' ' + d.desc)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
