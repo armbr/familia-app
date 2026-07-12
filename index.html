@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260712-143056</title>
+<title>Fluxo v20260712-171725</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1175,6 +1175,7 @@ select option{background:#1A2A3A}
         <div class="mnav-lbl" id="tm-lbl"></div>
         <button class="mnav-btn" onclick="shiftTM(1)">›</button>
       </div>
+      <div id="tm-sub" style="text-align:center;font-size:12px;font-weight:700;margin:-6px 0 10px"></div>
       <div class="mgrid" id="tm-grid"></div>
       <div id="tm-list"></div>
     </div>
@@ -5800,6 +5801,15 @@ function renderTM(){
   document.getElementById('tm-grid').innerHTML=gh;
   var ms=yr+'-'+pad(mo+1);
   var allTasks=TASKS.filter(function(t){return t.deadline&&ymds(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
+
+  var totalPagarMes = allTasks.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+  var totalReceberMes = allTasks.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
+  var tmSubParts=[];
+  if(totalPagarMes>0) tmSubParts.push('<span style="color:var(--red)">Pagar: '+fmtBRL(totalPagarMes)+'</span>');
+  if(totalReceberMes>0) tmSubParts.push('<span style="color:var(--green)">Receber: '+fmtBRL(totalReceberMes)+'</span>');
+  var tmSubEl = document.getElementById('tm-sub');
+  if(tmSubEl) tmSubEl.innerHTML = tmSubParts.join(' · ');
+
   var h='';
   if(allTasks.length){
     var fd2=new Date(yr,mo,1);
@@ -5826,7 +5836,10 @@ function renderTP(){
   var now=new Date(); now.setHours(0,0,0,0);
   var html='';
 
-  for(var mOff=0;mOff<3;mOff++){
+  // Só mostra o mês atual (detalhado, semana a semana) e o próximo mês
+  // (resumido, sem repetir cada tarefa) — evita listas longas e valores
+  // que pareciam somados demais quando 3 meses inteiros apareciam abertos.
+  for(var mOff=0;mOff<2;mOff++){
     var mDate=new Date(now.getFullYear(), now.getMonth()+mOff, 1);
     var yr=mDate.getFullYear(); var mo=mDate.getMonth();
     var ms=yr+'-'+pad(mo+1);
@@ -5840,7 +5853,6 @@ function renderTP(){
     var doneCount=TASKS.filter(function(t){
       return t.deadline && ymds(t.deadline).startsWith(ms) && t.status==='done';
     }).length;
-    var totalCount=moTasks.length+doneCount;
 
     var mLabel=mDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
     var taskPend = moTasks.length;
@@ -5855,11 +5867,18 @@ function renderTP(){
     // cabeçalho do mês
     html+='<div class="fmb">'+
       '<div class="fmb-title">'+
-      '<span>'+(isCur?'☀️ ':'')+mLabel+'</span>'+
+      '<span>'+(isCur?'☀️ Resto deste mês':'📅 Próximo mês — '+mLabel)+'</span>'+
       '<span style="font-size:11px;color:var(--t2)">'+summary+valoresSuffix+'</span>'+
       '</div>';
 
-    // semanas do mês
+    if(!isCur){
+      // Próximo mês: só o resumo acima, sem repetir semana a semana —
+      // clique no cabeçalho leva pro Mês completo, se quiser detalhar.
+      html+='<div class="fwr" onclick="taskMoFrom(\''+ms+'\')" style="cursor:pointer;text-align:center;color:var(--t3);font-size:12px">Ver mês completo →</div></div>';
+      continue;
+    }
+
+    // semanas do mês (só o mês atual entra em detalhe)
     var whtml='';
     var wNum=1;
     for(var day=1;day<=ld;day+=7){
@@ -5867,19 +5886,19 @@ function renderTP(){
       var from=yr+'-'+pad(mo+1)+'-'+pad(day);
       var to=yr+'-'+pad(mo+1)+'-'+pad(wEnd);
 
-      // só mostrar semanas a partir de hoje no mês atual
-      if(isCur && to < ymd(now)) { wNum++; continue; }
+      // só mostrar semanas a partir de hoje
+      if(to < ymd(now)) { wNum++; continue; }
 
       var wTasks=TASKS.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status!=='done';
-      });
+      }).sort(function(a,b){ return String(a.deadline).localeCompare(String(b.deadline)); });
       var wDone=TASKS.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status==='done';
       }).length;
 
-      var dayLabel=pad(day)+'/'+pad(mo+1)+' – '+pad(wEnd)+'/'+pad(mo+1);
+      var dayLabel=(wNum===1?'📆 Próxima semana — ':'')+pad(day)+'/'+pad(mo+1)+' – '+pad(wEnd)+'/'+pad(mo+1);
       var hasOv=wTasks.some(function(t){ return ymds(t.deadline)<ymd(now); });
       var wPagar = wTasks.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
       var wReceber = wTasks.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
@@ -5898,8 +5917,8 @@ function renderTP(){
         (wValores.length?'<br>'+wValores.join(' · '):'')+
         '</div></div>';
 
-      // listar tarefas desta semana expandidas (só mês atual / próxima semana)
-      if(wTasks.length && mOff<=1){
+      // listar tarefas desta semana expandidas, em ordem cronológica
+      if(wTasks.length){
         whtml+=wTasks.map(function(t){return taskCard(t);}).join('');
       }
       wNum++;
@@ -5910,6 +5929,11 @@ function renderTP(){
 
   document.getElementById('tp-body').innerHTML = html ||
     emptyHTML('🔮','Sem compromissos planejados','Adicione compromissos com prazo para ver o planejamento');
+}
+
+function taskMoFrom(ms){
+  tmDate=new Date(ms+'-01T00:00:00');
+  setTaskView('month');
 }
 
 function taskWkFrom(from){
