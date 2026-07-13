@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260713-140207</title>
+<title>Fluxo v20260713-143936</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -230,16 +230,16 @@ html,body{
 #bal{
   background:linear-gradient(135deg,#1E3A5F,#0F2438);
   border:1px solid rgba(91,155,213,.2);
-  border-radius:var(--r);padding:18px;margin-bottom:14px;
+  border-radius:var(--r);padding:12px 14px;margin-bottom:10px;
 }
-#bal .lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t2);margin-bottom:5px}
-#bal-val{font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:14px}
+#bal .lbl{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--t2);margin-bottom:3px}
+#bal-val{font-size:23px;font-weight:800;letter-spacing:-1px;margin-bottom:9px}
 #bal-val.neg{color:var(--red)}
-#bal-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.bal-cell{background:rgba(255,255,255,.05);border-radius:10px;padding:9px 11px}
-.bal-cell .bl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px}
+#bal-row{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.bal-cell{background:rgba(255,255,255,.05);border-radius:9px;padding:6px 9px}
+.bal-cell .bl{font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px}
 .bl.inc{color:var(--green)}.bl.exp{color:var(--red)}
-.bal-cell .bv{font-size:15px;font-weight:700}
+.bal-cell .bv{font-size:13px;font-weight:700}
 
 /* Fin tabs */
 #fin-tabs{display:flex;gap:5px}
@@ -869,13 +869,13 @@ select option{background:#1A2A3A}
   <!-- balance + fin tabs: só aparece na aba Finanças -->
   <div id="fin-header-extra" style="display:none">
     <!-- Seletor de mês -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <button onclick="shiftSelMonth(-1)" style="background:var(--card);border:1px solid var(--border);color:var(--t2);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;flex-shrink:0">‹</button>
-      <div id="month-chip" style="flex:1;text-align:center;font-size:14px;font-weight:700;color:var(--t1);background:var(--card);padding:7px 12px;border-radius:8px;border:1px solid var(--border);text-transform:capitalize">—</div>
-      <button onclick="shiftSelMonth(1)" id="btn-mes-prox" style="background:var(--card);border:1px solid var(--border);color:var(--t2);width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:18px;line-height:1;flex-shrink:0">›</button>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <button onclick="shiftSelMonth(-1)" style="background:var(--card);border:1px solid var(--border);color:var(--t2);width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:15px;line-height:1;flex-shrink:0">‹</button>
+      <div id="month-chip" style="flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--t1);background:var(--card);padding:5px 10px;border-radius:7px;border:1px solid var(--border);text-transform:capitalize">—</div>
+      <button onclick="shiftSelMonth(1)" id="btn-mes-prox" style="background:var(--card);border:1px solid var(--border);color:var(--t2);width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:15px;line-height:1;flex-shrink:0">›</button>
     </div>
     <div id="bal" style="margin-bottom:12px">
-      <div class="lbl">Saldo do Mês — <span id="bal-mes-lbl">—</span></div>
+      <div class="lbl">Saldo do Mês — <span id="bal-mes-lbl">—</span> <span id="bal-regime-tag" style="font-size:10px;font-weight:700;color:var(--t3)"></span></div>
       <div id="bal-val">R$ 0,00</div>
       <div id="bal-row">
         <div class="bal-cell"><div class="bl inc">↑ Receitas</div><div class="bv" id="bi">R$ 0,00</div></div>
@@ -4297,6 +4297,8 @@ function renderBal(){
     if(v){ v.textContent=fmtBRL(Math.abs(saldoFinal)); v.className=saldoFinal<0?'neg':''; }
     var bi=document.getElementById('bi'); if(bi) bi.textContent=fmtBRL(b.i);
     var be=document.getElementById('be'); if(be) be.textContent=fmtBRL(despesasTotais);
+    var regimeTag=document.getElementById('bal-regime-tag');
+    if(regimeTag) regimeTag.textContent = (typeof catRegimeView!=='undefined' && catRegimeView==='compra') ? '(por consumo)' : '(por fatura)';
   }catch(e){ console.error('renderBal',e); }
 }
 
@@ -4449,8 +4451,11 @@ function _cgastoIdsJaEmTx(){
 // de a fatura já ter sido fechada/paga (fechar fatura não duplica valor).
 function totalCGastosAbertos(moStr){
   var jaEmTx = _cgastoIdsJaEmTx();
-  return CGASTOS.filter(function(g){ return g.fatMes===moStr && !jaEmTx[String(g.id)]; })
-    .reduce(function(s,g){ return s+parseFloat(g.val||0); }, 0);
+  return CGASTOS.filter(function(g){
+    if(jaEmTx[String(g.id)]) return false;
+    var chave = (catRegimeView==='compra') ? ymds(g.data).substring(0,7) : g.fatMes;
+    return chave === moStr;
+  }).reduce(function(s,g){ return s+parseFloat(g.val||0); }, 0);
 }
 
 // Alterna entre "regime de caixa" (mês da fatura — quando você paga) e
@@ -4463,6 +4468,7 @@ function setCatRegime(modo){
   document.getElementById('cat-regime-fatura').classList.toggle('on', modo==='fatura');
   document.getElementById('cat-regime-compra').classList.toggle('on', modo==='compra');
   renderCat();
+  renderBal();
 }
 
 function renderCat(){
