@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260713-190905</title>
+<title>Fluxo v20260713-191059</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -4522,16 +4522,37 @@ function renderCat(){
   //    são pulados aqui, pois já estão contados no passo 1 via TXS.
   var cgastoIdsJaEmTx = _cgastoIdsJaEmTx();
   var moStr = selMonth;
-  CGASTOS.filter(function(g){
+  var gastosDoMes = CGASTOS.filter(function(g){
     if(cgastoIdsJaEmTx[String(g.id)]) return false;
     var chave = (catRegimeView==='compra') ? ymds(g.data).substring(0,7) : g.fatMes;
     return chave === moStr;
-  }).forEach(function(g){
-    var cat = g.cat || '💳 Cartão de Crédito';
-    var cartao = CARTOES.find(function(c){ return String(c.id)===String(g.cartaoId); });
-    addItem(cat, {desc:g.desc, value:parseFloat(g.val||0), date:g.data, isCartao:true, cartaoNome: cartao?cartao.nome:'',
-      parcelaAtual: g.parcelaAtual||1, parcelaTotal: g.parcelaTotal||1, valorCompraTotal: g.valorCompraTotal||g.val, catItemId: 'cgcat-'+g.id});
   });
+
+  if(catRegimeView==='compra'){
+    // Consumo Mensal: o consumo inteiro aconteceu numa única vez, mesmo
+    // parcelado — mostra UM card com o valor TOTAL da compra, não uma
+    // parcela de cada vez (evita ver "a mesma compra" duas vezes com
+    // metade do valor em cada, o que não reflete o consumo real).
+    var comprasJaAdicionadas = {};
+    gastosDoMes.forEach(function(g){
+      var chaveCompra = g.compraId || g.id; // compras não-parceladas usam o próprio id
+      if(comprasJaAdicionadas[chaveCompra]) return;
+      comprasJaAdicionadas[chaveCompra] = true;
+      var cat = g.cat || '💳 Cartão de Crédito';
+      var cartao = CARTOES.find(function(c){ return String(c.id)===String(g.cartaoId); });
+      addItem(cat, {desc:g.desc, value:parseFloat(g.valorCompraTotal||g.val||0), date:g.data, isCartao:true, cartaoNome: cartao?cartao.nome:'',
+        parcelaAtual: g.parcelaAtual||1, parcelaTotal: g.parcelaTotal||1, valorCompraTotal: g.valorCompraTotal||g.val, catItemId: 'cgcat-'+g.id});
+    });
+  } else {
+    // Visão Financeira: cada parcela é um card próprio, com o valor
+    // parcial — é literalmente o que vai pesar na fatura daquele mês.
+    gastosDoMes.forEach(function(g){
+      var cat = g.cat || '💳 Cartão de Crédito';
+      var cartao = CARTOES.find(function(c){ return String(c.id)===String(g.cartaoId); });
+      addItem(cat, {desc:g.desc, value:parseFloat(g.val||0), date:g.data, isCartao:true, cartaoNome: cartao?cartao.nome:'',
+        parcelaAtual: g.parcelaAtual||1, parcelaTotal: g.parcelaTotal||1, valorCompraTotal: g.valorCompraTotal||g.val, catItemId: 'cgcat-'+g.id});
+    });
+  }
 
   // OBS: tarefas concluídas NÃO são somadas aqui separadamente — toda
   // tarefa paga já gera um TX (passo 1), dated no dia em que foi paga.
