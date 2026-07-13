@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260713-191059</title>
+<title>Fluxo v20260713-191838</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2735,24 +2735,24 @@ function apiPost(action, body, cb){
     apiCall(action, body, cb);
     return;
   }
-  // Dividir em 3 chunks para contratos grandes
-  var chunk1 = { id:body.id, inqNome:body.inqNome, locNome:body.locNome,
-    imovel:body.imovel, valor:body.valor, inicio:body.inicio, fim:body.fim,
-    diaPgto:body.diaPgto, tipo:body.tipo, duracao:body.duracao, end:body.end,
-    ativo:body.ativo, criadoEm:body.criadoEm };
-  var chunk2 = { id:body.id, inqCpf:body.inqCpf, inqRg:body.inqRg,
-    inqEciv:body.inqEciv, inqEnd:body.inqEnd, inqNome2:body.inqNome2,
-    inqCpf2:body.inqCpf2, inqRg2:body.inqRg2, locCpf:body.locCpf,
-    locRg:body.locRg, locEciv:body.locEciv, locNome2:body.locNome2,
-    locCpf2:body.locCpf2, locRg2:body.locRg2, mat:body.mat };
-  var chunk3 = { id:body.id, vistoria:body.vistoria, itens:body.itens };
-  apiCall('salvarContratoChunk', chunk1, function(e1){
-    if(e1){ if(cb) cb(e1); return; }
-    apiCall('salvarContratoChunk', chunk2, function(e2){
-      if(e2){ if(cb) cb(e2); return; }
-      apiCall('salvarContratoChunk', chunk3, function(e3){ if(cb) cb(e3); });
-    });
-  });
+  // Payload grande demais pra caber numa URL (GET) — usar POST de
+  // verdade. Isso vale pra qualquer ação, não só Contratos: fotos de
+  // comprovante em base64, por exemplo, quase sempre caem aqui.
+  // IMPORTANTE: Content-Type "text/plain" evita que o navegador dispare
+  // um preflight CORS (OPTIONS), que o Apps Script Web App não trata
+  // corretamente — o servidor (doPost) já faz o JSON.parse do conteúdo
+  // independente do Content-Type declarado.
+  fetch(API + '?action=' + action, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r){ return r.text(); })
+  .then(function(txt){
+    try { if(cb) cb(null, JSON.parse(txt)); }
+    catch(e){ if(cb) cb(new Error('Resposta inválida do servidor')); }
+  })
+  .catch(function(e){ if(cb) cb(e); });
 }
 
 // ════════════════════════════════════════════════════════════
