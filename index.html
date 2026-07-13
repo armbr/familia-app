@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260713-130141</title>
+<title>Fluxo v20260713-140207</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1020,6 +1020,10 @@ select option{background:#1A2A3A}
     <!-- CATEGORIES -->
     <div class="pg" id="fp-cat">
       <div class="slbl">Despesas por Categoria — <span id="cat-month-lbl"></span></div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button type="button" id="cat-regime-fatura" onclick="setCatRegime('fatura')" class="vbtn on" style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px" title="Agrupa pelo mês em que a compra entrou na fatura do cartão — quando você paga">📅 Por Fatura</button>
+        <button type="button" id="cat-regime-compra" onclick="setCatRegime('compra')" class="vbtn" style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px" title="Agrupa pelo mês em que a compra/gasto realmente aconteceu — quando você consumiu">🛒 Por Data da Compra</button>
+      </div>
       <div class="catl" id="cat-list"></div>
     </div>
 
@@ -4449,6 +4453,18 @@ function totalCGastosAbertos(moStr){
     .reduce(function(s,g){ return s+parseFloat(g.val||0); }, 0);
 }
 
+// Alterna entre "regime de caixa" (mês da fatura — quando você paga) e
+// "regime de competência" (mês da compra/consumo — quando o gasto
+// realmente aconteceu). Resolve casos como combustível/viagem comprado
+// perto do fechamento do cartão, que "vaza" pro mês seguinte na fatura.
+var catRegimeView = 'fatura';
+function setCatRegime(modo){
+  catRegimeView = modo;
+  document.getElementById('cat-regime-fatura').classList.toggle('on', modo==='fatura');
+  document.getElementById('cat-regime-compra').classList.toggle('on', modo==='compra');
+  renderCat();
+}
+
 function renderCat(){
   var el=document.getElementById('cat-list');
   if(!el) return;
@@ -4463,25 +4479,33 @@ function renderCat(){
   // 1. TXS reais do mês (diretas em Finanças — já cobre QUALQUER
   //    despesa paga, seja lançamento manual ou tarefa concluída na
   //    Agenda, pois toda baixa de tarefa cria um TX correspondente)
+  //    TXS não têm "fatura" própria — já são naturalmente por data.
   filteredTxs().filter(function(t){return t.type==='exp';})
     .forEach(function(t){
-      addItem(t.cat||'📦 Outros', {desc:t.desc, value:parseFloat(t.value||0), date:t.date});
+      // TXS antigos convertidos de fatura fechada (versões anteriores do
+      // app) carregam cgastoIds — mesmo sendo um TX, a origem é cartão.
+      var origemCartao = !!(t.cgastoIds && t.cgastoIds.length);
+      addItem(t.cat||'📦 Outros', {desc:t.desc, value:parseFloat(t.value||0), date:t.date, isCartao: origemCartao});
     });
 
   // 2. Gastos do cartão do mês — mostrados pela categoria real
-  //    (alimentação, saúde etc.) no mês de CADA PARCELA. Independe de a
-  //    fatura já ter sido fechada/paga: fechar fatura é só um lembrete
-  //    de pagamento, não gera lançamento novo (evita duplicar valor).
+  //    (alimentação, saúde etc.). Por padrão, agrupa pelo mês da FATURA
+  //    (regime de caixa — quando você paga). Se o usuário escolher "Por
+  //    Data da Compra", agrupa pelo mês em que o gasto realmente
+  //    aconteceu (regime de competência — quando consumiu).
   //    EXCEÇÃO: gastos já convertidos em TXS por faturas fechadas ANTES
   //    desta atualização (versões antigas criavam um TX por categoria)
   //    são pulados aqui, pois já estão contados no passo 1 via TXS.
   var cgastoIdsJaEmTx = _cgastoIdsJaEmTx();
   var moStr = selMonth;
   CGASTOS.filter(function(g){
-    return g.fatMes === moStr && !cgastoIdsJaEmTx[String(g.id)];
+    if(cgastoIdsJaEmTx[String(g.id)]) return false;
+    var chave = (catRegimeView==='compra') ? ymds(g.data).substring(0,7) : g.fatMes;
+    return chave === moStr;
   }).forEach(function(g){
     var cat = g.cat || '💳 Cartão de Crédito';
-    addItem(cat, {desc:g.desc, value:parseFloat(g.val||0), date:g.data});
+    var cartao = CARTOES.find(function(c){ return String(c.id)===String(g.cartaoId); });
+    addItem(cat, {desc:g.desc, value:parseFloat(g.val||0), date:g.data, isCartao:true, cartaoNome: cartao?cartao.nome:''});
   });
 
   // OBS: tarefas concluídas NÃO são somadas aqui separadamente — toda
@@ -4523,8 +4547,11 @@ function abrirCategoriaModal(cat){
     html += '<div style="text-align:center;color:var(--t3);padding:16px">Nenhum item nesta categoria</div>';
   } else {
     html += itens.map(function(i){
+      var badgeCartao = i.isCartao
+        ? '<span style="font-size:9px;font-weight:800;color:var(--blue);border:1px solid var(--blue);padding:1px 5px;border-radius:4px;margin-left:6px;vertical-align:middle" title="Compra no cartão de crédito">💳'+(i.cartaoNome?' '+esc(i.cartaoNome):'')+'</span>'
+        : '';
       return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">'+
-        '<div><div style="font-size:13px;font-weight:600">'+esc(i.desc)+'</div>'+
+        '<div><div style="font-size:13px;font-weight:600">'+esc(i.desc)+badgeCartao+'</div>'+
         '<div style="font-size:12px;color:var(--t3)">'+fmtDate(i.date)+'</div></div>'+
         '<div style="font-size:13px;font-weight:700;color:var(--red)">'+fmtBRL(i.value)+'</div>'+
       '</div>';
