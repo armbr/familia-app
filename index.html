@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260713-182717</title>
+<title>Fluxo v20260713-185733</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -4413,12 +4413,15 @@ function renderHist(){
   try{
     var txs=filteredTxs();
 
-    // Mesclar compras no cartão do mês selecionado — cada parcela
-    // aparece como um card próprio, igual a uma despesa normal, com
-    // ícone indicando que é do cartão e é parcelada. Independe de a
-    // fatura já ter sido fechada (fechar fatura não duplica o valor).
+    // Mesclar compras no cartão do mês selecionado — usando a DATA REAL
+    // da compra/registro (linha do tempo fiel), não o mês da fatura.
+    // Histórico é um registro cronológico do que você fez, independente
+    // de quando a fatura fecha ou quando a parcela vai ser paga — isso
+    // é papel da Visão Financeira, não do Histórico.
     var jaEmTx = _cgastoIdsJaEmTx();
-    var cgastosDoMes = CGASTOS.filter(function(g){ return g.fatMes===selMonth && !jaEmTx[String(g.id)]; })
+    var cgastosDoMes = CGASTOS.filter(function(g){
+      return ymds(g.data).substring(0,7)===selMonth && !jaEmTx[String(g.id)];
+    })
       .map(function(g){
         return {
           id: 'cg-'+g.id, type:'exp', desc:g.desc, value:g.val, cat:g.cat, date:g.data,
@@ -6980,11 +6983,23 @@ function registrarGastoCartao(cartaoId, data, desc, val, cat, parc){
   var valParc = val/parc;
   var baseDate = new Date(data+'T12:00:00');
   var compraId = Date.now(); // vincula todas as parcelas desta mesma compra
+
+  // O mês da FATURA da 1ª parcela já considera se a fatura do mês da
+  // compra foi fechada antecipadamente (rola pro mês seguinte nesse
+  // caso). As parcelas seguintes são só +1 mês a partir daí — SEM
+  // reconsultar faturaJaFechada de novo, senão uma parcela que caiu no
+  // mês seguinte por causa do fechamento antecipado colide com a
+  // parcela seguinte, que naturalmente cairia no mesmo mês.
+  var fatMesParcela1 = faturaDoGasto(baseDate, cartao.fech, cartao.id);
+
   for(var p=0; p<parc; p++){
-    var d = new Date(baseDate.getFullYear(), baseDate.getMonth()+p, baseDate.getDate());
-    var fatMes = faturaDoGasto(d, cartao.fech, cartao.id);
+    var fatMes = (p===0) ? fatMesParcela1 : _addMesesFatMes(fatMesParcela1, p);
     var g = {id:compraId+p, cartaoId:String(cartao.id), cartao:cartao.nome,
-      desc:desc, val:valParc, cat:cat, data:ymd(d), fatMes:fatMes, pago:false,
+      // A data da compra é a MESMA para todas as parcelas — é quando o
+      // consumo realmente aconteceu, independente de quantas parcelas.
+      // Isso é o que a visão "Consumo Mensal" usa pra somar o valor
+      // total da compra no mês certo.
+      desc:desc, val:valParc, cat:cat, data:ymd(baseDate), fatMes:fatMes, pago:false,
       compraId:compraId, parcelaAtual:p+1, parcelaTotal:parc, valorCompraTotal:val};
     CGASTOS.push(g);
     apiCall('salvarCGasto', g, function(){});
@@ -6992,7 +7007,7 @@ function registrarGastoCartao(cartaoId, data, desc, val, cat, parc){
   saveCGastos();
 
   // Atualizar tasks recorrentes vinculadas ao cartão com novo total
-  var fatMesAtual = faturaDoGasto(new Date(data+'T12:00:00'), cartao.fech, cartao.id);
+  var fatMesAtual = fatMesParcela1;
   var novoTotal = totalFaturaCartao(String(cartaoId));
   TASKS.forEach(function(t){
     var r = RECUR.find(function(x){ return String(x.cartaoId)===String(cartaoId); });
@@ -7003,6 +7018,15 @@ function registrarGastoCartao(cartaoId, data, desc, val, cat, parc){
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
 
   return true;
+}
+
+// Soma N meses a uma string "YYYY-MM", sem considerar dia nenhum —
+// usada só para projetar o mês de fatura das parcelas seguintes a
+// partir do mês já calculado (com fechamento antecipado) da 1ª parcela.
+function _addMesesFatMes(fatMesStr, n){
+  var partes = fatMesStr.split('-');
+  var d = new Date(parseInt(partes[0],10), parseInt(partes[1],10)-1+n, 1);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1);
 }
 
 function addGastoCartao(){
