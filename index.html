@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260712-171725</title>
+<title>Fluxo v20260713-130141</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2308,6 +2308,9 @@ select option{background:#1A2A3A}
 <div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;align-items:flex-end;justify-content:center">
   <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto">
     <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:4px">✅ Marcar como concluída</div>
+    <div style="margin-bottom:12px"><div class="fl">Valor pago (R$)</div>
+      <div class="r-wrap"><input id="task-comprov-valor" type="number" step="0.01" min="0" inputmode="decimal" style="width:100%"></div>
+    </div>
     <p style="font-size:13px;color:var(--t3);margin-bottom:14px">Adicione um comprovante (opcional)</p>
     <input id="task-comprov-file" type="file" accept="image/*,.pdf" style="display:none">
     <div id="task-comprov-preview" style="display:none;background:var(--bg3);border-radius:8px;padding:10px;font-size:13px;margin-bottom:10px;color:var(--t2)"></div>
@@ -5088,6 +5091,9 @@ var taskComprovFile = null;
 function openComprovModal(id){
   comprovModalTaskId = id;
   taskComprovFile = null;
+  var t = TASKS.find(function(x){ return String(x.id)===String(id); });
+  var valEl = document.getElementById('task-comprov-valor');
+  if(valEl) valEl.value = t ? parseFloat(t.value||0).toFixed(2) : '';
   var _cp=document.getElementById('task-comprov-preview'); if(_cp) _cp.style.display='none';
   var _cb=document.getElementById('task-comprov-bar');      if(_cb) _cb.style.width='0%';
   var _cg=document.getElementById('task-comprov-progress'); if(_cg) _cg.style.display='none';
@@ -5115,6 +5121,12 @@ function closeComprovModal(){
 
 function confirmarComprov(){
   var id = comprovModalTaskId;
+  var t = TASKS.find(function(x){ return String(x.id)===String(id); });
+  var novoValor = parseFloat((document.getElementById('task-comprov-valor')||{}).value||0);
+  if(t && novoValor>0 && novoValor!==parseFloat(t.value||0)){
+    t.value = novoValor;
+    t.desc = t.desc.replace(/\(R\$[\d.,]+\)/, '('+fmtBRL(novoValor)+')'); // atualiza o valor no título, se estiver lá (ex: fatura de cartão)
+  }
   closeComprovModal();
   if(!id) return;
 
@@ -5245,13 +5257,17 @@ function chgTaskStatus(id,s){
   // Ao concluir task com valor financeiro, lançar em TXS
   var val = parseFloat(t.value||0);
   if(s==='done' && old!=='done' && val>0 && t.type!=='task'){
-    // Verificar se é a tarefa de pagamento de fatura de cartão (recorrência com cartaoId)
+    // Verificar se é a tarefa de pagamento de fatura de cartão — tanto o
+    // formato antigo (recorrência com cartaoId) quanto o novo (marcador
+    // cartaoIdFatura, criado ao clicar "Fechar Fatura")
     var recurCartao = t.recurId ? RECUR.find(function(r){ return String(r.id)===String(t.recurId) && r.cartaoId; }) : null;
+    var ehFaturaCartao = recurCartao || t.cartaoIdFatura;
 
-    if(recurCartao){
+    if(ehFaturaCartao){
       // Fechar a fatura por categoria real, em vez de lançar um único item "Cartão de Crédito"
-      var mesAnoFatura = ymds(t.deadline).substring(0,7);
-      var totalFechado = fecharFaturaInterno(recurCartao.cartaoId, mesAnoFatura);
+      var cartaoIdParaFechar = recurCartao ? recurCartao.cartaoId : t.cartaoIdFatura;
+      var mesAnoFatura = t.fatMesRef || ymds(t.deadline).substring(0,7);
+      var totalFechado = fecharFaturaInterno(cartaoIdParaFechar, mesAnoFatura);
       if(totalFechado !== null){
         toast('✅ Fatura paga — valores já contabilizados por categoria');
       } else {
@@ -5526,6 +5542,8 @@ function initTaskDelegation(){
     if(ctlink){ abrirLinkInquilino(ctlink.getAttribute('data-ctlink')); return; }
     var ctpgto = e.target.closest('[data-ctpgto]');
     if(ctpgto){ registrarPgtoContrato(ctpgto.getAttribute('data-ctpgto')); return; }
+    var editcc = e.target.closest('[data-editcc]');
+    if(editcc){ abrirEditarCartao(editcc.getAttribute('data-editcc')); return; }
     var delcc = e.target.closest('[data-delcc]');
     if(delcc){ delCartao(delcc.getAttribute('data-delcc')); return; }
     var delcg = e.target.closest('[data-delcg]');
@@ -6839,6 +6857,59 @@ function addCartao(){
   ['cc-nome','cc-fech','cc-venc','cc-limite'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
   renderCC(); toast('✅ Cartão salvo!');
 }
+var cartaoEmEdicaoId = null;
+
+function addCartao(){
+  var nome=((document.getElementById('cc-nome')||{}).value||'').trim();
+  var fech=parseInt((document.getElementById('cc-fech')||{}).value||25);
+  var venc=parseInt((document.getElementById('cc-venc')||{}).value||5);
+  var limite=parseFloat((document.getElementById('cc-limite')||{}).value||0);
+  if(!nome){toast('⚠️ Informe o nome do cartão','err');return;}
+
+  if(cartaoEmEdicaoId){
+    var existente = CARTOES.find(function(c){ return String(c.id)===String(cartaoEmEdicaoId); });
+    if(!existente){ toast('⚠️ Cartão não encontrado','err'); cancelarEdicaoCartao(); return; }
+    existente.nome = nome; existente.fech = fech; existente.venc = venc; existente.limite = limite;
+    saveCartoes();
+    apiCall('salvarCartao', existente, function(){});
+    cancelarEdicaoCartao();
+    renderCC(); renderFinCC();
+    toast('✅ Cartão atualizado!');
+    return;
+  }
+
+  CARTOES.push({id:Date.now(),nome:nome,fech:fech,venc:venc,limite:limite});
+  saveCartoes();
+
+  ['cc-nome','cc-fech','cc-venc','cc-limite'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderCC(); toast('✅ Cartão salvo!');
+}
+
+function abrirEditarCartao(id){
+  var cc = CARTOES.find(function(c){ return String(c.id)===String(id); });
+  if(!cc) return;
+  cartaoEmEdicaoId = id;
+  var elNome=document.getElementById('cc-nome'), elFech=document.getElementById('cc-fech'),
+      elVenc=document.getElementById('cc-venc'), elLimite=document.getElementById('cc-limite');
+  if(elNome) elNome.value = cc.nome||'';
+  if(elFech) elFech.value = cc.fech||25;
+  if(elVenc) elVenc.value = cc.venc||5;
+  if(elLimite) elLimite.value = cc.limite||'';
+
+  var btn = document.querySelector('[onclick="addCartao()"]');
+  if(btn) btn.textContent = '💾 Salvar Alterações';
+  var formEl = elNome ? elNome.closest('div') : null;
+  if(formEl) formEl.scrollIntoView({behavior:'smooth', block:'start'});
+  toast('✏️ Editando cartão — altere e salve');
+}
+
+function cancelarEdicaoCartao(){
+  cartaoEmEdicaoId = null;
+  var btn = document.querySelector('[onclick="addCartao()"]');
+  if(btn) btn.textContent = '+ Salvar Cartão';
+  ['cc-nome','cc-fech','cc-venc','cc-limite'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+}
+
 function delCartao(id){
   if(!confirm('Remover este cartão?')) return;
   addTombstone('cartoes', id);
@@ -6955,9 +7026,12 @@ function fecharFaturaInterno(cartaoId, mesAno){
   return total;
 }
 
-// Cria (ou evita duplicar) um compromisso simples de lembrete para você
-// marcar como pago manualmente no dia do vencimento. Sem valor financeiro
-// associado — assim, marcá-lo como concluído não lança nada em Finanças.
+// Cria (ou evita duplicar) um card de "conta a pagar" com o valor da
+// fatura no momento do fechamento — você pode editar esse valor depois
+// (ao marcar como pago) caso perceba algo errado. Como os gastos por
+// categoria já foram contabilizados no momento de cada compra, marcar
+// esse card como pago NÃO lança um valor duplicado em Finanças (ver
+// chgTaskStatus — reconhece cartaoIdFatura e evita relançar).
 function criarLembreteFatura(cartao, mesAno, total){
   var jaExiste = TASKS.some(function(t){
     return t.cartaoIdFatura===String(cartao.id) && t.fatMesRef===mesAno && t.status!=='done';
@@ -6974,8 +7048,8 @@ function criarLembreteFatura(cartao, mesAno, total){
   var tmp = Date.now();
   var task = {
     id: tmp, desc: '💳 Pagar fatura '+cartao.nome+' — '+mesLabel+' ('+fmtBRL(total)+')',
-    type: 'task', deadline: deadline, status: 'pend',
-    cartaoIdFatura: String(cartao.id), fatMesRef: mesAno // marcadores p/ evitar duplicar
+    type: 'exp', value: total, deadline: deadline, status: 'pend',
+    cartaoIdFatura: String(cartao.id), fatMesRef: mesAno // marcadores p/ evitar duplicar e evitar relançar em Finanças
   };
   TASKS.unshift(task);
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
@@ -7021,6 +7095,7 @@ function renderListaCartoes(){
         '<div style="font-size:12px;color:var(--t3)">Fecha dia '+cc.fech+' · Vence dia '+cc.venc+
           (cc.limite?' · Limite '+fmtBRL(cc.limite):'')+
         '</div></div>'+
+        '<button class="tdel2" data-editcc="'+cc.id+'" style="background:var(--bg3);color:var(--t2)">✏️</button>'+
         '<button class="tdel2" data-delcc="'+cc.id+'">🗑️</button>'+
       '</div>'+
       (cc.limite>0?
