@@ -159,9 +159,12 @@ function ss() {
 
 function fmtDate(v) {
   if (v instanceof Date) {
-    return v.getFullYear() + '-' +
-      String(v.getMonth() + 1).padStart(2, '0') + '-' +
-      String(v.getDate()).padStart(2, '0');
+    // IMPORTANTE: usar o fuso horário explícito (America/Sao_Paulo), não
+    // os getters padrão do Date (getFullYear/getMonth/getDate), que
+    // interpretam a data no fuso de EXECUÇÃO do Apps Script — se esse
+    // fuso não for o do Brasil, datas próximas à virada do dia/mês (ex:
+    // 01/07 às 00h) podem "voltar" um dia e cair no mês errado.
+    return Utilities.formatDate(v, 'America/Sao_Paulo', 'yyyy-MM-dd');
   }
   return v ? String(v) : '';
 }
@@ -259,6 +262,8 @@ function getTasks() {
     if (!obj.comprovUrl) obj.comprovUrl = '';
     if (!obj.cat)       obj.cat = '';
     if (!obj.recurId)   obj.recurId = '';
+    if (!obj.cartaoIdFatura) obj.cartaoIdFatura = '';
+    if (!obj.fatMesRef)      obj.fatMesRef = '';
     return obj;
   }).reverse();
   return { ok: true, data: data };
@@ -287,16 +292,31 @@ function addTask(body) {
     sheet.getRange(1, sheet.getLastColumn() + 1).setValue('time');
     headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   }
+  // cartaoIdFatura/fatMesRef marcam o lembrete de fechamento de fatura —
+  // sem essas colunas, o app perde a referência após sincronizar, e a
+  // proteção contra duplicata (ao clicar "Fechar Fatura" de novo) falha.
+  if (headers.indexOf('cartaoIdFatura') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('cartaoIdFatura');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+  if (headers.indexOf('fatMesRef') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('fatMesRef');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
 
   // Verificar duplicata antes de inserir
   var descIdx2    = headers.indexOf('desc');
   var deadlineIdx2= headers.indexOf('deadline');
   var recurIdx2   = headers.indexOf('recurId');
   var idIdx2      = headers.indexOf('id');
+  var cartaoFatIdx= headers.indexOf('cartaoIdFatura');
+  var fatMesIdx   = headers.indexOf('fatMesRef');
   var allRows     = sheet.getLastRow() > 1 ? sheet.getRange(2, 1, sheet.getLastRow()-1, headers.length).getValues() : [];
   var newMo       = String(body.deadline || '').substring(0,7);
   var newDesc     = String(body.desc || '').trim().toLowerCase();
   var newRid      = String(body.recurId || '');
+  var newCartaoFat= String(body.cartaoIdFatura || '');
+  var newFatMes   = String(body.fatMesRef || '');
 
   // 1) Idempotência por ID — se o cliente está reenviando uma tarefa que já
   // existe (ex: retry após falha de rede), não duplicar, apenas confirmar.
@@ -304,6 +324,19 @@ function addTask(body) {
     for (var bi = 0; bi < allRows.length; bi++) {
       if (String(allRows[bi][idIdx2]) === String(body.id)) {
         return { ok: true, id: body.id, alreadyExists: true };
+      }
+    }
+  }
+
+  // 1b) Duplicata por marcador de fatura — mais confiável que comparar
+  // descrição (que muda se o valor for editado ao fechar a fatura de novo).
+  if (newCartaoFat && newFatMes) {
+    for (var fi = 0; fi < allRows.length; fi++) {
+      var rCartaoFat = String(allRows[fi][cartaoFatIdx] || '');
+      var rFatMes    = String(allRows[fi][fatMesIdx]    || '');
+      var rStatus    = String(allRows[fi][headers.indexOf('status')] || '');
+      if (rCartaoFat === newCartaoFat && rFatMes === newFatMes && rStatus !== 'done') {
+        return { ok: true, id: allRows[fi][0], duplicate: true };
       }
     }
   }
@@ -334,6 +367,8 @@ function addTask(body) {
   set('cat',       body.cat || '');
   set('recurId',   newRid);
   set('time',      body.time || '');
+  set('cartaoIdFatura', newCartaoFat);
+  set('fatMesRef',      newFatMes);
 
   sheet.appendRow(row);
   return { ok: true, id: id };
@@ -3086,7 +3121,7 @@ function enviarLembreteAluguel() {
     if (diasAte !== 3 && diasAte !== 0) continue;
 
     // Verificar se já foi pago este mês
-    var mesAno = hoje.getFullYear() + '-' + String(hoje.getMonth() + 1).padStart(2, '0');
+    var mesAno = Utilities.formatDate(hoje, 'America/Sao_Paulo', 'yyyy-MM');
     var nomeAba = 'Contrato - ' + String(ct.inqNome).substring(0, 18);
     var pgSheet = ss().getSheetByName(nomeAba);
     var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
