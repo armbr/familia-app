@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260713-143936</title>
+<title>Fluxo v20260713-145734</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1021,8 +1021,8 @@ select option{background:#1A2A3A}
     <div class="pg" id="fp-cat">
       <div class="slbl">Despesas por Categoria — <span id="cat-month-lbl"></span></div>
       <div style="display:flex;gap:6px;margin-bottom:10px">
-        <button type="button" id="cat-regime-fatura" onclick="setCatRegime('fatura')" class="vbtn on" style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px" title="Agrupa pelo mês em que a compra entrou na fatura do cartão — quando você paga">📅 Por Fatura</button>
-        <button type="button" id="cat-regime-compra" onclick="setCatRegime('compra')" class="vbtn" style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px" title="Agrupa pelo mês em que a compra/gasto realmente aconteceu — quando você consumiu">🛒 Por Data da Compra</button>
+        <button type="button" id="cat-regime-fatura" onclick="setCatRegime('fatura')" class="vbtn on" style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px" title="Agrupa pelo mês em que a compra entrou na fatura do cartão — quando você paga">📅 Visão Financeira</button>
+        <button type="button" id="cat-regime-compra" onclick="setCatRegime('compra')" class="vbtn" style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px" title="Agrupa pelo mês em que a compra/gasto realmente aconteceu — quando você consumiu">🛒 Consumo Mensal</button>
       </div>
       <div class="catl" id="cat-list"></div>
     </div>
@@ -4298,7 +4298,7 @@ function renderBal(){
     var bi=document.getElementById('bi'); if(bi) bi.textContent=fmtBRL(b.i);
     var be=document.getElementById('be'); if(be) be.textContent=fmtBRL(despesasTotais);
     var regimeTag=document.getElementById('bal-regime-tag');
-    if(regimeTag) regimeTag.textContent = (typeof catRegimeView!=='undefined' && catRegimeView==='compra') ? '(por consumo)' : '(por fatura)';
+    if(regimeTag) regimeTag.textContent = (typeof catRegimeView!=='undefined' && catRegimeView==='compra') ? '(consumo mensal)' : '(visão financeira)';
   }catch(e){ console.error('renderBal',e); }
 }
 
