@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260714-025703</title>
+<title>Fluxo v20260714-134409</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -6636,6 +6636,13 @@ function emitirRecibo(){
 }
 function abrirRecibo(r){
   var dataFmt=r.data?r.data.split('-').reverse().join('/') :'';
+  var linhasWpp=['🧾 *RECIBO*','','Código: '+r.codigo,'Pagador: '+r.pagador,
+    'Referente: '+r.desc,'Valor: '+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),
+    'Data: '+dataFmt];
+  if(r.fichaUrl) linhasWpp.push('', '📋 Acompanhe todos os seus pagamentos: '+r.fichaUrl);
+  linhasWpp.push('Emitido via Fluxo App');
+  var wppHref = 'https://wa.me/'+(r.tel?String(r.tel).replace(/\D/g,''):'')+'?text='+encodeURIComponent(linhasWpp.join('\n'));
+
   var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>Recibo '+r.codigo+'</title>'+
@@ -6651,7 +6658,7 @@ function abrirRecibo(r){
     '.rc-cod{font-family:monospace;font-size:14px;font-weight:700;letter-spacing:2px}'+
     '.btns{display:flex;gap:10px;padding:0 24px 24px}'+
     '.bp{flex:1;padding:12px;border:none;border-radius:8px;background:#0a0a1a;color:#fff;font-weight:700;cursor:pointer}'+
-    '.bw{flex:1;padding:12px;border:none;border-radius:8px;background:#25D366;color:#fff;font-weight:700;cursor:pointer}'+
+    '.bw{flex:1;padding:12px;border:none;border-radius:8px;background:#25D366;color:#fff;font-weight:700;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center}'+
     '@media print{.btns{display:none}}</style></head><body>'+
     '<div class="rec">'+
       '<div class="rh"><h1>⚡ FLUXO</h1><p style="color:#888;font-size:12px;margin-top:4px">RECIBO DE PAGAMENTO</p></div>'+
@@ -6671,15 +6678,10 @@ function abrirRecibo(r){
       '</div>'+
       '<div class="btns">'+
         '<button class="bp" onclick="window.print()">🖨️ Imprimir / PDF</button>'+
-        (r.tel?'<button class="bw" onclick="wpp()">💬 WhatsApp</button>':'<button class="bw" style="background:#ccc">💬 Sem telefone</button>')+
+        (r.tel?'<a class="bw" href="'+wppHref+'" target="_blank" rel="noopener">💬 WhatsApp</a>':'<button class="bw" style="background:#ccc">💬 Sem telefone</button>')+
       '</div>'+
     '</div>'+
-    '<script>function wpp(){'+
-      'var linhas=["🧾 *RECIBO*","","Código: '+r.codigo+'","Pagador: '+r.pagador.replace(/'/g," ")+'",'+
-      '"Referente: '+r.desc.replace(/'/g," ")+'","Valor: '+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'",'+
-      '"Data: '+dataFmt+'","Emitido via Fluxo App"];'+
-      'window.open("https://wa.me/'+(r.tel?r.tel.replace(/\D/g,''):'')+'"+"?text="+encodeURIComponent(linhas.join("\n")),"_blank");}'+
-    '<\/script></body></html>';
+    '</body></html>';
   var w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();}
   else toast('⚠️ Permita pop-ups','err');
@@ -6791,11 +6793,17 @@ function registrarPagamento(alugId,mesAno,valorCustom){
   a.parcelas.push(parcela); saveAlugueis();
   var partes=mesAno.split('-');
   var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+  var fichaUrl = API ? (API + '?action=paginaAluguel&alugId=' + a.id) : '';
   var recibo={id:Date.now(),codigo:codigo,pagador:a.nome,tel:a.tel,cpf:'',
     desc:'Aluguel '+(a.ref?a.ref+' — ':'')+mesLabel,valor:val,
     data:ymd(agora),obs:'Referente ao mês de '+mesLabel,emitidoEm:emitidoEm,
-    aluguelId:String(alugId),mesAno:mesAno};
+    aluguelId:String(alugId),mesAno:mesAno,fichaUrl:fichaUrl};
   RECIBOS.unshift(recibo); saveRecibos();
+  // IMPORTANTE: salvar o objeto atualizado (com a nova parcela) na
+  // planilha PRINCIPAL de Aluguéis — sem isso, a ficha compartilhável
+  // (que lê dessa planilha) nunca via os pagamentos novos, só a aba
+  // paralela por inquilino usada pelo registro abaixo.
+  apiCall('salvarAluguel', a, function(){});
   apiCall('registrarPagamentoAluguel',{nome:a.nome,ref:a.ref,mesAno:mesAno,
     valor:val,dataPgto:ymd(agora),codigo:codigo,tel:a.tel},function(){});
   renderRecibos(); abrirRecibo(recibo); toast('✅ Pagamento registrado!');
@@ -7693,7 +7701,7 @@ function addDivida(){
   var divida = {
     id: Date.now(), tipo: tipo, pagadorId: String(pagId), pagadorNome: pag?pag.nome:'',
     desc: desc, metodoJuros: metodo, taxaMensal: taxa, indexador: idx,
-    status: 'pendente',
+    status: 'pendente', cor: corParaNovaDivida(pagId),
     movimentos: [{id:Date.now()+1, tipo:'aporte', valor:val, data:data, obs:'Empréstimo inicial'}],
     criadoEm: new Date().toISOString()
   };
@@ -7802,6 +7810,7 @@ function addFinanciamento(){
     tipoTaxa: tipoTaxa, indexador: tipoTaxa==='indexada' ? indexador : '',
     parcelaFixaInformada: (sistema==='PRICE' && parcelaFixaInformada>0) ? parcelaFixaInformada : 0,
     historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
+    cor: corAleatoriaNova(),
     criadoEm: new Date().toISOString()
   };
 
@@ -7848,6 +7857,7 @@ function addCapitalGiroRotativo(){
     movimentos: movimentos, extras: [], status: utilizado>0?'parcial':'pendente',
     tipoTaxa: tipoTaxa,
     historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
+    cor: corAleatoriaNova(),
     criadoEm: new Date().toISOString()
   };
 
@@ -7902,6 +7912,25 @@ function resumoRotativo(d){
   };
 }
 
+// Gera uma cor aleatória nova — usada só no momento em que uma dívida/
+// financiamento é CRIADO (fica salva no registro, não é recalculada a
+// cada tela). Para devo/recebo, se a pessoa já tiver outra dívida, a
+// cor é reaproveitada (agrupamento visual); para financiamentos, cada
+// registro novo sempre ganha uma cor própria, mesmo repetindo o banco.
+function corAleatoriaNova(){
+  var hue = Math.floor(Math.random()*360);
+  return 'hsl('+hue+', 65%, 55%)';
+}
+function corParaNovaDivida(pagadorId){
+  if(pagadorId){
+    var existente = DIVIDAS.find(function(d){
+      return d.tipo!=='financiamento' && String(d.pagadorId)===String(pagadorId) && d.cor;
+    });
+    if(existente) return existente.cor;
+  }
+  return corAleatoriaNova();
+}
+
 function dividaCardHTML(d){
   if(d.tipo === 'financiamento' && d.sistemaAmortizacao === 'ROTATIVO') return rotativoCardHTML(d);
   if(d.tipo === 'financiamento' && d.sistemaAmortizacao === 'SPV') return spvCardHTML(d);
@@ -7925,8 +7954,9 @@ function dividaCardHTML(d){
 
   var movs = garantirMovimentos(d);
   var primeiroMov = movs.length ? movs.slice().sort(function(a,b){return a.data<b.data?-1:1;})[0] : null;
+  var corBorda = d.cor || tipoColor;
 
-  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+tipoColor+'">'+
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+corBorda+'">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
       '<div style="min-width:0">'+
         '<div style="font-size:10px;font-weight:800;color:'+tipoColor+';letter-spacing:.5px;margin-bottom:2px">'+tipoLabel+'</div>'+
@@ -7973,6 +8003,7 @@ function addFinanciamentoSPV(){
     movimentos: [], extras: [], status: 'pendente',
     tipoTaxa: tipoTaxa, indexador: tipoTaxa==='indexada' ? indexador : '',
     historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
+    cor: corAleatoriaNova(),
     criadoEm: new Date().toISOString()
   };
 
@@ -8021,7 +8052,9 @@ function spvCardHTML(d){
   var statusLabel = r.quitado ? 'QUITADO' : (r.movimentos.length>0 ? 'EM ANDAMENTO' : 'INICIADO');
   var statusColor = r.quitado ? 'var(--green)' : 'var(--blue)';
 
-  return '<div class="card" style="margin-bottom:10px;border-left:3px solid #C2680C">'+
+  var corBorda = d.cor || '#C2680C';
+
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+corBorda+'">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
       '<div style="min-width:0">'+
         '<div style="font-size:10px;font-weight:800;color:#C2680C;letter-spacing:.5px;margin-bottom:2px">📊 SPV — PAGAMENTOS VARIÁVEIS</div>'+
@@ -8053,7 +8086,9 @@ function rotativoCardHTML(d){
   var statusLabel = r.quitado ? 'QUITADO' : (r.valorUtilizado>0 ? 'EM USO' : 'SEM SAQUES');
   var statusColor = r.quitado ? 'var(--green)' : (r.valorUtilizado>0 ? 'var(--blue)' : 'var(--t3)');
 
-  return '<div class="card" style="margin-bottom:10px;border-left:3px solid #0F9D58">'+
+  var corBorda = d.cor || '#0F9D58';
+
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+corBorda+'">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
       '<div style="min-width:0">'+
         '<div style="font-size:10px;font-weight:800;color:#0F9D58;letter-spacing:.5px;margin-bottom:2px">🔄 CAPITAL DE GIRO ROTATIVO</div>'+
@@ -8101,7 +8136,9 @@ function financiamentoCardHTML(d){
     ? taxaAplicavelNaData(d.historicoTaxas, ymd(new Date()), d.taxaMensal)
     : d.taxaMensal;
 
-  return '<div class="card" style="margin-bottom:10px;border-left:3px solid #6D28D9">'+
+  var corBorda = d.cor || '#6D28D9';
+
+  return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+corBorda+'">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
       '<div style="min-width:0">'+
         '<div style="font-size:10px;font-weight:800;color:#6D28D9;letter-spacing:.5px;margin-bottom:2px">'+(d.sistemaAmortizacao==='BULLET' ? '💼 CAPITAL DE GIRO' : '🏦 FINANCIAMENTO')+(isIndexada?' · 📊 INDEXADA':'')+'</div>'+
