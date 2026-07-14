@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260714-002559</title>
+<title>Fluxo v20260714-025703</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -4509,7 +4509,7 @@ function renderCat(){
       // TXS antigos convertidos de fatura fechada (versões anteriores do
       // app) carregam cgastoIds — mesmo sendo um TX, a origem é cartão.
       var origemCartao = !!(t.cgastoIds && t.cgastoIds.length);
-      addItem(t.cat||'📦 Outros', {desc:t.desc, value:parseFloat(t.value||0), date:t.date, isCartao: origemCartao});
+      addItem(t.cat||'📦 Outros', {desc:t.desc, value:parseFloat(t.value||0), date:t.date, isCartao: origemCartao, txId: t.id, catItemId: 'txcat-'+t.id});
     });
 
   // 2. Gastos do cartão do mês — mostrados pela categoria real
@@ -4595,18 +4595,30 @@ function abrirCategoriaModal(cat){
     html += itens.map(function(i){
       var badgeCartao = '';
       if(i.isCartao){
-        var parcInfo = (i.parcelaTotal>1) ? ' '+i.parcelaAtual+'/'+i.parcelaTotal : '';
+        // Em Consumo Mensal o valor exibido já é o TOTAL da compra, não
+        // uma parcela — mostrar "1/2" ali seria enganoso. Só faz sentido
+        // mostrar o número da parcela em Visão Financeira, onde cada
+        // parcela é realmente uma fração do valor.
+        var parcInfo = (i.parcelaTotal>1 && catRegimeView==='fatura') ? ' '+i.parcelaAtual+'/'+i.parcelaTotal : '';
         badgeCartao = '<span style="font-size:9px;font-weight:800;color:var(--blue);border:1px solid var(--blue);padding:1px 5px;border-radius:4px;margin-left:6px;vertical-align:middle" title="Compra no cartão de crédito'+(i.parcelaTotal>1?' — parcelada':'')+'">💳'+(i.cartaoNome?' '+esc(i.cartaoNome):'')+parcInfo+'</span>';
       }
-      var temDetalhe = i.isCartao && i.catItemId;
-      var detailHtml = temDetalhe
-        ? '<div id="'+i.catItemId+'" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--t3)">'+
+      var temDetalhe = !!i.catItemId;
+      var detailHtml = '';
+      if(temDetalhe && i.isCartao){
+        detailHtml = '<div id="'+i.catItemId+'" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--t3)">'+
             '<div>💳 Cartão: <b style="color:var(--t1)">'+esc(i.cartaoNome||'')+'</b></div>'+
-            (i.parcelaTotal>1?'<div>📑 Parcela: <b style="color:var(--t1)">'+i.parcelaAtual+'/'+i.parcelaTotal+'</b></div>':'')+
+            (i.parcelaTotal>1 && catRegimeView==='fatura'?'<div>📑 Parcela: <b style="color:var(--t1)">'+i.parcelaAtual+'/'+i.parcelaTotal+'</b></div>':'')+
+            (i.parcelaTotal>1 && catRegimeView==='compra'?'<div>📑 Compra parcelada em <b style="color:var(--t1)">'+i.parcelaTotal+'x</b></div>':'')+
             '<div>💰 Valor total da compra: <b style="color:var(--t1)">'+fmtBRL(i.valorCompraTotal||i.value)+'</b></div>'+
             '<button data-delcompra="'+i.compraId+'" style="margin-top:8px;width:100%;padding:8px;border:1px solid var(--red);border-radius:7px;background:transparent;color:var(--red);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit">🗑️ Excluir compra'+(i.parcelaTotal>1?' (todas as '+i.parcelaTotal+' parcelas)':'')+'</button>'+
-          '</div>'
-        : '';
+          '</div>';
+      } else if(temDetalhe){
+        // Despesa/receita manual (não-cartão) — também pode ser excluída
+        // direto daqui, não só compras no cartão.
+        detailHtml = '<div id="'+i.catItemId+'" style="display:none;margin-top:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--t3)">'+
+            '<button data-deltx="'+i.txId+'" style="width:100%;padding:8px;border:1px solid var(--red);border-radius:7px;background:transparent;color:var(--red);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit">🗑️ Excluir este lançamento</button>'+
+          '</div>';
+      }
       return '<div '+(temDetalhe?'data-txcardtoggle="'+i.catItemId+'" style="cursor:pointer;padding:9px 0;border-bottom:1px solid var(--border)"':'style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"')+'>'+
         (temDetalhe
           ? '<div style="display:flex;justify-content:space-between">'+
@@ -5516,6 +5528,11 @@ function initTaskDelegation(){
     if(cgastodel){ delGasto(cgastodel.getAttribute('data-cgastodel')); return; }
     var delcompra = e.target.closest('[data-delcompra]');
     if(delcompra){ excluirCompraCompleta(delcompra.getAttribute('data-delcompra')); return; }
+    var deltxcat = e.target.closest('[data-deltx]');
+    if(deltxcat){
+      if(confirm('Excluir este lançamento?')){ delTx(deltxcat.getAttribute('data-deltx')); closeCatModal(); }
+      return;
+    }
     var txcardtoggle = e.target.closest('[data-txcardtoggle]');
     if(txcardtoggle){ toggleTxCardDetail(txcardtoggle.getAttribute('data-txcardtoggle')); return; }
     // Recibos
