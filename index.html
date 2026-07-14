@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260714-194112</title>
+<title>Fluxo v20260714-201345</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -5591,6 +5591,12 @@ function initTaskDelegation(){
     }
     var histdiv = e.target.closest('[data-histdiv]');
     if(histdiv){ verHistoricoDivida(histdiv.getAttribute('data-histdiv')); return; }
+    var editdivida = e.target.closest('[data-editdivida]');
+    if(editdivida){ abrirEditarDivida(editdivida.getAttribute('data-editdivida')); return; }
+    var editrotativo = e.target.closest('[data-editrotativo]');
+    if(editrotativo){ abrirEditarRotativo(editrotativo.getAttribute('data-editrotativo')); return; }
+    var editspv = e.target.closest('[data-editspv]');
+    if(editspv){ abrirEditarSPV(editspv.getAttribute('data-editspv')); return; }
     var editfin = e.target.closest('[data-editfin]');
     if(editfin){ abrirEditarFinanciamento(editfin.getAttribute('data-editfin')); return; }
     var linkdiv = e.target.closest('[data-linkdiv]');
@@ -7722,6 +7728,31 @@ function resumoFinanciamento(fin){
   };
 }
 
+var dividaEmEdicaoId = null;
+
+function abrirEditarDivida(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  dividaEmEdicaoId = id;
+  setDvTipo(d.tipo);
+  document.getElementById('dv-pag').value = d.pagadorId||'';
+  document.getElementById('dv-desc').value = d.desc||'';
+  document.getElementById('dv-metodo').value = d.metodoJuros||'';
+  document.getElementById('dv-taxa').value = d.taxaMensal||'';
+  document.getElementById('dv-indexador').value = d.indexador||'';
+  // Valor/data iniciais não fazem sentido editar aqui — já viraram
+  // histórico no extrato de movimentos; escondemos esses 2 campos.
+  var valWrap = document.getElementById('dv-val'); if(valWrap) valWrap.closest('div').style.display='none';
+  var dataWrap = document.getElementById('dv-data'); if(dataWrap) dataWrap.closest('div').style.display='none';
+
+  var btn = document.getElementById('dv-btn-registrar');
+  if(btn) btn.textContent = '💾 Salvar Alterações';
+  var formBody = document.getElementById('div-form-body');
+  if(formBody && formBody.style.display==='none') toggleColl('div-form-body','div-form-arrow');
+  formBody.scrollIntoView({behavior:'smooth', block:'start'});
+  toast('✏️ Editando — altere e salve');
+}
+
 function addDivida(){
   var tipo = document.getElementById('dv-tipo').value || 'devo';
 
@@ -7732,17 +7763,36 @@ function addDivida(){
 
   var pagId   = document.getElementById('dv-pag').value;
   var desc    = (document.getElementById('dv-desc').value||'').trim();
-  var val     = parseFloat(document.getElementById('dv-val').value||0);
-  var data    = document.getElementById('dv-data').value || ymd(new Date());
   var metodo  = document.getElementById('dv-metodo').value;
   var taxa    = parseFloat(document.getElementById('dv-taxa').value||0);
   var idx     = document.getElementById('dv-indexador').value;
 
   if(!pagId){ toast('⚠️ Selecione uma pessoa','err'); return; }
   if(!desc){ toast('⚠️ Informe a descrição','err'); return; }
-  if(!val || val<=0){ toast('⚠️ Informe o valor inicial','err'); return; }
 
   var pag = PAGADORES.find(function(p){ return String(p.id)===String(pagId); });
+
+  if(dividaEmEdicaoId){
+    var existente = DIVIDAS.find(function(x){ return String(x.id)===String(dividaEmEdicaoId); });
+    if(!existente){ toast('⚠️ Registro não encontrado','err'); dividaEmEdicaoId=null; return; }
+    existente.pagadorId = String(pagId); existente.pagadorNome = pag?pag.nome:'';
+    existente.desc = desc; existente.metodoJuros = metodo; existente.taxaMensal = taxa; existente.indexador = idx;
+    saveDividas();
+    apiCall('salvarDivida', existente, function(){});
+    dividaEmEdicaoId = null;
+    var valEl=document.getElementById('dv-val'); if(valEl) valEl.closest('div').style.display='';
+    var dataEl=document.getElementById('dv-data'); if(dataEl) dataEl.closest('div').style.display='';
+    var btnR = document.getElementById('dv-btn-registrar');
+    if(btnR) btnR.textContent = '+ Registrar';
+    ['dv-desc'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    renderDividas();
+    toast('✅ Atualizado!');
+    return;
+  }
+
+  var val     = parseFloat(document.getElementById('dv-val').value||0);
+  var data    = document.getElementById('dv-data').value || ymd(new Date());
+  if(!val || val<=0){ toast('⚠️ Informe o valor inicial','err'); return; }
 
   var divida = {
     id: Date.now(), tipo: tipo, pagadorId: String(pagId), pagadorNome: pag?pag.nome:'',
@@ -7949,21 +7999,66 @@ function addFinanciamento(){
   toast(eraEdicao ? '✅ Financiamento atualizado!' : '✅ Financiamento cadastrado! '+parcelas+' parcelas geradas.');
 }
 
+var rotativoEmEdicaoId = null;
+
+function abrirEditarRotativo(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  rotativoEmEdicaoId = id;
+  setDvTipo('financiamento'); setFinSistema('ROTATIVO'); setFinTaxaTipo(d.tipoTaxa||'fixa');
+  document.getElementById('dv-desc').value = d.desc||'';
+  document.getElementById('dv-rot-liberado').value = d.valorLiberado||'';
+  document.getElementById('dv-fin-taxa').value = d.taxaMensal||'';
+  document.getElementById('dv-rot-iofbasico').value = d.iofBasicoPct||'';
+  document.getElementById('dv-rot-iofadicional').value = d.iofAdicionalPct||'';
+  // Valor já utilizado / data não são editáveis aqui — vêm do extrato de
+  // movimentos (saques/amortizações), não faz sentido sobrescrever.
+  var utilWrap = document.getElementById('dv-rot-utilizado'); if(utilWrap) utilWrap.closest('div').style.display='none';
+  var dataWrap = document.getElementById('dv-rot-data'); if(dataWrap) dataWrap.closest('div').style.display='none';
+
+  var btn = document.getElementById('dv-btn-registrar');
+  if(btn) btn.textContent = '💾 Salvar Alterações';
+  var formBody = document.getElementById('div-form-body');
+  if(formBody && formBody.style.display==='none') toggleColl('div-form-body','div-form-arrow');
+  formBody.scrollIntoView({behavior:'smooth', block:'start'});
+  toast('✏️ Editando — altere e salve');
+}
+
 function addCapitalGiroRotativo(){
   var desc      = (document.getElementById('dv-desc').value||'').trim();
   var liberado  = parseFloat(document.getElementById('dv-rot-liberado').value||0);
-  var utilizado = parseFloat(document.getElementById('dv-rot-utilizado').value||0);
-  var data      = document.getElementById('dv-rot-data').value || ymd(new Date());
   var taxa      = parseFloat(document.getElementById('dv-fin-taxa').value||0);
   var iofBasico = parseFloat(document.getElementById('dv-rot-iofbasico').value||0);
   var iofAdic   = parseFloat(document.getElementById('dv-rot-iofadicional').value||0);
+  var tipoTaxa  = document.getElementById('dv-fin-taxatipo').value || 'fixa';
 
   if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
   if(!liberado || liberado<=0){ toast('⚠️ Informe o valor liberado','err'); return; }
-  if(utilizado > liberado){ toast('⚠️ Valor utilizado não pode ser maior que o liberado','err'); return; }
   if(taxa < 0){ toast('⚠️ Taxa inválida','err'); return; }
 
-  var tipoTaxa = document.getElementById('dv-fin-taxatipo').value || 'fixa';
+  if(rotativoEmEdicaoId){
+    var existente = DIVIDAS.find(function(x){ return String(x.id)===String(rotativoEmEdicaoId); });
+    if(!existente){ toast('⚠️ Registro não encontrado','err'); rotativoEmEdicaoId=null; return; }
+    existente.desc = desc; existente.valorLiberado = liberado; existente.taxaMensal = taxa;
+    existente.iofBasicoPct = iofBasico; existente.iofAdicionalPct = iofAdic; existente.tipoTaxa = tipoTaxa;
+    saveDividas();
+    apiCall('salvarDivida', existente, function(){});
+    rotativoEmEdicaoId = null;
+    var utilEl=document.getElementById('dv-rot-utilizado'); if(utilEl) utilEl.closest('div').style.display='';
+    var dataEl=document.getElementById('dv-rot-data'); if(dataEl) dataEl.closest('div').style.display='';
+    var btnR = document.getElementById('dv-btn-registrar');
+    if(btnR) btnR.textContent = '+ Registrar';
+    ['dv-desc','dv-rot-liberado','dv-fin-taxa','dv-rot-iofbasico','dv-rot-iofadicional'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    setFinTaxaTipo('fixa'); setFinSistema('PRICE');
+    renderDividas();
+    toast('✅ Atualizado!');
+    return;
+  }
+
+  var utilizado = parseFloat(document.getElementById('dv-rot-utilizado').value||0);
+  var data      = document.getElementById('dv-rot-data').value || ymd(new Date());
+  if(utilizado > liberado){ toast('⚠️ Valor utilizado não pode ser maior que o liberado','err'); return; }
+
   var movimentos = [];
   if(utilizado > 0){
     movimentos.push({id:Date.now(), tipo:'saque', valor:utilizado, data:data, obs:'Saque inicial'});
@@ -8093,29 +8188,74 @@ function dividaCardHTML(d){
       (primeiroMov?('Início: '+fmtBRL(primeiroMov.valor)+' em '+fmtDate(primeiroMov.data)):'')+' · '+esc(metodoLabel)+
     '</div>'+
     '<div style="font-size:12px;color:var(--t3);margin-bottom:10px">'+movs.length+' movimento'+(movs.length!==1?'s':'')+' registrado'+(movs.length!==1?'s':'')+'</div>'+
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-      '<button data-addmov="'+d.id+'" style="flex:1;min-width:100px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">+ Movimento</button>'+
-      '<button data-histdiv="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Extrato</button>'+
-      '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar extrato">🔗</button>'+
-      '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '<div style="display:flex;gap:4px;flex-wrap:nowrap">'+
+      '<button data-addmov="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:none;border-radius:7px;background:var(--green);color:#0A1A12;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">+ Mov.</button>'+
+      '<button data-histdiv="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t1);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">📋 Extrato</button>'+
+      '<button data-editdivida="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit" title="Editar informações">✏️</button>'+
+      '<button data-linkdiv="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--blue);font-size:12px;cursor:pointer;font-family:inherit" title="Compartilhar extrato">🔗</button>'+
+      '<button data-deldiv="'+d.id+'" style="flex-shrink:0;padding:8px 10px;border:none;border-radius:7px;background:transparent;color:var(--red);font-size:13px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
   '</div>';
 }
 
+var spvEmEdicaoId = null;
+
+function abrirEditarSPV(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  spvEmEdicaoId = id;
+  setDvTipo('financiamento'); setFinSistema('SPV'); setFinTaxaTipo(d.tipoTaxa||'fixa');
+  document.getElementById('dv-desc').value = d.desc||'';
+  document.getElementById('dv-fin-taxa').value = d.taxaMensal||'';
+  document.getElementById('dv-spv-diavenc').value = d.diaVencimento||'';
+  document.getElementById('dv-spv-saldoatual').value = d.valorUtilizado||'';
+  // Valor emprestado / data de início não editáveis aqui — o saldo já
+  // reflete o histórico de pagamentos; ajuste-o pelo campo "Saldo atual".
+  var valWrap = document.getElementById('dv-spv-val'); if(valWrap) valWrap.closest('div').style.display='none';
+  var dataWrap = document.getElementById('dv-spv-data'); if(dataWrap) dataWrap.closest('div').style.display='none';
+
+  var btn = document.getElementById('dv-btn-registrar');
+  if(btn) btn.textContent = '💾 Salvar Alterações';
+  var formBody = document.getElementById('div-form-body');
+  if(formBody && formBody.style.display==='none') toggleColl('div-form-body','div-form-arrow');
+  formBody.scrollIntoView({behavior:'smooth', block:'start'});
+  toast('✏️ Editando — altere e salve');
+}
+
 function addFinanciamentoSPV(){
   var desc = (document.getElementById('dv-desc').value||'').trim();
-  var val  = parseFloat(document.getElementById('dv-spv-val').value||0);
-  var data = document.getElementById('dv-spv-data').value || ymd(new Date());
   var diaVenc = parseInt(document.getElementById('dv-spv-diavenc').value||0);
   var saldoAtualInformado = parseFloat(document.getElementById('dv-spv-saldoatual').value||0);
   var taxa = parseFloat(document.getElementById('dv-fin-taxa').value||0);
-
-  if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
-  if(!val || val<=0){ toast('⚠️ Informe o valor emprestado','err'); return; }
-  if(taxa < 0){ toast('⚠️ Taxa inválida','err'); return; }
-
   var tipoTaxa = document.getElementById('dv-fin-taxatipo').value || 'fixa';
   var indexador = document.getElementById('dv-fin-indexador').value || 'CDI';
+
+  if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
+  if(taxa < 0){ toast('⚠️ Taxa inválida','err'); return; }
+
+  if(spvEmEdicaoId){
+    var existente = DIVIDAS.find(function(x){ return String(x.id)===String(spvEmEdicaoId); });
+    if(!existente){ toast('⚠️ Registro não encontrado','err'); spvEmEdicaoId=null; return; }
+    existente.desc = desc; existente.taxaMensal = taxa; existente.diaVencimento = diaVenc||0;
+    existente.tipoTaxa = tipoTaxa; existente.indexador = tipoTaxa==='indexada' ? indexador : '';
+    if(saldoAtualInformado>0) existente.valorUtilizado = saldoAtualInformado;
+    saveDividas();
+    apiCall('salvarDivida', existente, function(){});
+    spvEmEdicaoId = null;
+    var valEl=document.getElementById('dv-spv-val'); if(valEl) valEl.closest('div').style.display='';
+    var dataEl=document.getElementById('dv-spv-data'); if(dataEl) dataEl.closest('div').style.display='';
+    var btnR = document.getElementById('dv-btn-registrar');
+    if(btnR) btnR.textContent = '+ Registrar';
+    ['dv-desc','dv-spv-diavenc','dv-spv-saldoatual'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    setFinTaxaTipo('fixa'); setFinSistema('PRICE');
+    renderDividas();
+    toast('✅ Atualizado!');
+    return;
+  }
+
+  var val  = parseFloat(document.getElementById('dv-spv-val').value||0);
+  var data = document.getElementById('dv-spv-data').value || ymd(new Date());
+  if(!val || val<=0){ toast('⚠️ Informe o valor emprestado','err'); return; }
 
   var fin = {
     id: Date.now(), tipo: 'financiamento', pagadorId:'', pagadorNome:'',
@@ -8196,11 +8336,12 @@ function spvCardHTML(d){
 
     (!r.quitado ? '<div style="font-size:12px;color:var(--t3);margin-bottom:10px">Juros projetados até hoje: '+fmtBRL(r.jurosProjetados)+' ('+r.diasDesdeUltimoPagamento+' dias desde o último pagamento)</div>' : '')+
 
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-      (r.quitado ? '' : '<button data-spvpagamento="'+d.id+'" style="flex:1;min-width:120px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">💵 Registrar Pagamento</button>')+
-      '<button data-spvhist="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Extrato</button>'+
-      '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
-      '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '<div style="display:flex;gap:4px;flex-wrap:nowrap">'+
+      (r.quitado ? '' : '<button data-spvpagamento="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:none;border-radius:7px;background:var(--green);color:#0A1A12;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">💵 Pagar</button>')+
+      '<button data-spvhist="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t1);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">📋 Extrato</button>'+
+      '<button data-editspv="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit" title="Editar informações">✏️</button>'+
+      '<button data-linkdiv="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--blue);font-size:12px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
+      '<button data-deldiv="'+d.id+'" style="flex-shrink:0;padding:8px 10px;border:none;border-radius:7px;background:transparent;color:var(--red);font-size:13px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
   '</div>';
 }
@@ -8241,11 +8382,12 @@ function rotativoCardHTML(d){
       '<div style="font-size:12px;color:var(--t3);margin-bottom:10px">Próximo juros estimado: '+fmtBRL(r.proximoJuros)+(r.proximoIof>0?' + IOF '+fmtBRL(r.proximoIof):'')+'</div>'
       : '<div style="font-size:12px;color:var(--t3);margin-bottom:10px">Nenhum saque em aberto</div>') +
 
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-      '<button data-rotmov="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">+ Movimento</button>'+
-      '<button data-rothist="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📋 Extrato</button>'+
-      '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
-      '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '<div style="display:flex;gap:4px;flex-wrap:nowrap">'+
+      '<button data-rotmov="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:none;border-radius:7px;background:var(--green);color:#0A1A12;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">+ Mov.</button>'+
+      '<button data-rothist="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t1);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">📋 Extrato</button>'+
+      '<button data-editrotativo="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit" title="Editar informações">✏️</button>'+
+      '<button data-linkdiv="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--blue);font-size:12px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
+      '<button data-deldiv="'+d.id+'" style="flex-shrink:0;padding:8px 10px;border:none;border-radius:7px;background:transparent;color:var(--red);font-size:13px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
   '</div>';
 }
@@ -8291,14 +8433,14 @@ function financiamentoCardHTML(d){
       '<div style="font-size:12px;color:var(--t3);margin-bottom:10px">Próxima parcela ('+resumo.proximaParcela.parcela+'): '+fmtBRL(resumo.proximaParcela.valorParcela)+' em '+fmtDate(resumo.proximaParcela.data)+'</div>'
       : '<div style="font-size:11px;color:var(--green);margin-bottom:10px">✅ Todas as parcelas quitadas</div>') +
 
-    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
-      (resumo.quitado ? '' : '<button data-pagarparcela="'+d.id+'" style="flex:1;min-width:100px;padding:9px;border:none;border-radius:8px;background:var(--green);color:#0A1A12;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">✅ Pagar parcela</button>')+
-      '<button data-tabelafin="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📊 Tabela</button>'+
-      (resumo.quitado ? '' : '<button data-amortextra="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:#6D28D9;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">⚡ Extra</button>')+
-      (isIndexada && !resumo.quitado ? '<button data-atualizartaxa="'+d.id+'" style="flex:1;min-width:80px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:#B794F6;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Taxa</button>' : '')+
-      '<button data-editfin="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-size:13px;cursor:pointer;font-family:inherit" title="Editar informações">✏️</button>'+
-      '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
-      '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
+    '<div style="display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto">'+
+      (resumo.quitado ? '' : '<button data-pagarparcela="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:none;border-radius:7px;background:var(--green);color:#0A1A12;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">✅ Pagar</button>')+
+      '<button data-tabelafin="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t1);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">📊 Tabela</button>'+
+      (resumo.quitado ? '' : '<button data-amortextra="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:1px solid var(--border);border-radius:7px;background:transparent;color:#6D28D9;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">⚡</button>')+
+      (isIndexada && !resumo.quitado ? '<button data-atualizartaxa="'+d.id+'" style="flex:1;min-width:0;padding:8px 4px;border:1px solid var(--border);border-radius:7px;background:transparent;color:#B794F6;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap">🔄</button>' : '')+
+      '<button data-editfin="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--t2);font-size:12px;cursor:pointer;font-family:inherit" title="Editar informações">✏️</button>'+
+      '<button data-linkdiv="'+d.id+'" style="flex-shrink:0;padding:8px 9px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--blue);font-size:12px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
+      '<button data-deldiv="'+d.id+'" style="flex-shrink:0;padding:8px 10px;border:none;border-radius:7px;background:transparent;color:var(--red);font-size:13px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
   '</div>';
 }
@@ -9080,13 +9222,28 @@ function sincronizarDividas(cb){
 
       if(pendentes.length === 0){ finalizar(); return; }
 
-      var enviados = 0;
-      pendentes.forEach(function(x){
-        apiCall('salvarDivida', x, function(){
-          enviados++;
-          if(enviados === pendentes.length) finalizar();
+      // IMPORTANTE: reenviar SEQUENCIALMENTE (um de cada vez), não em
+      // paralelo. Se vários financiamentos precisarem adicionar as
+      // mesmas colunas novas na planilha ao mesmo tempo, chamadas em
+      // paralelo podem colidir e corromper a estrutura — mesmo com um
+      // bloqueio no servidor, em alta concorrência ele pode expirar sem
+      // conseguir serializar tudo a tempo. Sequencial evita o problema
+      // por completo, sem depender de nada no servidor.
+      var falhas = [];
+      var idx = 0;
+      function enviarProximo(){
+        if(idx >= pendentes.length){
+          if(falhas.length) console.warn('Falha ao sincronizar dívida(s):', falhas.join(', '));
+          finalizar();
+          return;
+        }
+        var x = pendentes[idx++];
+        apiCall('salvarDivida', x, function(err){
+          if(err) falhas.push(x.desc || x.id);
+          enviarProximo();
         });
-      });
+      }
+      enviarProximo();
     });
   });
 }
