@@ -2,7 +2,7 @@
 // ║   FAMÍLIA APP — BACKEND                                  ║
 // ║   1. Cole este código no Google Apps Script              ║
 // ║   2. Salve (Ctrl+S)                                      ║
-// ║   3. Implantar > Gerenciar implantações > ✏️ editar      ║
+// ║   3. Implantar > Gerenciar implantações > ✏️ editar       ║
 // ║   4. Versão: "Nova versão" > Implantar                   ║
 // ╚══════════════════════════════════════════════════════════╝
 
@@ -1334,7 +1334,7 @@ function garantirEstruturaDividas() {
                  'tipoTaxa','historicoTaxasJSON',
                  'valorLiberado','dataUltimaParcela','iofTotal',
                  'valorUtilizado','iofBasicoPct','iofAdicionalPct','parcelaFixaInformada',
-                 'valoresPagosJSON'];
+                 'valoresPagosJSON','cor'];
   var eraNova = !sh;
   if (!sh) sh = sp.insertSheet('Dívidas');
   var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
@@ -1603,7 +1603,8 @@ function salvarDividaEstruturada(body) {
       iofBasicoPct:          parseFloat(body.iofBasicoPct) || 0,
       iofAdicionalPct:       parseFloat(body.iofAdicionalPct) || 0,
       parcelaFixaInformada:  parseFloat(body.parcelaFixaInformada) || 0,
-      valoresPagosJSON:      JSON.stringify(body.valoresPagos || {})
+      valoresPagosJSON:      JSON.stringify(body.valoresPagos || {}),
+      cor:                   body.cor || ''
     };
     _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader);
 
@@ -1668,7 +1669,8 @@ function salvarDividaEstruturada(body) {
     sistemaAmortizacao:   '',
     numParcelas:          '',
     parcelasPagas:        '',
-    extrasJSON:           ''
+    extrasJSON:           '',
+    cor:                  body.cor || ''
   };
   _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader2);
 
@@ -1745,7 +1747,8 @@ function getDividasEstruturadas() {
       saldoDevedorEstimado: (typeof obj.saldoDevedorEstimado === 'number') ? obj.saldoDevedorEstimado : null,
       status: obj.status || 'pendente',
       criadoEm: obj.criadoEm instanceof Date ? obj.criadoEm.toISOString() : String(obj.criadoEm || ''),
-      movimentos: movs
+      movimentos: movs,
+      cor: obj.cor || ''
     };
 
     // Campos extras de Financiamento
