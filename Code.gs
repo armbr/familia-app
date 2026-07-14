@@ -1334,7 +1334,8 @@ function garantirEstruturaDividas() {
                  'tipoTaxa','historicoTaxasJSON',
                  'valorLiberado','dataUltimaParcela','iofTotal',
                  'valorUtilizado','iofBasicoPct','iofAdicionalPct','parcelaFixaInformada',
-                 'valoresPagosJSON','cor'];
+                 'valoresPagosJSON','cor','saldoDevedorInformado','seguroPrestamista','outrasDespesasIniciais',
+                 'diaVencimento'];
   var eraNova = !sh;
   if (!sh) sh = sp.insertSheet('Dívidas');
   var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
@@ -1604,7 +1605,11 @@ function salvarDividaEstruturada(body) {
       iofAdicionalPct:       parseFloat(body.iofAdicionalPct) || 0,
       parcelaFixaInformada:  parseFloat(body.parcelaFixaInformada) || 0,
       valoresPagosJSON:      JSON.stringify(body.valoresPagos || {}),
-      cor:                   body.cor || ''
+      cor:                   body.cor || '',
+      saldoDevedorInformado: parseFloat(body.saldoDevedorInformado) || 0,
+      seguroPrestamista:     parseFloat(body.seguroPrestamista) || 0,
+      outrasDespesasIniciais: parseFloat(body.outrasDespesasIniciais) || 0,
+      diaVencimento:          parseInt(body.diaVencimento) || 0
     };
     _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader);
 
@@ -1767,6 +1772,10 @@ function getDividasEstruturadas() {
       item.iofAdicionalPct    = parseFloat(obj.iofAdicionalPct) || 0;
       item.parcelaFixaInformada = parseFloat(obj.parcelaFixaInformada) || 0;
       try { item.valoresPagos = JSON.parse(obj.valoresPagosJSON || '{}'); } catch(e3) { item.valoresPagos = {}; }
+      item.saldoDevedorInformado = parseFloat(obj.saldoDevedorInformado) || 0;
+      item.seguroPrestamista = parseFloat(obj.seguroPrestamista) || 0;
+      item.outrasDespesasIniciais = parseFloat(obj.outrasDespesasIniciais) || 0;
+      item.diaVencimento = parseInt(obj.diaVencimento) || 0;
     }
 
     result.push(item);
@@ -2230,10 +2239,25 @@ function gerarTabelaAmortizacaoServer(fin){
     ? parseFloat(fin.parcelaFixaInformada)
     : (n>0 ? calcularParcelaPriceServer(pv, taxaAnterior, n) : 0);
 
+  var parcelasPagasIni = parseInt(fin.parcelasPagas)||0;
+  var saldoInformadoAplicado = false;
+
   for (var k=1; k<=n && saldo>0.005; k++){
     var dataParcela = addMesesServer(dataIni, k-1);
     var iPct = isIndexada ? taxaAplicavelNaDataServer(historico, dataParcela, iPctBase) : iPctBase;
     var i = iPct/100;
+
+    // Financiamento cadastrado já em andamento — corrige o saldo pelo
+    // valor informado e recalcula o resto do prazo a partir daqui.
+    if (!saldoInformadoAplicado && parseFloat(fin.saldoDevedorInformado)>0 && k===parcelasPagasIni+1) {
+      saldo = parseFloat(fin.saldoDevedorInformado);
+      var parcRestSaldo = n - parcelasPagasIni;
+      if (parcRestSaldo>0) {
+        if (sistema==='SAC') amortConstante = saldo / parcRestSaldo;
+        else if (sistema==='PRICE') parcelaFixa = calcularParcelaPriceServer(saldo, iPct, parcRestSaldo);
+      }
+      saldoInformadoAplicado = true;
+    }
 
     // Se a taxa mudou desde a última parcela E o sistema é Price, recalcular
     // a parcela fixa para o saldo/prazo restantes (recast, como os bancos fazem)
