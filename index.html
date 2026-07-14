@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260713-191838</title>
+<title>Fluxo v20260714-002559</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -4426,7 +4426,7 @@ function renderHist(){
         return {
           id: 'cg-'+g.id, type:'exp', desc:g.desc, value:g.val, cat:g.cat, date:g.data,
           __cgasto:true, __cgastoRealId:g.id, cartaoNome:g.cartao,
-          parcelaAtual:g.parcelaAtual||1, parcelaTotal:g.parcelaTotal||1, valorCompraTotal:g.valorCompraTotal||g.val
+          parcelaAtual:g.parcelaAtual||1, parcelaTotal:g.parcelaTotal||1, valorCompraTotal:g.valorCompraTotal||g.val, compraId:g.compraId||g.id
         };
       });
 
@@ -4541,7 +4541,7 @@ function renderCat(){
       var cat = g.cat || '💳 Cartão de Crédito';
       var cartao = CARTOES.find(function(c){ return String(c.id)===String(g.cartaoId); });
       addItem(cat, {desc:g.desc, value:parseFloat(g.valorCompraTotal||g.val||0), date:g.data, isCartao:true, cartaoNome: cartao?cartao.nome:'',
-        parcelaAtual: g.parcelaAtual||1, parcelaTotal: g.parcelaTotal||1, valorCompraTotal: g.valorCompraTotal||g.val, catItemId: 'cgcat-'+g.id});
+        parcelaAtual: g.parcelaAtual||1, parcelaTotal: g.parcelaTotal||1, valorCompraTotal: g.valorCompraTotal||g.val, catItemId: 'cgcat-'+g.id, compraId: g.compraId||g.id});
     });
   } else {
     // Visão Financeira: cada parcela é um card próprio, com o valor
@@ -4550,7 +4550,7 @@ function renderCat(){
       var cat = g.cat || '💳 Cartão de Crédito';
       var cartao = CARTOES.find(function(c){ return String(c.id)===String(g.cartaoId); });
       addItem(cat, {desc:g.desc, value:parseFloat(g.val||0), date:g.data, isCartao:true, cartaoNome: cartao?cartao.nome:'',
-        parcelaAtual: g.parcelaAtual||1, parcelaTotal: g.parcelaTotal||1, valorCompraTotal: g.valorCompraTotal||g.val, catItemId: 'cgcat-'+g.id});
+        parcelaAtual: g.parcelaAtual||1, parcelaTotal: g.parcelaTotal||1, valorCompraTotal: g.valorCompraTotal||g.val, catItemId: 'cgcat-'+g.id, compraId: g.compraId||g.id});
     });
   }
 
@@ -4604,6 +4604,7 @@ function abrirCategoriaModal(cat){
             '<div>💳 Cartão: <b style="color:var(--t1)">'+esc(i.cartaoNome||'')+'</b></div>'+
             (i.parcelaTotal>1?'<div>📑 Parcela: <b style="color:var(--t1)">'+i.parcelaAtual+'/'+i.parcelaTotal+'</b></div>':'')+
             '<div>💰 Valor total da compra: <b style="color:var(--t1)">'+fmtBRL(i.valorCompraTotal||i.value)+'</b></div>'+
+            '<button data-delcompra="'+i.compraId+'" style="margin-top:8px;width:100%;padding:8px;border:1px solid var(--red);border-radius:7px;background:transparent;color:var(--red);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit">🗑️ Excluir compra'+(i.parcelaTotal>1?' (todas as '+i.parcelaTotal+' parcelas)':'')+'</button>'+
           '</div>'
         : '';
       return '<div '+(temDetalhe?'data-txcardtoggle="'+i.catItemId+'" style="cursor:pointer;padding:9px 0;border-bottom:1px solid var(--border)"':'style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"')+'>'+
@@ -4660,6 +4661,7 @@ function txCard(t){
         '<div>💳 Cartão: <b style="color:var(--t1)">'+esc(t.cartaoNome||'')+'</b></div>'+
         '<div>📑 Parcela: <b style="color:var(--t1)">'+t.parcelaAtual+'/'+t.parcelaTotal+'</b></div>'+
         '<div>💰 Valor total da compra: <b style="color:var(--t1)">'+fmtBRL(t.valorCompraTotal||0)+'</b></div>'+
+        '<button data-delcompra="'+t.compraId+'" style="margin-top:8px;width:100%;padding:8px;border:1px solid var(--red);border-radius:7px;background:transparent;color:var(--red);font-weight:700;font-size:11px;cursor:pointer;font-family:inherit">🗑️ Excluir compra'+(t.parcelaTotal>1?' (todas as '+t.parcelaTotal+' parcelas)':'')+'</button>'+
       '</div>'+
     '</div>'+
     '<div class="txi-val '+tp+'">'+sig+fmtBRL(parseFloat(t.value||0))+'</div>'+
@@ -4839,8 +4841,11 @@ function renderFinCC(){
       html += '<div style="text-align:center;padding:20px;color:var(--t3)">Nenhum gasto nesta fatura</div>';
     }
 
-    if(pendentes.length){
-      html += '<button data-fechfin="'+cid+'|'+moStr+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">💳 Fechar fatura — '+fmtBRL(totalPend)+'</button>';
+    var faturaEstaFechada = gastos.length>0 && pendentes.length===0;
+    if(gastos.length){
+      html += (faturaEstaFechada
+        ? '<button data-fechfin="'+cid+'|'+moStr+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--green);color:#0A1A12;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">✅ Fatura Fechada — '+fmtBRL(total)+'</button>'
+        : '<button data-fechfin="'+cid+'|'+moStr+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">💳 Fechar fatura — '+fmtBRL(totalPend)+'</button>');
     }
     html += '</div>';
   }
@@ -5509,6 +5514,8 @@ function initTaskDelegation(){
     if(txdel){ delTx(txdel.getAttribute('data-txdel')); return; }
     var cgastodel = e.target.closest('[data-cgastodel]');
     if(cgastodel){ delGasto(cgastodel.getAttribute('data-cgastodel')); return; }
+    var delcompra = e.target.closest('[data-delcompra]');
+    if(delcompra){ excluirCompraCompleta(delcompra.getAttribute('data-delcompra')); return; }
     var txcardtoggle = e.target.closest('[data-txcardtoggle]');
     if(txcardtoggle){ toggleTxCardDetail(txcardtoggle.getAttribute('data-txcardtoggle')); return; }
     // Recibos
@@ -7082,39 +7089,61 @@ function addGastoCartao(){
   var pgEl=document.getElementById('cg-parc'); if(pgEl) pgEl.value='1';
   renderCC(); renderHist(); toast('✅ Gasto registrado'+(parc>1?' em '+parc+'x':'')+'!');
 }
-function delGasto(id){
-  // Encontrar o gasto antes de remover para saber sua fatura
+// Remove um gasto de cartão específico da memória/servidor e limpa
+// referências em TXS antigos — usado tanto pra excluir 1 parcela quanto
+// (em loop) pra excluir a compra inteira.
+function _removerGastoInterno(id){
   var gasto = CGASTOS.find(function(g){ return String(g.id)===String(id); });
-
   addTombstone('cgastos', id);
   CGASTOS = CGASTOS.filter(function(g){ return String(g.id)!==String(id); });
-  saveCGastos();
   apiCall('deletarItemSheet', {aba:'GastosCartao', id:id}, function(){});
 
-  // Remover do TXS qualquer lançamento de fatura que contenha este gasto
-  var antes = TXS.length;
   TXS = TXS.filter(function(t){
     if(!t.cgastoIds) return true;
-    // Remover o TX se continha SOMENTE este gasto
     var ids = t.cgastoIds.map(String);
     if(ids.length === 1 && ids[0] === String(id)) return false;
-    // Se o TX tinha múltiplos gastos: recriar sem este gasto
     if(ids.indexOf(String(id)) > -1){
-      // Recalcular o valor deste TX subtraindo o gasto excluído
       if(gasto) t.value = Math.max(0, parseFloat(t.value||0) - parseFloat(gasto.val||0));
       t.cgastoIds = ids.filter(function(x){ return x !== String(id); });
-      if(t.value <= 0) return false; // remover se zerou
+      if(t.value <= 0) return false;
     }
     return true;
   });
-  if(TXS.length !== antes){
-    localStorage.setItem('ff_txs', JSON.stringify(TXS));
-  }
+}
 
+function delGasto(id){
+  _removerGastoInterno(id);
+  saveCGastos();
+  localStorage.setItem('ff_txs', JSON.stringify(TXS));
   renderCC();
   renderBal();
   renderHist();
   toast('🗑️ Gasto removido');
+}
+
+// Exclui uma compra inteira (todas as parcelas de uma vez) — útil pra
+// devolução de produto, por exemplo. Se alguma parcela já estiver numa
+// fatura fechada, avisa que o valor do lembrete de pagamento já criado
+// não se ajusta sozinho, mas não bloqueia a exclusão por causa disso.
+function excluirCompraCompleta(compraId){
+  var parcelas = CGASTOS.filter(function(g){ return String(g.compraId)===String(compraId); });
+  if(!parcelas.length){ toast('⚠️ Compra não encontrada','err'); return; }
+
+  var algumaPaga = parcelas.some(function(g){ return g.pago; });
+  var msg = 'Excluir esta compra e ' + (parcelas.length>1 ? 'todas as '+parcelas.length+' parcelas' : 'sua parcela única') + '?';
+  if(algumaPaga){
+    msg += '\n\n⚠️ Uma ou mais parcelas já estão numa fatura fechada. O valor do lembrete de pagamento já criado não é ajustado automaticamente — edite manualmente se precisar corrigir.';
+  }
+  if(!confirm(msg)) return;
+
+  parcelas.forEach(function(g){ _removerGastoInterno(g.id); });
+  saveCGastos();
+  localStorage.setItem('ff_txs', JSON.stringify(TXS));
+  renderCC();
+  renderBal();
+  renderHist();
+  try{ renderCat(); }catch(e){}
+  toast('🗑️ Compra excluída ('+parcelas.length+' parcela(s))');
 }
 // Fecha a fatura do cartão criando UM lançamento PARA CADA CATEGORIA
 // (não um único lançamento "Cartão de Crédito"), preservando a real
@@ -7143,21 +7172,34 @@ function fecharFaturaInterno(cartaoId, mesAno){
 // esse card como pago NÃO lança um valor duplicado em Finanças (ver
 // chgTaskStatus — reconhece cartaoIdFatura e evita relançar).
 function criarLembreteFatura(cartao, mesAno, total){
-  var jaExiste = TASKS.some(function(t){
-    return t.cartaoIdFatura===String(cartao.id) && t.fatMesRef===mesAno && t.status!=='done';
-  });
-  if(jaExiste) return;
-
   var partes = mesAno.split('-');
   var ano = parseInt(partes[0]), mes = parseInt(partes[1]);
+  var mesLabel = MESES_BR[mes-1]+'/'+ano;
+  var novaDesc = '💳 Pagar fatura '+cartao.nome+' — '+mesLabel+' ('+fmtBRL(total)+')';
+
+  // Já existe um lembrete pra essa fatura (pago ou não)? Atualiza o
+  // valor e a descrição em vez de criar outro — é assim que o botão
+  // "Fatura Fechada" consegue reabrir só pra corrigir o valor.
+  var existente = TASKS.find(function(t){
+    return t.cartaoIdFatura===String(cartao.id) && t.fatMesRef===mesAno;
+  });
+  if(existente){
+    existente.value = total;
+    existente.desc = novaDesc;
+    localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
+    apiCall('updateTask', {id:existente.id, value:total, desc:novaDesc}, function(err){
+      if(err) console.warn('Erro ao atualizar lembrete de fatura:', err);
+    });
+    return;
+  }
+
   var ultimoDia = new Date(ano, mes, 0).getDate();
   var diaVenc = Math.min(parseInt(cartao.venc)||10, ultimoDia);
   var deadline = mesAno+'-'+String(diaVenc).padStart(2,'0');
-  var mesLabel = MESES_BR[mes-1]+'/'+ano;
 
   var tmp = Date.now();
   var task = {
-    id: tmp, desc: '💳 Pagar fatura '+cartao.nome+' — '+mesLabel+' ('+fmtBRL(total)+')',
+    id: tmp, desc: novaDesc,
     type: 'exp', value: total, deadline: deadline, status: 'pend',
     cartaoIdFatura: String(cartao.id), fatMesRef: mesAno // marcadores p/ evitar duplicar e evitar relançar em Finanças
   };
@@ -7183,19 +7225,29 @@ function fecharFatura(cartaoId,mesAno){
   var cartao=CARTOES.find(function(c){return String(c.id)===cartaoId;});
   if(!cartao) return;
   var gastos=CGASTOS.filter(function(g){return String(g.cartaoId)===cartaoId&&g.fatMes===mesAno&&!g.pago;});
-  var total=gastos.reduce(function(s,g){return s+g.val;},0);
+  var totalPendente=gastos.reduce(function(s,g){return s+g.val;},0);
   var partes=mesAno.split('-');
   var mesLabel=MESES_BR[parseInt(partes[1])-1]+'/'+partes[0];
+
+  // Se a fatura já foi fechada antes (sem pendências novas), usa o valor
+  // do lembrete já criado como ponto de partida — permite reabrir só
+  // pra ajustar o valor, sem perder a referência do que foi confirmado.
+  var lembreteExistente = TASKS.find(function(t){
+    return t.cartaoIdFatura===String(cartaoId) && t.fatMesRef===mesAno;
+  });
+  var valorInicial = totalPendente>0 ? totalPendente : (lembreteExistente ? parseFloat(lembreteExistente.value||0) : 0);
 
   fecharFaturaContexto = {cartaoId: cartaoId, mesAno: mesAno, cartao: cartao, mesLabel: mesLabel};
 
   document.getElementById('fecharfatura-modal-info').innerHTML =
     '<b>'+esc(cartao.nome)+' — '+mesLabel+'</b><br>'+
     (gastos.length
-      ? gastos.length+' gasto(s) registrado(s) no app, somando o valor abaixo.'
-      : '⚠️ Nenhum gasto foi registrado no app para este mês — informe o valor manualmente, conforme sua fatura real.')+
-    '<br><br>Os valores já contabilizados por categoria não mudam — fechar a fatura só cria o lembrete de pagamento com o valor que você confirmar abaixo.';
-  document.getElementById('fecharfatura-valor').value = total.toFixed(2);
+      ? gastos.length+' gasto(s) pendente(s) registrado(s) no app, somando o valor abaixo.'
+      : (lembreteExistente
+          ? '✅ Fatura já fechada — o valor abaixo é o que foi confirmado. Ajuste e salve se precisar corrigir.'
+          : '⚠️ Nenhum gasto foi registrado no app para este mês — informe o valor manualmente, conforme sua fatura real.'))+
+    '<br><br>Os valores já contabilizados por categoria não mudam — fechar a fatura só cria (ou atualiza) o lembrete de pagamento com o valor que você confirmar abaixo.';
+  document.getElementById('fecharfatura-valor').value = valorInicial.toFixed(2);
   document.getElementById('fecharfatura-modal').style.display = 'flex';
 }
 
@@ -7330,8 +7382,10 @@ function renderFatura(){
         '<div class="fi-val" style="color:'+(g.pago?'var(--t3)':'var(--red)')+'">'+fmtBRL(g.val)+'</div></div>';
     }).join('');
   }
-  if(pendentes.length){
-    html+='<button data-fechfin="'+cartaoId+'|'+mesAno+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">💳 Fechar fatura — '+fmtBRL(totalPend)+'</button>';
+  if(gastos.length){
+    html += (faturaFechada
+      ? '<button data-fechfin="'+cartaoId+'|'+mesAno+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--green);color:#0A1A12;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">✅ Fatura Fechada — '+fmtBRL(total)+'</button>'
+      : '<button data-fechfin="'+cartaoId+'|'+mesAno+'" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:10px;background:var(--red);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit">💳 Fechar fatura — '+fmtBRL(totalPend)+'</button>');
   }
   el.innerHTML=html;
 }
