@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260714-185719</title>
+<title>Fluxo v20260714-194112</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1614,6 +1614,10 @@ select option{background:#1A2A3A}
             <div style="margin-bottom:10px"><div class="fl">Dia de vencimento mensal <span style="color:var(--t3);font-weight:400">(opcional)</span></div>
               <input id="dv-spv-diavenc" type="number" placeholder="Ex: 10" step="1" min="1" max="31" inputmode="numeric">
               <div style="font-size:11px;color:var(--t3);margin-top:4px">Mesmo com o valor variável, o dia de cobrança dos juros geralmente é fixo — informe pra ver um lembrete de quando pagar.</div>
+            </div>
+            <div style="margin-bottom:10px"><div class="fl">Saldo devedor atual (R$) <span style="color:var(--t3);font-weight:400">(opcional — se já vem pagando antes de usar o app)</span></div>
+              <div class="r-wrap"><input id="dv-spv-saldoatual" type="number" placeholder="Deixe em branco se o financiamento é novo" step="0.01" min="0" inputmode="decimal"></div>
+              <div style="font-size:11px;color:var(--t3);margin-top:4px">Se você já fez amortizações além dos juros mensais antes de cadastrar aqui, informe o saldo real — sem isso, o app assume que o saldo ainda é o valor emprestado inteiro.</div>
             </div>
             <div style="font-size:12px;color:var(--t3);margin:-4px 0 10px;line-height:1.4">📊 As parcelas <b>não são fixas</b> — todo mês você registra o quanto pagou, e o app calcula os juros automaticamente sobre o saldo devedor. O que sobrar do pagamento abate o principal. A única regra é que os juros do período sempre precisam ser cobertos.</div>
           </div>
@@ -5587,6 +5591,8 @@ function initTaskDelegation(){
     }
     var histdiv = e.target.closest('[data-histdiv]');
     if(histdiv){ verHistoricoDivida(histdiv.getAttribute('data-histdiv')); return; }
+    var editfin = e.target.closest('[data-editfin]');
+    if(editfin){ abrirEditarFinanciamento(editfin.getAttribute('data-editfin')); return; }
     var linkdiv = e.target.closest('[data-linkdiv]');
     if(linkdiv){ abrirLinkDivida(linkdiv.getAttribute('data-linkdiv')); return; }
     var edittime = e.target.closest('[data-edittime]');
@@ -7700,7 +7706,12 @@ function resumoFinanciamento(fin){
   var tabela = gerarTabelaAmortizacao(fin);
   var pagas = parseInt(fin.parcelasPagas)||0;
   var linhaAtual = tabela[pagas]; // próxima parcela a pagar (0-indexed)
-  var saldoAtual = pagas>0 ? (tabela[pagas-1] ? tabela[pagas-1].saldoDevedor : fin.valorOriginal) : fin.valorOriginal;
+  // Se o usuário informou o saldo devedor oficial do banco, esse é o
+  // valor de referência — não o calculado pela fórmula teórica (que
+  // pode divergir por taxas/encargos que o app não tem como saber).
+  var saldoAtual = (parseFloat(fin.saldoDevedorInformado)>0)
+    ? parseFloat(fin.saldoDevedorInformado)
+    : (pagas>0 ? (tabela[pagas-1] ? tabela[pagas-1].saldoDevedor : fin.valorOriginal) : fin.valorOriginal);
   return {
     tabela: tabela,
     parcelasPagas: pagas,
@@ -7835,6 +7846,42 @@ function setFinTaxaTipo(tipo){
   if(indEl) indEl.style.display = tipo==='indexada' ? 'block' : 'none';
 }
 
+var financiamentoEmEdicaoId = null;
+
+function abrirEditarFinanciamento(id){
+  var d = DIVIDAS.find(function(x){ return String(x.id)===String(id); });
+  if(!d) return;
+  financiamentoEmEdicaoId = id;
+
+  setDvTipo('financiamento');
+  setFinSistema(d.sistemaAmortizacao||'PRICE');
+  setFinTaxaTipo(d.tipoTaxa||'fixa');
+
+  document.getElementById('dv-desc').value = d.desc||'';
+  document.getElementById('dv-fin-val').value = d.valorOriginal||'';
+  document.getElementById('dv-fin-liberado').value = d.valorLiberado||'';
+  document.getElementById('dv-fin-data').value = d.dataOriginal||'';
+  document.getElementById('dv-fin-taxa').value = d.taxaMensal||'';
+  document.getElementById('dv-fin-parcelas').value = d.numParcelas||'';
+  document.getElementById('dv-fin-pagas').value = d.parcelasPagas||0;
+  document.getElementById('dv-fin-ioftotal').value = d.iofTotal||'';
+  document.getElementById('dv-fin-seguro').value = d.seguroPrestamista||'';
+  document.getElementById('dv-fin-outrasdespesas').value = d.outrasDespesasIniciais||'';
+  document.getElementById('dv-fin-parcelafixa').value = d.parcelaFixaInformada||'';
+  document.getElementById('dv-fin-saldoinformado').value = d.saldoDevedorInformado||'';
+  document.getElementById('dv-fin-indexador').value = d.indexador||'CDI';
+  onDvFinPagasChange();
+  atualizarValorDevido();
+
+  var btn = document.getElementById('dv-btn-registrar');
+  if(btn) btn.textContent = '💾 Salvar Alterações';
+
+  var formBody = document.getElementById('div-form-body');
+  if(formBody && formBody.style.display==='none') toggleColl('div-form-body','div-form-arrow');
+  formBody.scrollIntoView({behavior:'smooth', block:'start'});
+  toast('✏️ Editando financiamento — altere e salve');
+}
+
 function addFinanciamento(){
   var sistema = document.getElementById('dv-fin-sistema').value;
   if(sistema === 'ROTATIVO'){ addCapitalGiroRotativo(); return; }
@@ -7862,35 +7909,44 @@ function addFinanciamento(){
   if(taxa < 0){ toast('⚠️ Taxa inválida','err'); return; }
 
   var tipoTaxa = document.getElementById('dv-fin-taxatipo').value || 'fixa';
+  var editando = !!financiamentoEmEdicaoId;
+  var finExistente = editando ? DIVIDAS.find(function(d){ return String(d.id)===String(financiamentoEmEdicaoId); }) : null;
 
-  var fin = {
+  var fin = editando && finExistente ? finExistente : {
     id: Date.now(), tipo: 'financiamento', pagadorId:'', pagadorNome:'',
-    desc: desc, valorOriginal: val, valorLiberado: liberado||val, dataOriginal: data,
-    sistemaAmortizacao: sistema, taxaMensal: taxa, numParcelas: parcelas,
-    parcelasPagas: pagas, extras: [], status: 'pendente', iofTotal: iofTotal,
-    seguroPrestamista: seguroPrestamista, outrasDespesasIniciais: outrasDespesas,
-    saldoDevedorInformado: (pagas>0 && saldoDevedorInformado>0) ? saldoDevedorInformado : 0,
-    tipoTaxa: tipoTaxa, indexador: tipoTaxa==='indexada' ? indexador : '',
-    parcelaFixaInformada: (sistema==='PRICE' && parcelaFixaInformada>0) ? parcelaFixaInformada : 0,
-    historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
-    cor: corAleatoriaNova(),
-    criadoEm: new Date().toISOString()
+    extras: [], cor: corAleatoriaNova(), criadoEm: new Date().toISOString()
   };
+
+  fin.desc = desc; fin.valorOriginal = val; fin.valorLiberado = liberado||val; fin.dataOriginal = data;
+  fin.sistemaAmortizacao = sistema; fin.taxaMensal = taxa; fin.numParcelas = parcelas;
+  fin.parcelasPagas = pagas; fin.iofTotal = iofTotal;
+  fin.seguroPrestamista = seguroPrestamista; fin.outrasDespesasIniciais = outrasDespesas;
+  fin.saldoDevedorInformado = (pagas>0 && saldoDevedorInformado>0) ? saldoDevedorInformado : 0;
+  fin.tipoTaxa = tipoTaxa; fin.indexador = tipoTaxa==='indexada' ? indexador : '';
+  fin.parcelaFixaInformada = (sistema==='PRICE' && parcelaFixaInformada>0) ? parcelaFixaInformada : 0;
+  if(!editando || tipoTaxa!=='indexada' || !fin.historicoTaxas || !fin.historicoTaxas.length){
+    fin.historicoTaxas = tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [];
+  }
 
   var resumo = resumoFinanciamento(fin);
   fin.saldoAtual = resumo.saldoAtual;
   fin.status = resumo.quitado ? 'pago' : (pagas>0 ? 'parcial' : 'pendente');
   fin.dataUltimaParcela = resumo.tabela.length ? resumo.tabela[resumo.tabela.length-1].data : '';
 
-  DIVIDAS.unshift(fin); saveDividas();
+  if(!editando){ DIVIDAS.unshift(fin); }
+  saveDividas();
   apiCall('salvarDivida', fin, function(){});
 
   ['dv-desc','dv-fin-val','dv-fin-liberado','dv-fin-parcelas','dv-fin-taxa','dv-fin-ioftotal','dv-fin-parcelafixa','dv-fin-saldoinformado','dv-fin-seguro','dv-fin-outrasdespesas'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('dv-fin-pagas').value = '0';
   onDvFinPagasChange(); atualizarValorDevido();
   setFinTaxaTipo('fixa');
+  var editBtn = document.getElementById('dv-btn-registrar');
+  if(editBtn) editBtn.textContent = '+ Registrar';
+  var eraEdicao = editando;
+  financiamentoEmEdicaoId = null;
   renderDividas();
-  toast('✅ Financiamento cadastrado! '+parcelas+' parcelas geradas.');
+  toast(eraEdicao ? '✅ Financiamento atualizado!' : '✅ Financiamento cadastrado! '+parcelas+' parcelas geradas.');
 }
 
 function addCapitalGiroRotativo(){
@@ -8051,6 +8107,7 @@ function addFinanciamentoSPV(){
   var val  = parseFloat(document.getElementById('dv-spv-val').value||0);
   var data = document.getElementById('dv-spv-data').value || ymd(new Date());
   var diaVenc = parseInt(document.getElementById('dv-spv-diavenc').value||0);
+  var saldoAtualInformado = parseFloat(document.getElementById('dv-spv-saldoatual').value||0);
   var taxa = parseFloat(document.getElementById('dv-fin-taxa').value||0);
 
   if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
@@ -8064,7 +8121,10 @@ function addFinanciamentoSPV(){
     id: Date.now(), tipo: 'financiamento', pagadorId:'', pagadorNome:'',
     desc: desc, valorOriginal: val, dataOriginal: data, diaVencimento: diaVenc||0,
     sistemaAmortizacao: 'SPV', taxaMensal: taxa,
-    valorUtilizado: val, // saldo devedor atual — reaproveita o mesmo campo do Rotativo
+    // Se veio um saldo devedor real informado (financiamento já em
+    // andamento antes de usar o app), usa ele; senão assume que ainda
+    // deve o valor emprestado inteiro (financiamento novo).
+    valorUtilizado: (saldoAtualInformado>0) ? saldoAtualInformado : val,
     movimentos: [], extras: [], status: 'pendente',
     tipoTaxa: tipoTaxa, indexador: tipoTaxa==='indexada' ? indexador : '',
     historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
@@ -8075,7 +8135,7 @@ function addFinanciamentoSPV(){
   DIVIDAS.unshift(fin); saveDividas();
   apiCall('salvarDivida', fin, function(){});
 
-  ['dv-desc','dv-spv-val','dv-spv-diavenc'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['dv-desc','dv-spv-val','dv-spv-diavenc','dv-spv-saldoatual'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   setFinTaxaTipo('fixa'); setFinSistema('PRICE');
   renderDividas();
   toast('✅ Financiamento SPV cadastrado!');
@@ -8236,6 +8296,7 @@ function financiamentoCardHTML(d){
       '<button data-tabelafin="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">📊 Tabela</button>'+
       (resumo.quitado ? '' : '<button data-amortextra="'+d.id+'" style="flex:1;min-width:90px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:#6D28D9;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">⚡ Extra</button>')+
       (isIndexada && !resumo.quitado ? '<button data-atualizartaxa="'+d.id+'" style="flex:1;min-width:80px;padding:9px;border:1px solid var(--border);border-radius:8px;background:transparent;color:#B794F6;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 Taxa</button>' : '')+
+      '<button data-editfin="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-size:13px;cursor:pointer;font-family:inherit" title="Editar informações">✏️</button>'+
       '<button data-linkdiv="'+d.id+'" style="padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:13px;cursor:pointer;font-family:inherit" title="Compartilhar">🔗</button>'+
       '<button data-deldiv="'+d.id+'" style="padding:9px 12px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
