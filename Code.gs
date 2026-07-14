@@ -2,7 +2,7 @@
 // ║   FAMÍLIA APP — BACKEND                                  ║
 // ║   1. Cole este código no Google Apps Script              ║
 // ║   2. Salve (Ctrl+S)                                      ║
-// ║   3. Implantar > Gerenciar implantações > ✏️ editar       ║
+// ║   3. Implantar > Gerenciar implantações > ✏️ editar      ║
 // ║   4. Versão: "Nova versão" > Implantar                   ║
 // ╚══════════════════════════════════════════════════════════╝
 
@@ -382,6 +382,7 @@ function updateTask(body) {
   var comprovIdx  = r.headers.indexOf('comprovUrl');
   var timeIdx     = r.headers.indexOf('time');
   var deadlineIdx = r.headers.indexOf('deadline');
+  var descIdx     = r.headers.indexOf('desc');
 
   // Criar coluna comprovUrl se não existir
   if (comprovIdx === -1 && body.comprovUrl) {
@@ -421,6 +422,10 @@ function updateTask(body) {
       // Atualizar data (remarcação completa)
       if (body.deadline !== undefined && body.deadline !== null && deadlineIdx > -1) {
         r.sheet.getRange(i + 2, deadlineIdx + 1).setValue(body.deadline);
+      }
+      // Atualizar descrição (ex: valor da fatura corrigido no texto)
+      if (body.desc !== undefined && body.desc !== null && descIdx > -1) {
+        r.sheet.getRange(i + 2, descIdx + 1).setValue(body.desc);
       }
       return { ok: true };
     }
