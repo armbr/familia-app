@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260714-134409</title>
+<title>Fluxo v20260714-185719</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1583,12 +1583,25 @@ select option{background:#1A2A3A}
               <div><div class="fl">Data da 1ª parcela</div><input id="dv-fin-data" type="date"></div>
               <div><div class="fl">Número total de parcelas</div><input id="dv-fin-parcelas" type="number" placeholder="Ex: 48" step="1" min="1" inputmode="numeric"></div>
             </div>
-            <div style="margin-bottom:10px"><div class="fl">Parcelas já pagas <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-fin-pagas" type="number" placeholder="0" step="1" min="0" inputmode="numeric" value="0"></div>
+            <div style="margin-bottom:10px"><div class="fl">Parcelas já pagas <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-fin-pagas" type="number" placeholder="0" step="1" min="0" inputmode="numeric" value="0" oninput="onDvFinPagasChange()"></div>
+            <div id="dv-fin-saldoinformado-wrap" style="display:none;margin-bottom:10px">
+              <div class="fl">Saldo devedor atual (R$) <span style="color:var(--t3);font-weight:400">(opcional, mas recomendado)</span></div>
+              <div class="r-wrap"><input id="dv-fin-saldoinformado" type="number" placeholder="Deixe em branco para calcular pela fórmula" step="0.01" min="0" inputmode="decimal"></div>
+              <div style="font-size:11px;color:var(--t3);margin-top:4px;line-height:1.4">💡 Se você já pagou algo a mais além das parcelas normais (amortização extra) antes de usar o app, o cálculo puro pode ficar errado. Informe aqui o saldo devedor real (do seu extrato/app do banco) para corrigir o ponto de partida — os cálculos daqui pra frente usam esse valor.</div>
+            </div>
             <div id="dv-fin-parcelafixa-wrap" style="margin-bottom:10px">
               <div class="fl">Valor da parcela informado pelo banco <span style="color:var(--t3);font-weight:400">(opcional — só para Price)</span></div>
               <div class="r-wrap"><input id="dv-fin-parcelafixa" type="number" placeholder="Deixe em branco para calcular automaticamente" step="0.01" min="0" inputmode="decimal"></div>
             </div>
-            <div style="margin-bottom:10px"><div class="fl">IOF total (R$) <span style="color:var(--t3);font-weight:400">(opcional — valor exato do contrato)</span></div><div class="r-wrap"><input id="dv-fin-ioftotal" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+            <div style="margin-bottom:10px"><div class="fl">IOF total (R$) <span style="color:var(--t3);font-weight:400">(opcional — valor exato do contrato)</span></div><div class="r-wrap"><input id="dv-fin-ioftotal" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal" oninput="atualizarValorDevido()"></div></div>
+            <div class="row2" style="margin-bottom:10px">
+              <div><div class="fl">Seguro prestamista (R$) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><div class="r-wrap"><input id="dv-fin-seguro" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal" oninput="atualizarValorDevido()"></div></div>
+              <div><div class="fl">Outras despesas iniciais (R$) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><div class="r-wrap"><input id="dv-fin-outrasdespesas" type="number" placeholder="Taxas, tarifas..." step="0.01" min="0" inputmode="decimal" oninput="atualizarValorDevido()"></div></div>
+            </div>
+            <div id="dv-fin-valordevido-wrap" style="display:none;margin-bottom:10px;padding:10px;background:var(--bg3);border-radius:8px">
+              <div style="font-size:11px;color:var(--t3)">💰 Valor Devido (como o banco chama) <span title="Valor liberado + IOF + Seguro + Outras despesas — não entra no cálculo de juros/saldo devedor, é só informativo">ⓘ</span></div>
+              <div id="dv-fin-valordevido" style="font-size:16px;font-weight:800;color:var(--t1)">R$ 0,00</div>
+            </div>
             <div id="dv-fin-bullet-hint" style="display:none;font-size:12px;color:var(--t3);margin:-4px 0 10px;line-height:1.4">💵 Todo mês você paga só os juros; no mês da última parcela, paga os juros + o valor inteiro do empréstimo de volta. O IOF é cobrado uma única vez, na liberação do crédito.</div>
           </div>
 
@@ -1597,6 +1610,10 @@ select option{background:#1A2A3A}
             <div class="row2" style="margin-bottom:10px">
               <div><div class="fl">Valor emprestado (R$)</div><div class="r-wrap"><input id="dv-spv-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
               <div><div class="fl">Data de início</div><input id="dv-spv-data" type="date"></div>
+            </div>
+            <div style="margin-bottom:10px"><div class="fl">Dia de vencimento mensal <span style="color:var(--t3);font-weight:400">(opcional)</span></div>
+              <input id="dv-spv-diavenc" type="number" placeholder="Ex: 10" step="1" min="1" max="31" inputmode="numeric">
+              <div style="font-size:11px;color:var(--t3);margin-top:4px">Mesmo com o valor variável, o dia de cobrança dos juros geralmente é fixo — informe pra ver um lembrete de quando pagar.</div>
             </div>
             <div style="font-size:12px;color:var(--t3);margin:-4px 0 10px;line-height:1.4">📊 As parcelas <b>não são fixas</b> — todo mês você registra o quanto pagou, e o app calcula os juros automaticamente sobre o saldo devedor. O que sobrar do pagamento abate o principal. A única regra é que os juros do período sempre precisam ser cobertos.</div>
           </div>
@@ -7594,10 +7611,28 @@ function gerarTabelaAmortizacao(fin){
     ? parseFloat(fin.parcelaFixaInformada)
     : calcularParcelaPrice(pv, taxaAnterior, n); // usada pelo Price
 
+  var parcelasPagasIni = parseInt(fin.parcelasPagas)||0;
+  var saldoInformadoAplicado = false;
+
   for(var k=1; k<=n && saldo>0.005; k++){
     var dataParcela = _addMeses(dataIni, k-1);
     var iPct = isIndexada ? taxaAplicavelNaData(historico, dataParcela, iPctBase) : iPctBase;
     var i = iPct/100;
+
+    // Financiamento cadastrado já em andamento: se foi informado o saldo
+    // devedor ATUAL (mais confiável do que recalcular tudo desde a 1ª
+    // parcela, pois não sabemos se houve amortizações extras antes de
+    // usar o app), corrige o saldo e recalcula o resto do prazo a partir
+    // daqui — igual ao recast que já fazemos quando há amortização extra.
+    if(!saldoInformadoAplicado && parseFloat(fin.saldoDevedorInformado)>0 && k===parcelasPagasIni+1){
+      saldo = parseFloat(fin.saldoDevedorInformado);
+      var parcRestSaldo = n - parcelasPagasIni;
+      if(parcRestSaldo>0){
+        if(sistema==='SAC') amortConstante = saldo / parcRestSaldo;
+        else if(sistema==='PRICE') parcelaFixa = calcularParcelaPrice(saldo, iPct, parcRestSaldo);
+      }
+      saldoInformadoAplicado = true;
+    }
 
     // Taxa mudou desde a última parcela e é Price? Recast: recalcula a
     // parcela fixa sobre o saldo/prazo restantes (como os bancos fazem).
@@ -7714,6 +7749,29 @@ function addDivida(){
   toast('✅ Registrado!');
 }
 
+function onDvFinPagasChange(){
+  var pagas = parseInt(document.getElementById('dv-fin-pagas').value||0);
+  var wrap = document.getElementById('dv-fin-saldoinformado-wrap');
+  if(wrap) wrap.style.display = pagas>0 ? 'block' : 'none';
+}
+
+// "Valor Devido" (termo usado pelos bancos) = valor liberado + IOF +
+// seguro prestamista + outras despesas iniciais. É só informativo — não
+// entra no cálculo de juros nem no saldo devedor, que continuam usando
+// só o valor emprestado/financiado.
+function atualizarValorDevido(){
+  var liberado = parseFloat((document.getElementById('dv-fin-liberado')||{}).value||0)
+    || parseFloat((document.getElementById('dv-fin-val')||{}).value||0);
+  var iof = parseFloat((document.getElementById('dv-fin-ioftotal')||{}).value||0);
+  var seguro = parseFloat((document.getElementById('dv-fin-seguro')||{}).value||0);
+  var outras = parseFloat((document.getElementById('dv-fin-outrasdespesas')||{}).value||0);
+  var total = liberado + iof + seguro + outras;
+  var wrap = document.getElementById('dv-fin-valordevido-wrap');
+  if(wrap) wrap.style.display = (iof>0||seguro>0||outras>0) ? 'block' : 'none';
+  var el = document.getElementById('dv-fin-valordevido');
+  if(el) el.textContent = fmtBRL(total);
+}
+
 function setFinSistema(sistema){
   document.getElementById('dv-fin-sistema').value = sistema;
   document.getElementById('dv-fin-sis-price').classList.toggle('on', sistema==='PRICE');
@@ -7789,7 +7847,10 @@ function addFinanciamento(){
   var taxa      = parseFloat(document.getElementById('dv-fin-taxa').value||0);
   var parcelas  = parseInt(document.getElementById('dv-fin-parcelas').value||0);
   var pagas     = parseInt(document.getElementById('dv-fin-pagas').value||0);
+  var saldoDevedorInformado = parseFloat(document.getElementById('dv-fin-saldoinformado').value||0);
   var iofTotal  = parseFloat(document.getElementById('dv-fin-ioftotal').value||0);
+  var seguroPrestamista = parseFloat(document.getElementById('dv-fin-seguro').value||0);
+  var outrasDespesas = parseFloat(document.getElementById('dv-fin-outrasdespesas').value||0);
   var parcelaFixaInformada = parseFloat(document.getElementById('dv-fin-parcelafixa').value||0);
   var indexador = document.getElementById('dv-fin-indexador').value || 'CDI';
 
@@ -7807,6 +7868,8 @@ function addFinanciamento(){
     desc: desc, valorOriginal: val, valorLiberado: liberado||val, dataOriginal: data,
     sistemaAmortizacao: sistema, taxaMensal: taxa, numParcelas: parcelas,
     parcelasPagas: pagas, extras: [], status: 'pendente', iofTotal: iofTotal,
+    seguroPrestamista: seguroPrestamista, outrasDespesasIniciais: outrasDespesas,
+    saldoDevedorInformado: (pagas>0 && saldoDevedorInformado>0) ? saldoDevedorInformado : 0,
     tipoTaxa: tipoTaxa, indexador: tipoTaxa==='indexada' ? indexador : '',
     parcelaFixaInformada: (sistema==='PRICE' && parcelaFixaInformada>0) ? parcelaFixaInformada : 0,
     historicoTaxas: tipoTaxa==='indexada' ? [{data: data, taxaMensal: taxa}] : [],
@@ -7822,8 +7885,9 @@ function addFinanciamento(){
   DIVIDAS.unshift(fin); saveDividas();
   apiCall('salvarDivida', fin, function(){});
 
-  ['dv-desc','dv-fin-val','dv-fin-liberado','dv-fin-parcelas','dv-fin-taxa','dv-fin-ioftotal','dv-fin-parcelafixa'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['dv-desc','dv-fin-val','dv-fin-liberado','dv-fin-parcelas','dv-fin-taxa','dv-fin-ioftotal','dv-fin-parcelafixa','dv-fin-saldoinformado','dv-fin-seguro','dv-fin-outrasdespesas'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('dv-fin-pagas').value = '0';
+  onDvFinPagasChange(); atualizarValorDevido();
   setFinTaxaTipo('fixa');
   renderDividas();
   toast('✅ Financiamento cadastrado! '+parcelas+' parcelas geradas.');
@@ -7986,6 +8050,7 @@ function addFinanciamentoSPV(){
   var desc = (document.getElementById('dv-desc').value||'').trim();
   var val  = parseFloat(document.getElementById('dv-spv-val').value||0);
   var data = document.getElementById('dv-spv-data').value || ymd(new Date());
+  var diaVenc = parseInt(document.getElementById('dv-spv-diavenc').value||0);
   var taxa = parseFloat(document.getElementById('dv-fin-taxa').value||0);
 
   if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
@@ -7997,7 +8062,7 @@ function addFinanciamentoSPV(){
 
   var fin = {
     id: Date.now(), tipo: 'financiamento', pagadorId:'', pagadorNome:'',
-    desc: desc, valorOriginal: val, dataOriginal: data,
+    desc: desc, valorOriginal: val, dataOriginal: data, diaVencimento: diaVenc||0,
     sistemaAmortizacao: 'SPV', taxaMensal: taxa,
     valorUtilizado: val, // saldo devedor atual — reaproveita o mesmo campo do Rotativo
     movimentos: [], extras: [], status: 'pendente',
@@ -8010,7 +8075,7 @@ function addFinanciamentoSPV(){
   DIVIDAS.unshift(fin); saveDividas();
   apiCall('salvarDivida', fin, function(){});
 
-  ['dv-desc','dv-spv-val'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['dv-desc','dv-spv-val','dv-spv-diavenc'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   setFinTaxaTipo('fixa'); setFinSistema('PRICE');
   renderDividas();
   toast('✅ Financiamento SPV cadastrado!');
@@ -8059,7 +8124,7 @@ function spvCardHTML(d){
       '<div style="min-width:0">'+
         '<div style="font-size:10px;font-weight:800;color:#C2680C;letter-spacing:.5px;margin-bottom:2px">📊 SPV — PAGAMENTOS VARIÁVEIS</div>'+
         '<div style="font-weight:800;font-size:14px">'+esc(d.desc)+'</div>'+
-        '<div style="font-size:12px;color:var(--t3)">'+(d.taxaMensal||0)+'%/mês sobre saldo devedor</div>'+
+        '<div style="font-size:12px;color:var(--t3)">'+(d.taxaMensal||0)+'%/mês sobre saldo devedor'+(d.diaVencimento>0?' · vencimento dia '+d.diaVencimento:'')+'</div>'+
       '</div>'+
       '<span style="flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+statusColor+';color:'+statusColor+'">'+statusLabel+'</span>'+
     '</div>'+
