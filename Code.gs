@@ -2,7 +2,7 @@
 // ║   FAMÍLIA APP — BACKEND                                  ║
 // ║   1. Cole este código no Google Apps Script              ║
 // ║   2. Salve (Ctrl+S)                                      ║
-// ║   3. Implantar > Gerenciar implantações > ✏️ editar      ║
+// ║   3. Implantar > Gerenciar implantações > ✏️ editar       ║
 // ║   4. Versão: "Nova versão" > Implantar                   ║
 // ╚══════════════════════════════════════════════════════════╝
 
@@ -42,16 +42,24 @@ function doGet(e) {
     }
 
     var body = {};
+    var debugParsePayload = '';
     if (params.payload) {
+      debugParsePayload = 'tamanho_recebido=' + params.payload.length + ' primeiros_100_chars=' + params.payload.substring(0,100);
       try { body = JSON.parse(params.payload); }
-      catch(ex) { Logger.log('ERRO ao decodificar payload: ' + ex.message + ' | payload bruto: ' + params.payload.substring(0,300)); }
-    }
-    if (action === 'salvarDivida') {
-      Logger.log('[doGet salvarDivida] action=' + action + ' | body.id=' + body.id + ' | body.tipo=' + body.tipo + ' | body.desc=' + body.desc + ' | body.status=' + body.status + ' | body.saldoAtual=' + body.saldoAtual + ' | body.sistemaAmortizacao=' + body.sistemaAmortizacao);
+      catch(ex) { debugParsePayload += ' | ERRO_PARSE=' + ex.message; }
+    } else {
+      debugParsePayload = 'PAYLOAD NÃO CHEGOU (params.payload está vazio/ausente)';
     }
     var result = doGetInternal(action, body);
     if (action === 'salvarDivida') {
-      Logger.log('[doGet salvarDivida] resultado=' + JSON.stringify(result));
+      // Debug embutido na própria resposta — aparece direto no Console
+      // do navegador (F12), sem precisar navegar nas telas de Execuções
+      // do Apps Script.
+      result._debug = {
+        bodyTipo: body.tipo, bodyId: body.id, bodyDesc: body.desc,
+        bodyStatus: body.status, bodySaldoAtual: body.saldoAtual,
+        parsePayload: debugParsePayload
+      };
     }
     return ContentService
       .createTextOutput(JSON.stringify(result))
@@ -1574,6 +1582,87 @@ function _lerLinhaPorHeader(headerRow, row){
 //  planilha. Depois de rodar, veja o resultado em "Execuções"
 //  (relógio na lateral) — vai aparecer como "testarSalvarFinanciamento".
 // ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  TESTE 2 — reproduz o EXATO objeto "teste06" que está travado,
+//  simulando o caminho completo que a sincronização usa (incluindo
+//  a passagem pelo doGetInternal, não só a função interna direto).
+//  Rode pelo editor (▶ Executar, selecionando "testarComDadosReais").
+// ════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+//  TESTE 3 — simula uma requisição chegando de verdade (com o
+//  parâmetro "payload" como STRING, exatamente como uma URL real
+//  entregaria), passando pelo doGet inteiro. Rode pelo editor.
+// ════════════════════════════════════════════════════════════
+function testarComRequisicaoSimulada() {
+  var bodyReal = {
+    id: 1784087029931, tipo: 'financiamento', pagadorId: '', pagadorNome: '',
+    desc: 'teste06', valorOriginal: 2222, valorLiberado: 2222, dataOriginal: '2026-06-12',
+    sistemaAmortizacao: 'PRICE', taxaMensal: 0, numParcelas: 4, parcelasPagas: 0,
+    extras: [], status: 'pendente', iofTotal: 0, seguroPrestamista: 0,
+    outrasDespesasIniciais: 0, saldoDevedorInformado: 0, tipoTaxa: 'fixa', indexador: '',
+    parcelaFixaInformada: 0, historicoTaxas: [], cor: 'hsl(93, 65%, 55%)',
+    criadoEm: '2026-07-15T03:43:49.931Z', saldoAtual: 2222, dataUltimaParcela: '2026-09-12'
+  };
+
+  // Monta um "e" (evento de requisição) exatamente como o Apps Script
+  // entregaria de uma URL real — com o payload como STRING codificada,
+  // não como objeto já pronto (isso é a diferença do Teste 2).
+  var payloadString = JSON.stringify(bodyReal);
+  var eSimulado = {
+    parameter: {
+      action: 'salvarDivida',
+      payload: payloadString
+    }
+  };
+
+  Logger.log('=== TESTE 3: simulando uma requisição real (via doGet) ===');
+  Logger.log('Tamanho do payload simulado: ' + payloadString.length + ' chars');
+
+  try {
+    var resposta = doGet(eSimulado);
+    var texto = resposta.getContent();
+    Logger.log('Resposta do doGet: ' + texto);
+
+    if (texto.indexOf('"status":"pago"') !== -1 || texto.indexOf('"saldoAtual":0') !== -1) {
+      Logger.log('❌ REPRODUZIU O BUG — o problema está em como o "e.parameter" chega, não na lógica de cálculo');
+    } else {
+      Logger.log('✅ Resultado correto — o bug precisa de uma requisição HTTP real pra aparecer (não é possível simular aqui)');
+    }
+  } catch (e) {
+    Logger.log('❌ ERRO: ' + e.message);
+  }
+}
+
+function testarComDadosReais() {
+  var bodyReal = {
+    id: 1784087029931, tipo: 'financiamento', pagadorId: '', pagadorNome: '',
+    desc: 'teste06', valorOriginal: 2222, valorLiberado: 2222, dataOriginal: '2026-06-12',
+    sistemaAmortizacao: 'PRICE', taxaMensal: 0, numParcelas: 4, parcelasPagas: 0,
+    extras: [], status: 'pendente', iofTotal: 0, seguroPrestamista: 0,
+    outrasDespesasIniciais: 0, saldoDevedorInformado: 0, tipoTaxa: 'fixa', indexador: '',
+    parcelaFixaInformada: 0, historicoTaxas: [], cor: 'hsl(93, 65%, 55%)',
+    criadoEm: '2026-07-15T03:43:49.931Z', saldoAtual: 2222, dataUltimaParcela: '2026-09-12'
+  };
+
+  Logger.log('=== TESTE 2: simulando o objeto real "teste06" ===');
+  Logger.log('Entrada: tipo=' + bodyReal.tipo + ' status=' + bodyReal.status + ' saldoAtual=' + bodyReal.saldoAtual);
+
+  try {
+    // Passa pelo MESMO caminho que doGet usa: doGetInternal
+    var resultado = doGetInternal('salvarDivida', bodyReal);
+    Logger.log('Resultado: ' + JSON.stringify(resultado));
+
+    if (resultado.status === 'pago' || resultado.saldoAtual === 0) {
+      Logger.log('❌ REPRODUZIU O BUG — resultado errado mesmo rodando direto no editor (não é rede/navegador)');
+    } else {
+      Logger.log('✅ Resultado correto — o bug só acontece quando vem pela URL/sincronização, não na lógica em si');
+    }
+  } catch (e) {
+    Logger.log('❌ ERRO: ' + e.message);
+    Logger.log('Stack: ' + e.stack);
+  }
+}
+
 function testarSalvarFinanciamento() {
   var testeFin = {
     id: 'TESTE_' + Date.now(),
