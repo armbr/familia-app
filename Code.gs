@@ -43,9 +43,16 @@ function doGet(e) {
 
     var body = {};
     if (params.payload) {
-      try { body = JSON.parse(decodeURIComponent(params.payload)); } catch(ex) {}
+      try { body = JSON.parse(params.payload); }
+      catch(ex) { Logger.log('ERRO ao decodificar payload: ' + ex.message + ' | payload bruto: ' + params.payload.substring(0,300)); }
+    }
+    if (action === 'salvarDivida') {
+      Logger.log('[doGet salvarDivida] action=' + action + ' | body.id=' + body.id + ' | body.tipo=' + body.tipo + ' | body.desc=' + body.desc + ' | body.status=' + body.status + ' | body.saldoAtual=' + body.saldoAtual + ' | body.sistemaAmortizacao=' + body.sistemaAmortizacao);
     }
     var result = doGetInternal(action, body);
+    if (action === 'salvarDivida') {
+      Logger.log('[doGet salvarDivida] resultado=' + JSON.stringify(result));
+    }
     return ContentService
       .createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
@@ -139,9 +146,10 @@ function doPost(e) {
     if (e.postData && e.postData.contents) {
       try { body = JSON.parse(e.postData.contents); } catch(ex) {}
     }
-    // Também aceita payload na URL
+    // Também aceita payload na URL (mesma observação: e.parameter já
+    // vem decodificado, não usar decodeURIComponent aqui)
     if (!Object.keys(body).length && params.payload) {
-      body = JSON.parse(decodeURIComponent(params.payload));
+      body = JSON.parse(params.payload);
     }
 
     var result;
@@ -1624,6 +1632,7 @@ function salvarDividaEstruturadaInterna(body) {
   // ── FINANCIAMENTO — modelo próprio (sem ledger de movimentos), OU
   //    Capital de Giro Rotativo — usa ledger de movimentos (saque/juros/amortização)
   if (body.tipo === 'financiamento') {
+    Logger.log('[salvarDividaEstruturadaInterna] ENTROU no ramo financiamento. body.id=' + body.id + ' sistemaAmortizacao=' + body.sistemaAmortizacao);
     var isRotativo = body.sistemaAmortizacao === 'ROTATIVO';
     var isSpv = body.sistemaAmortizacao === 'SPV';
     var valorUtilizadoCalc = parseFloat(body.valorUtilizado) || 0;
@@ -1711,6 +1720,7 @@ function salvarDividaEstruturadaInterna(body) {
   }
 
   // ── DEVO / RECEBO — modelo de ledger cronológico (já existente) ──
+  Logger.log('[salvarDividaEstruturadaInterna] ATENÇÃO: chegou no ramo DEVO/RECEBO. body.tipo=' + body.tipo + ' body.id=' + body.id + ' body.desc=' + body.desc);
   var movimentos = body.movimentos || [];
   var ledger = recalcularLedgerDivida({
     movimentos: movimentos, metodoJuros: body.metodoJuros,
