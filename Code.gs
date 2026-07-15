@@ -1332,35 +1332,26 @@ function dividasSS() {
 }
 
 function garantirEstruturaDividas() {
-  // IMPORTANTE: proteger a migração de colunas com um lock — se vários
-  // financiamentos forem salvos ao mesmo tempo (retry de sincronização
-  // em paralelo), duas execuções concorrentes tentando adicionar as
-  // mesmas colunas novas podem colidir e corromper o cabeçalho da
-  // planilha, fazendo alguns salvamentos falharem silenciosamente.
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(15000); } catch(e) { /* segue mesmo assim — melhor tentar do que travar */ }
+  var sp = dividasSS();
 
-  try {
-    var sp = dividasSS();
+  // ── Aba "Dívidas" ──────────────────────────────────────
+  var sh = sp.getSheetByName('Dívidas');
+  var headers = ['id','tipo','pagadorId','pagador','descricao','valorOriginal','dataOriginal',
+                 'metodoJuros','taxaMensal','indexador','valorPrincipalAtual','dataBaseAtual',
+                 'diasEmAtraso','saldoDevedorEstimado','status','criadoEm','atualizadoEm',
+                 'sistemaAmortizacao','numParcelas','parcelasPagas','extrasJSON',
+                 'tipoTaxa','historicoTaxasJSON',
+                 'valorLiberado','dataUltimaParcela','iofTotal',
+                 'valorUtilizado','iofBasicoPct','iofAdicionalPct','parcelaFixaInformada',
+                 'valoresPagosJSON','cor','saldoDevedorInformado','seguroPrestamista','outrasDespesasIniciais',
+                 'diaVencimento'];
+  var eraNova = !sh;
+  if (!sh) sh = sp.insertSheet('Dívidas');
+  var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
 
-    // ── Aba "Dívidas" ──────────────────────────────────────
-    var sh = sp.getSheetByName('Dívidas');
-    var headers = ['id','tipo','pagadorId','pagador','descricao','valorOriginal','dataOriginal',
-                   'metodoJuros','taxaMensal','indexador','valorPrincipalAtual','dataBaseAtual',
-                   'diasEmAtraso','saldoDevedorEstimado','status','criadoEm','atualizadoEm',
-                   'sistemaAmortizacao','numParcelas','parcelasPagas','extrasJSON',
-                   'tipoTaxa','historicoTaxasJSON',
-                   'valorLiberado','dataUltimaParcela','iofTotal',
-                   'valorUtilizado','iofBasicoPct','iofAdicionalPct','parcelaFixaInformada',
-                   'valoresPagosJSON','cor','saldoDevedorInformado','seguroPrestamista','outrasDespesasIniciais',
-                   'diaVencimento'];
-    var eraNova = !sh;
-    if (!sh) sh = sp.insertSheet('Dívidas');
-    var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
-
-    if (eraNova) {
-      // Planilha nova — criar do zero com formatação completa
-      sh.getRange(1,1,1,headers.length).setValues([headers]);
+  if (eraNova) {
+    // Planilha nova — criar do zero com formatação completa
+    sh.getRange(1,1,1,headers.length).setValues([headers]);
     sh.setFrozenRows(1);
     sh.getRange(1,1,1,headers.length).setFontWeight('bold').setBackground('#6D28D9').setFontColor('#FFF');
     sh.setColumnWidth(4,140); sh.setColumnWidth(5,220);
@@ -1430,9 +1421,6 @@ function garantirEstruturaDividas() {
   }
 
   return { dividas: sh, movimentos: shM, resumo: shS };
-  } finally {
-    try { lock.releaseLock(); } catch(e2) {}
-  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1553,6 +1541,18 @@ function _lerLinhaPorHeader(headerRow, row){
 }
 
 function salvarDividaEstruturada(body) {
+  try {
+    return salvarDividaEstruturadaInterna(body);
+  } catch (errSalvar) {
+    // Registra no log de Execuções do Apps Script (Extensões → Apps
+    // Script → ícone de relógio "Execuções") — essencial pra diagnosticar
+    // por que um salvamento específico está falhando sem devolver nada.
+    Logger.log('ERRO salvarDividaEstruturada: ' + errSalvar.message + ' | body.id=' + (body && body.id) + ' | stack=' + errSalvar.stack);
+    return { ok: false, error: 'Falha ao salvar: ' + errSalvar.message };
+  }
+}
+
+function salvarDividaEstruturadaInterna(body) {
   var sheets = garantirEstruturaDividas();
   var sh = sheets.dividas;
   var dados = sh.getDataRange().getValues();
