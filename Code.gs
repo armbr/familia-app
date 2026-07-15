@@ -18,18 +18,27 @@ function doGet(e) {
     var params = e.parameter || {};
     var action = params.action || '';
 
-    // paginaInquilino retorna HTML — tratamento especial
-    if (action === 'paginaInquilino') {
-      return paginaInquilino(e);
-    }
-    if (action === 'paginaDivida') {
-      return paginaDivida(e);
-    }
-    if (action === 'paginaLista') {
-      return paginaLista(e);
-    }
-    if (action === 'paginaAluguel') {
-      return paginaAluguel(e);
+    // Páginas públicas em HTML — cada uma protegida com seu próprio
+    // try/catch, retornando uma página de erro legível em vez de deixar
+    // a exceção "vazar" pro catch geral do doGet (que devolve um JSON
+    // cru — aparece como texto solto na tela de quem abre o link).
+    var paginasPublicas = {
+      paginaInquilino: paginaInquilino,
+      paginaDivida: paginaDivida,
+      paginaLista: paginaLista,
+      paginaAluguel: paginaAluguel
+    };
+    if (paginasPublicas[action]) {
+      try {
+        return paginasPublicas[action](e);
+      } catch (errPagina) {
+        return HtmlService.createHtmlOutput(
+          '<div style="font-family:Arial;padding:40px;text-align:center;background:#0a0a14;color:#eee;min-height:100vh">' +
+          '<h2 style="color:#FF6B6B">Não foi possível abrir esta página</h2>' +
+          '<p style="color:#888">Detalhe técnico: ' + String(errPagina.message||errPagina) + '</p>' +
+          '<p style="color:#888;margin-top:10px">Avise quem compartilhou o link.</p></div>'
+        );
+      }
     }
 
     var body = {};
@@ -1937,25 +1946,33 @@ function paginaAluguel(e){
 
   var parcMap = {};
   (a.parcelas||[]).forEach(function(p){ parcMap[p.mesAno] = p; });
-  var inicio = new Date(a.criadoEm || new Date());
+  var inicioDate = a.criadoEm ? new Date(a.criadoEm) : new Date();
+  if (isNaN(inicioDate.getTime())) inicioDate = new Date(); // proteção: data inválida cai no padrão
+  var diaVenc = parseInt(a.dia, 10) || 1; // proteção: sem dia cadastrado, assume dia 1
   var agora = new Date();
   var meses = [];
-  var d = new Date(inicio.getFullYear(), inicio.getMonth(), 1);
-  while (d <= agora) { meses.push(d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)); d.setMonth(d.getMonth()+1); }
-  var totalPago = (a.parcelas||[]).reduce(function(s,p){ return s+p.valor; }, 0);
+  var d = new Date(inicioDate.getFullYear(), inicioDate.getMonth(), 1);
+  var limiteSeguranca = 0;
+  while (d <= agora && limiteSeguranca < 600) { // 600 meses = 50 anos, evita loop infinito em qualquer cenário
+    meses.push(d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2));
+    d.setMonth(d.getMonth()+1);
+    limiteSeguranca++;
+  }
+  var totalPago = (a.parcelas||[]).reduce(function(s,p){ return s+(parseFloat(p.valor)||0); }, 0);
 
   var MESES_BR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   var linhas = meses.map(function(mo){
     var p = parcMap[mo];
     var mes = MESES_BR[parseInt(mo.split('-')[1])-1]+'/'+mo.split('-')[0];
-    var venc = mo+'-'+('0'+a.dia).slice(-2);
+    var venc = mo+'-'+('0'+diaVenc).slice(-2);
     var agr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
     var status, cor, ico;
-    if (p) { status = 'Pago em '+String(p.dataPgto).split('-').reverse().join('/'); cor='#2ecc9a'; ico='✅'; }
+    if (p) { status = 'Pago em '+String(p.dataPgto||'').split('-').reverse().join('/'); cor='#2ecc9a'; ico='✅'; }
     else if (venc < agr) { status='Vencido'; cor='#FF6B6B'; ico='⚠️'; }
     else { status='Pendente'; cor='#888'; ico='⏳'; }
+    var valorLinha = parseFloat(p ? p.valor : a.valorBase) || 0;
     return '<tr><td style="padding:10px 12px;border-bottom:1px solid #222">'+ico+' '+mes+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-weight:700">R$ '+(p?p.valor:a.valorBase).toFixed(2).replace('.',',')+'</td>'+
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-weight:700">R$ '+valorLinha.toFixed(2).replace('.',',')+'</td>'+
       '<td style="padding:10px 12px;border-bottom:1px solid #222;color:'+cor+';font-size:12px">'+status+'</td>'+
     '</tr>';
   }).join('');
@@ -1978,7 +1995,7 @@ function paginaAluguel(e){
       '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">⚡ Fluxo App</div>'+
       '<div style="font-size:17px;font-weight:900">'+esc(a.nome)+'</div>'+
       '<div style="font-size:12px;color:#888;margin-top:2px">'+(a.ref?esc(a.ref)+' · ':'')+
-        'Vence dia '+a.dia+' · R$ '+parseFloat(a.valorBase||0).toFixed(2).replace('.',',')+'/mês</div>'+
+        'Vence dia '+diaVenc+' · R$ '+parseFloat(a.valorBase||0).toFixed(2).replace('.',',')+'/mês</div>'+
     '</div>'+
     '<div class="ft">'+
       '<div class="ftot"><div class="ftv" style="color:#2ecc9a">R$ '+totalPago.toFixed(2).replace('.',',')+'</div><div class="ftl">Recebido</div></div>'+
