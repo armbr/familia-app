@@ -1347,7 +1347,13 @@ function garantirEstruturaDividas() {
   var sp = dividasSS();
 
   // ── Aba "Dívidas" ──────────────────────────────────────
-  var sh = sp.getSheetByName('Dívidas');
+  // IMPORTANTE: a aba real na planilha se chama "Dividas" (sem acento),
+  // mas o código antes só procurava "Dívidas" (com acento) — como são
+  // nomes diferentes, nunca encontrava a aba de verdade, e criava uma
+  // aba NOVA (vazia) toda vez, deixando os dados reais "presos" na aba
+  // antiga sem accento, que ninguém tinha notado. Aceita os dois nomes,
+  // priorizando a aba que já existe de verdade.
+  var sh = sp.getSheetByName('Dívidas') || sp.getSheetByName('Dividas');
   var headers = ['id','tipo','pagadorId','pagador','descricao','valorOriginal','dataOriginal',
                  'metodoJuros','taxaMensal','indexador','valorPrincipalAtual','dataBaseAtual',
                  'diasEmAtraso','saldoDevedorEstimado','status','criadoEm','atualizadoEm',
@@ -1872,7 +1878,7 @@ function deletarDivida(id) {
 function getDividasSheetUrl() {
   var sp = dividasSS();
   garantirEstruturaDividas();
-  var sh = sp.getSheetByName('Dívidas');
+  var sh = sp.getSheetByName('Dívidas') || sp.getSheetByName('Dividas');
   var gid = sh ? sh.getSheetId() : 0;
   return { ok: true, url: sp.getUrl() + '#gid=' + gid };
 }
