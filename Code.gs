@@ -1316,6 +1316,18 @@ function getItemsSheet(nomeAba) {
 // na primeira vez (o ID gerado é salvo nas Propriedades do Script).
 var DIVIDAS_SPREADSHEET_ID = '';
 
+// ════════════════════════════════════════════════════════════
+//  DIAGNÓSTICO — rode esta função pelo editor (▶ Executar,
+//  selecionando "mostrarUrlPlanilhaDividas" no menu) pra descobrir
+//  o link exato da planilha onde Dívidas/Financiamentos são salvos
+//  de verdade — que pode ser DIFERENTE da planilha principal do app.
+// ════════════════════════════════════════════════════════════
+function mostrarUrlPlanilhaDividas() {
+  var sp = dividasSS();
+  Logger.log('📄 Nome da planilha: ' + sp.getName());
+  Logger.log('🔗 Link direto: ' + sp.getUrl());
+}
+
 function dividasSS() {
   if (DIVIDAS_SPREADSHEET_ID) {
     return SpreadsheetApp.openById(DIVIDAS_SPREADSHEET_ID);
