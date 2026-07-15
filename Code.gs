@@ -1540,6 +1540,45 @@ function _lerLinhaPorHeader(headerRow, row){
   return obj;
 }
 
+// ════════════════════════════════════════════════════════════
+//  TESTE MANUAL — rode esta função direto pelo editor do Apps
+//  Script (selecione "testarSalvarFinanciamento" no menu de cima
+//  e clique em ▶ Executar). Isso testa a gravação de um
+//  financiamento SEM passar pelo app, celular ou internet — só a
+//  planilha. Depois de rodar, veja o resultado em "Execuções"
+//  (relógio na lateral) — vai aparecer como "testarSalvarFinanciamento".
+// ════════════════════════════════════════════════════════════
+function testarSalvarFinanciamento() {
+  var testeFin = {
+    id: 'TESTE_' + Date.now(),
+    tipo: 'financiamento',
+    desc: 'TESTE — pode excluir depois',
+    valorOriginal: 1000,
+    valorLiberado: 1000,
+    dataOriginal: '2026-01-01',
+    sistemaAmortizacao: 'PRICE',
+    taxaMensal: 1,
+    numParcelas: 12,
+    parcelasPagas: 0,
+    status: 'pendente'
+  };
+
+  Logger.log('Iniciando teste de gravação...');
+  try {
+    var resultado = salvarDividaEstruturadaInterna(testeFin);
+    Logger.log('✅ SUCESSO: ' + JSON.stringify(resultado));
+
+    // Confirma que realmente foi parar na planilha
+    var sheets = garantirEstruturaDividas();
+    var dados = sheets.dividas.getDataRange().getValues();
+    var achou = dados.some(function(row){ return String(row[0]) === String(testeFin.id); });
+    Logger.log(achou ? '✅ CONFIRMADO: a linha está na planilha "Dívidas"' : '❌ PROBLEMA: salvou sem erro, mas a linha NÃO está na planilha');
+  } catch (e) {
+    Logger.log('❌ ERRO: ' + e.message);
+    Logger.log('Stack: ' + e.stack);
+  }
+}
+
 function salvarDividaEstruturada(body) {
   try {
     return salvarDividaEstruturadaInterna(body);
