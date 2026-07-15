@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260715-032731</title>
+<title>Fluxo v20260715-034708</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -9221,6 +9221,11 @@ function sincronizarDividas(cb){
         return !serverMap[String(x.id)] && !exclSet[String(x.id)];
       });
 
+      console.log('[sincronizarDividas] local='+DIVIDAS.length+' servidor='+serverList.length+' pendentes='+pendentes.length);
+      pendentes.forEach(function(x){
+        console.log('[sincronizarDividas] pendente:', x.id, x.desc, 'tamanho do payload:', JSON.stringify(x).length, 'chars');
+      });
+
       function finalizar(){
         var pendMap = {};
         pendentes.forEach(function(x){ pendMap[String(x.id)] = true; });
@@ -9242,13 +9247,20 @@ function sincronizarDividas(cb){
       var idx = 0;
       function enviarProximo(){
         if(idx >= pendentes.length){
-          if(falhas.length) console.warn('Falha ao sincronizar dívida(s):', falhas.join(', '));
+          if(falhas.length) console.warn('[sincronizarDividas] Falha ao sincronizar:', falhas.join(', '));
+          else console.log('[sincronizarDividas] Todos os pendentes foram reenviados com sucesso.');
           finalizar();
           return;
         }
         var x = pendentes[idx++];
-        apiPost('salvarDivida', x, function(err){
-          if(err) falhas.push(x.desc || x.id);
+        console.log('[sincronizarDividas] enviando', x.id, x.desc, '...');
+        apiPost('salvarDivida', x, function(err, resp){
+          if(err){
+            console.error('[sincronizarDividas] ERRO ao enviar', x.id, x.desc, '→', err.message || err, err);
+            falhas.push(x.desc || x.id);
+          } else {
+            console.log('[sincronizarDividas] OK', x.id, x.desc, '→', resp);
+          }
           enviarProximo();
         });
       }
