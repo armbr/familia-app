@@ -2,7 +2,7 @@
 // ║   FAMÍLIA APP — BACKEND                                  ║
 // ║   1. Cole este código no Google Apps Script              ║
 // ║   2. Salve (Ctrl+S)                                      ║
-// ║   3. Implantar > Gerenciar implantações > ✏️ editar       ║
+// ║   3. Implantar > Gerenciar implantações > ✏️ editar      ║
 // ║   4. Versão: "Nova versão" > Implantar                   ║
 // ╚══════════════════════════════════════════════════════════╝
 
