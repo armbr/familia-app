@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260715-000952</title>
+<title>Fluxo v20260715-013535</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -6700,6 +6700,7 @@ function abrirRecibo(r){
       '</div>'+
       '<div class="rtot"><div style="font-size:11px;color:#999;margin-bottom:6px">VALOR PAGO</div>'+
         '<div class="rtot-v">'+Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})+'</div></div>'+
+      (r.fichaUrl ? '<div style="padding:0 24px 18px"><a href="'+r.fichaUrl+'" target="_blank" rel="noopener" style="display:block;text-align:center;padding:12px;border-radius:8px;border:1px solid #ddd;color:#0a0a1a;font-weight:700;font-size:13px;text-decoration:none">📋 Ver ficha de pagamentos</a></div>' : '')+
       '<div class="rc">'+
         '<div style="font-size:10px;color:#bbb;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Carimbo Digital · Fluxo App</div>'+
         '<div class="rc-cod">'+r.codigo+'</div>'+
