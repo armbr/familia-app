@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260715-034708</title>
+<title>Fluxo v20260715-192043</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -9224,6 +9224,7 @@ function sincronizarDividas(cb){
       console.log('[sincronizarDividas] local='+DIVIDAS.length+' servidor='+serverList.length+' pendentes='+pendentes.length);
       pendentes.forEach(function(x){
         console.log('[sincronizarDividas] pendente:', x.id, x.desc, 'tamanho do payload:', JSON.stringify(x).length, 'chars');
+        console.log('[sincronizarDividas] campos completos:', JSON.parse(JSON.stringify(x)));
       });
 
       function finalizar(){
