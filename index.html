@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260715-192043</title>
+<title>Fluxo v20260715-193010</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2659,14 +2659,19 @@ function resetSetup(){
 // ════════════════════════════════════════════════════════
 function _apiCallOnce(action, body, cb){
   if(!API){ if(cb) cb(new Error('URL não configurada')); return; }
-  var url = API + '?action=' + action;
+  // IMPORTANTE: parâmetro "_t" (timestamp único) impede que o navegador
+  // (ou qualquer cache no meio do caminho) reaproveite uma resposta
+  // antiga — sem isso, reenviar o MESMO objeto (mesmo id, mesmos campos)
+  // gera a MESMA URL toda vez, e uma resposta em cache poderia ser
+  // devolvida em vez de consultar o servidor de novo.
+  var url = API + '?action=' + action + '&_t=' + Date.now() + Math.random().toString(36).slice(2);
   if(body){
     url += '&payload=' + encodeURIComponent(JSON.stringify(body));
   }
   var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   var tid  = ctrl ? setTimeout(function(){ ctrl.abort(); }, 25000) : null;
   fetch(url, {
-    method: 'GET', redirect: 'follow',
+    method: 'GET', redirect: 'follow', cache: 'no-store',
     headers: { 'Accept': 'application/json, text/plain, */*' },
     signal: ctrl ? ctrl.signal : undefined
   })
@@ -2720,7 +2725,7 @@ function apiPostRaw(action, body, cb){
   var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   var tid  = ctrl ? setTimeout(function(){ ctrl.abort(); }, 30000) : null;
   fetch(url, {
-    method: 'POST', redirect: 'follow',
+    method: 'POST', redirect: 'follow', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: payload,
     signal: ctrl ? ctrl.signal : undefined
@@ -2764,7 +2769,7 @@ function apiPost(action, body, cb){
   // corretamente — o servidor (doPost) já faz o JSON.parse do conteúdo
   // independente do Content-Type declarado.
   fetch(API + '?action=' + action, {
-    method: 'POST',
+    method: 'POST', cache: 'no-store',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(body)
   })
