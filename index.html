@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260715-013535</title>
+<title>Fluxo v20260715-032731</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -7779,7 +7779,7 @@ function addDivida(){
     existente.pagadorId = String(pagId); existente.pagadorNome = pag?pag.nome:'';
     existente.desc = desc; existente.metodoJuros = metodo; existente.taxaMensal = taxa; existente.indexador = idx;
     saveDividas();
-    apiCall('salvarDivida', existente, function(){});
+    apiPost('salvarDivida', existente, function(){});
     dividaEmEdicaoId = null;
     var valEl=document.getElementById('dv-val'); if(valEl) valEl.closest('div').style.display='';
     var dataEl=document.getElementById('dv-data'); if(dataEl) dataEl.closest('div').style.display='';
@@ -7804,7 +7804,7 @@ function addDivida(){
   };
 
   DIVIDAS.unshift(divida); saveDividas();
-  apiCall('salvarDivida', divida, function(){});
+  apiPost('salvarDivida', divida, function(){});
 
   ['dv-desc','dv-val'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   renderDividas();
@@ -7986,7 +7986,7 @@ function addFinanciamento(){
 
   if(!editando){ DIVIDAS.unshift(fin); }
   saveDividas();
-  apiCall('salvarDivida', fin, function(){});
+  apiPost('salvarDivida', fin, function(){});
 
   ['dv-desc','dv-fin-val','dv-fin-liberado','dv-fin-parcelas','dv-fin-taxa','dv-fin-ioftotal','dv-fin-parcelafixa','dv-fin-saldoinformado','dv-fin-seguro','dv-fin-outrasdespesas'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('dv-fin-pagas').value = '0';
@@ -8043,7 +8043,7 @@ function addCapitalGiroRotativo(){
     existente.desc = desc; existente.valorLiberado = liberado; existente.taxaMensal = taxa;
     existente.iofBasicoPct = iofBasico; existente.iofAdicionalPct = iofAdic; existente.tipoTaxa = tipoTaxa;
     saveDividas();
-    apiCall('salvarDivida', existente, function(){});
+    apiPost('salvarDivida', existente, function(){});
     rotativoEmEdicaoId = null;
     var utilEl=document.getElementById('dv-rot-utilizado'); if(utilEl) utilEl.closest('div').style.display='';
     var dataEl=document.getElementById('dv-rot-data'); if(dataEl) dataEl.closest('div').style.display='';
@@ -8078,7 +8078,7 @@ function addCapitalGiroRotativo(){
   };
 
   DIVIDAS.unshift(fin); saveDividas();
-  apiCall('salvarDivida', fin, function(){});
+  apiPost('salvarDivida', fin, function(){});
 
   ['dv-desc','dv-rot-liberado','dv-rot-utilizado','dv-fin-taxa','dv-rot-iofbasico','dv-rot-iofadicional'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   setFinTaxaTipo('fixa'); setFinSistema('PRICE');
@@ -8243,7 +8243,7 @@ function addFinanciamentoSPV(){
     existente.tipoTaxa = tipoTaxa; existente.indexador = tipoTaxa==='indexada' ? indexador : '';
     if(saldoAtualInformado>0) existente.valorUtilizado = saldoAtualInformado;
     saveDividas();
-    apiCall('salvarDivida', existente, function(){});
+    apiPost('salvarDivida', existente, function(){});
     spvEmEdicaoId = null;
     var valEl=document.getElementById('dv-spv-val'); if(valEl) valEl.closest('div').style.display='';
     var dataEl=document.getElementById('dv-spv-data'); if(dataEl) dataEl.closest('div').style.display='';
@@ -8276,7 +8276,7 @@ function addFinanciamentoSPV(){
   };
 
   DIVIDAS.unshift(fin); saveDividas();
-  apiCall('salvarDivida', fin, function(){});
+  apiPost('salvarDivida', fin, function(){});
 
   ['dv-desc','dv-spv-val','dv-spv-diavenc','dv-spv-saldoatual'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   setFinTaxaTipo('fixa'); setFinSistema('PRICE');
@@ -8628,7 +8628,7 @@ function salvarMovimentoDivida(){
   closeMovModal();
   toast('💾 Salvando e recalculando...');
 
-  apiCall('salvarDivida', d, function(err, resp){
+  apiPost('salvarDivida', d, function(err, resp){
     if(!err && resp && resp.ok){
       d.status = resp.status || d.status;
       saveDividas();
@@ -8644,7 +8644,7 @@ function delMovimentoDivida(dividaId, movId){
   if(!confirm('Remover este movimento do extrato?')) return;
   d.movimentos = (d.movimentos||[]).filter(function(m){ return String(m.id)!==String(movId); });
   saveDividas();
-  apiCall('salvarDivida', d, function(){});
+  apiPost('salvarDivida', d, function(){});
   verHistoricoDivida(dividaId); // re-renderiza o modal já aberto
   renderDividas();
   toast('🗑️ Movimento removido');
@@ -8760,7 +8760,7 @@ function salvarMovimentoRotativo(){
   d.status = rNovo.quitado ? 'pago' : (rNovo.valorUtilizado>0 ? 'parcial' : 'pendente');
 
   saveDividas();
-  apiCall('salvarDivida', d, function(){});
+  apiPost('salvarDivida', d, function(){});
 
   closeRotMov();
   renderDividas();
@@ -8836,7 +8836,7 @@ function confirmarPagamentoSPV(){
   d.status = rNovo.quitado ? 'pago' : 'parcial';
 
   saveDividas();
-  apiCall('salvarDivida', d, function(){});
+  apiPost('salvarDivida', d, function(){});
   closeSpvPagamento();
   renderDividas();
   toast('✅ Pagamento registrado! Novo saldo: '+fmtBRL(rNovo.saldoAtual));
@@ -8923,7 +8923,7 @@ function _syncFinanciamento(d){
   d.saldoAtual = resumo.saldoAtual;
   d.status = resumo.quitado ? 'pago' : (resumo.parcelasPagas>0 ? 'parcial' : 'pendente');
   saveDividas();
-  apiCall('salvarDivida', d, function(){});
+  apiPost('salvarDivida', d, function(){});
 }
 
 var parcelaEmPagamentoId = null;
@@ -9247,7 +9247,7 @@ function sincronizarDividas(cb){
           return;
         }
         var x = pendentes[idx++];
-        apiCall('salvarDivida', x, function(err){
+        apiPost('salvarDivida', x, function(err){
           if(err) falhas.push(x.desc || x.id);
           enviarProximo();
         });
