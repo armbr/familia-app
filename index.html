@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260715-193010</title>
+<title>Fluxo v20260716-204833</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1526,9 +1526,10 @@ select option{background:#1A2A3A}
         <!-- Campos de DEVO / RECEBO -->
         <div id="dv-campos-livre">
           <div class="row2" style="margin-bottom:10px">
-            <div><div class="fl">Valor original (R$)</div><div class="r-wrap"><input id="dv-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
-            <div><div class="fl">Data de início</div><input id="dv-data" type="date"></div>
+            <div><div class="fl">Valor (R$)</div><div class="r-wrap"><input id="dv-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+            <div><div class="fl">Data</div><input id="dv-data" type="date"></div>
           </div>
+          <div style="font-size:11px;color:var(--t3);margin:-6px 0 10px;line-height:1.4">💡 Já vem de antes e você não sabe o valor/data originais? Sem problema — informe o <b>saldo devedor de hoje</b> e a <b>data de hoje</b>. Os juros e o saldo passam a ser calculados corretamente a partir daqui, mesmo sem o histórico completo.</div>
           <div style="margin-bottom:10px">
             <div class="fl">Método de cálculo de juros</div>
             <select id="dv-metodo" onchange="toggleCamposJuros()">
@@ -1576,9 +1577,10 @@ select option{background:#1A2A3A}
           <!-- Campos comuns a Price/SAC -->
           <div id="dv-fin-campos-parcelado">
             <div class="row2" style="margin-bottom:10px">
-              <div><div class="fl">Valor emprestado (R$)</div><div class="r-wrap"><input id="dv-fin-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
-              <div><div class="fl">Valor liberado (R$) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><div class="r-wrap"><input id="dv-fin-liberado" type="number" placeholder="Se diferente do emprestado" step="0.01" min="0" inputmode="decimal"></div></div>
+              <div><div class="fl">Valor do contrato / financiado (R$) <span style="color:var(--t3);font-weight:400">— usado p/ calcular a parcela</span></div><div class="r-wrap"><input id="dv-fin-val" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+              <div><div class="fl">Valor líquido recebido em conta (R$) <span style="color:var(--t3);font-weight:400">(opcional, só informativo)</span></div><div class="r-wrap"><input id="dv-fin-liberado" type="number" placeholder="Se diferente do valor do contrato" step="0.01" min="0" inputmode="decimal"></div></div>
             </div>
+            <div style="font-size:11px;color:var(--t3);margin:-6px 0 10px;line-height:1.4">💡 Muitos bancos financiam o IOF, seguro e taxas <b>junto</b> com o valor — nesse caso, "valor do contrato" é <b>maior</b> que o valor líquido recebido. Confira o boleto/contrato: o valor certo pra calcular a parcela é o que aparece como "valor financiado" ou "valor total do financiamento", não o valor que caiu na sua conta.</div>
             <div class="row2" style="margin-bottom:10px">
               <div><div class="fl">Data da 1ª parcela</div><input id="dv-fin-data" type="date"></div>
               <div><div class="fl">Número total de parcelas</div><input id="dv-fin-parcelas" type="number" placeholder="Ex: 48" step="1" min="1" inputmode="numeric"></div>
