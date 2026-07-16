@@ -1378,7 +1378,7 @@ function garantirEstruturaDividas() {
                  'valorLiberado','dataUltimaParcela','iofTotal',
                  'valorUtilizado','iofBasicoPct','iofAdicionalPct','parcelaFixaInformada',
                  'valoresPagosJSON','cor','saldoDevedorInformado','seguroPrestamista','outrasDespesasIniciais',
-                 'diaVencimento'];
+                 'diaVencimento','valorParcelaLembrado'];
   var eraNova = !sh;
   if (!sh) sh = sp.insertSheet('Dívidas');
   var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
@@ -1785,7 +1785,8 @@ function salvarDividaEstruturadaInterna(body) {
       saldoDevedorInformado: parseFloat(body.saldoDevedorInformado) || 0,
       seguroPrestamista:     parseFloat(body.seguroPrestamista) || 0,
       outrasDespesasIniciais: parseFloat(body.outrasDespesasIniciais) || 0,
-      diaVencimento:          parseInt(body.diaVencimento) || 0
+      diaVencimento:          parseInt(body.diaVencimento) || 0,
+      valorParcelaLembrado:   parseFloat(body.valorParcelaLembrado) || 0
     };
     _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader);
 
@@ -1953,6 +1954,7 @@ function getDividasEstruturadas() {
       item.seguroPrestamista = parseFloat(obj.seguroPrestamista) || 0;
       item.outrasDespesasIniciais = parseFloat(obj.outrasDespesasIniciais) || 0;
       item.diaVencimento = parseInt(obj.diaVencimento) || 0;
+      item.valorParcelaLembrado = parseFloat(obj.valorParcelaLembrado) || 0;
     }
 
     result.push(item);
