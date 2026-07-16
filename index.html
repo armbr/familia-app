@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260716-204833</title>
+<title>Fluxo v20260716-210126</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -8946,7 +8946,12 @@ function abrirConfirmarParcela(id){
   var numParcela = resumo.parcelasPagas + 1;
   document.getElementById('parcela-modal-info').textContent =
     'Parcela '+numParcela+' de '+resumo.numParcelas+' — vencimento '+fmtDate(resumo.proximaParcela.data);
-  document.getElementById('parcela-valor-pago').value = resumo.proximaParcela.valorParcela.toFixed(2);
+  // Se numa parcela anterior você editou o valor (porque a parcela real
+  // é diferente da calculada pela fórmula — comum quando há seguro,
+  // taxas ou arredondamento do banco embutidos), usa esse valor lembrado
+  // como padrão aqui, em vez do calculado puro pela fórmula de novo.
+  var valorPadrao = (d.valorParcelaLembrado>0) ? d.valorParcelaLembrado : resumo.proximaParcela.valorParcela;
+  document.getElementById('parcela-valor-pago').value = valorPadrao.toFixed(2);
   document.getElementById('parcela-modal').style.display = 'flex';
 }
 
@@ -8971,6 +8976,12 @@ function confirmarPagamentoParcela(){
   // histórico fiel do que foi efetivamente pago em cada uma.
   d.valoresPagos = d.valoresPagos || {};
   d.valoresPagos[numParcela] = valor;
+  // Se o valor digitado é diferente do calculado pela fórmula, lembra
+  // esse valor como padrão pra próxima parcela (evita ter que editar
+  // todo mês o mesmo ajuste).
+  if(Math.abs(valor - resumo.proximaParcela.valorParcela) > 0.005){
+    d.valorParcelaLembrado = valor;
+  }
 
   _syncFinanciamento(d);
   closeConfirmarParcela();
