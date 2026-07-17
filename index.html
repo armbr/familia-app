@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260716-210126</title>
+<title>Fluxo v20260717-144946</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1215,6 +1215,14 @@ select option{background:#1A2A3A}
       </div>
     </div>
 
+    <!-- 🎂 Aniversários — separado do resto, só aparece se tiver alguém -->
+    <div class="hoje-section" id="hs-aniversario" style="display:none">
+      <div class="hoje-section-title" style="color:#F7B84B">
+        <span>🎂 Aniversário hoje</span>
+      </div>
+      <div id="hoje-aniversario-list"></div>
+    </div>
+
     <!-- gastos do dia -->
     <!-- 1. Compromissos de hoje -->
     <div class="hoje-section" id="hs-task">
@@ -1282,6 +1290,10 @@ select option{background:#1A2A3A}
       <div style="margin-bottom:10px">
         <div class="fl">📧 E-mail <span style="color:var(--t3);font-weight:400">(para lembretes automáticos)</span></div>
         <input id="pag-email" type="email" placeholder="email@contato.com" maxlength="80">
+      </div>
+      <div style="margin-bottom:10px">
+        <div class="fl">🎂 Data de nascimento <span style="color:var(--t3);font-weight:400">(opcional — lembrete automático no dia)</span></div>
+        <input id="pag-nasc" type="date">
       </div>
       <button class="btn" onclick="addPagador()">+ Salvar Contato</button>
       </div><!-- /pag-form-body -->
@@ -1585,6 +1597,10 @@ select option{background:#1A2A3A}
               <div><div class="fl">Data da 1ª parcela</div><input id="dv-fin-data" type="date"></div>
               <div><div class="fl">Número total de parcelas</div><input id="dv-fin-parcelas" type="number" placeholder="Ex: 48" step="1" min="1" inputmode="numeric"></div>
             </div>
+            <div id="dv-fin-datafinal-wrap" style="display:none;margin-bottom:10px">
+              <div class="fl">Data final de pagamento <span style="color:var(--t3);font-weight:400">(opcional — preenche e calcula o nº de parcelas sozinho)</span></div>
+              <input id="dv-fin-datafinal" type="date" onchange="calcularParcelasPorDataFinal()">
+            </div>
             <div style="margin-bottom:10px"><div class="fl">Parcelas já pagas <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-fin-pagas" type="number" placeholder="0" step="1" min="0" inputmode="numeric" value="0" oninput="onDvFinPagasChange()"></div>
             <div id="dv-fin-saldoinformado-wrap" style="display:none;margin-bottom:10px">
               <div class="fl">Saldo devedor atual (R$) <span style="color:var(--t3);font-weight:400">(opcional, mas recomendado)</span></div>
@@ -1631,6 +1647,7 @@ select option{background:#1A2A3A}
               <div><div class="fl">Valor já utilizado (R$)</div><div class="r-wrap"><input id="dv-rot-utilizado" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
             </div>
             <div style="margin-bottom:10px"><div class="fl">Data de início do contrato</div><input id="dv-rot-data" type="date"></div>
+            <div style="margin-bottom:10px"><div class="fl">Data final de pagamento <span style="color:var(--t3);font-weight:400">(opcional — vencimento/renovação do contrato)</span></div><input id="dv-rot-datafinal" type="date"></div>
             <div class="row2" style="margin-bottom:10px">
               <div><div class="fl">IOF básico (% ao dia) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-rot-iofbasico" type="number" placeholder="PJ: 0,0041" step="0.0001" min="0" inputmode="decimal"></div>
               <div><div class="fl">IOF adicional (% mensal) <span style="color:var(--t3);font-weight:400">(opcional)</span></div><input id="dv-rot-iofadicional" type="number" placeholder="Padrão: 0,38" step="0.01" min="0" inputmode="decimal"></div>
@@ -1816,6 +1833,9 @@ select option{background:#1A2A3A}
     </div>
     <div style="margin-bottom:16px"><div class="fl">CPF / CNPJ</div>
       <input id="ep-doc" type="text" placeholder="000.000.000-00" maxlength="20">
+    </div>
+    <div style="margin-bottom:16px"><div class="fl">🎂 Data de nascimento <span style="color:var(--t3);font-weight:400">(opcional)</span></div>
+      <input id="ep-nasc" type="date">
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="closeEditPagModal()" style="flex:1;padding:12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t2);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Cancelar</button>
@@ -6126,6 +6146,25 @@ function renderHoje(){
     if(dlEl) dlEl.textContent=now2.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
 
     var mesAtual = tod.substring(0,7);
+    var diaMesHoje = tod.substring(5,10); // "MM-DD", pra comparar aniversário (ignora o ano)
+
+    // 🎂 Aniversários de hoje — checagem simples de dia+mês, sem
+    // depender do ano (alguns contatos podem ter ano só de preenchimento)
+    var aniversariantes = PAGADORES.filter(function(p){
+      return p.dataNascimento && p.dataNascimento.substring(5,10) === diaMesHoje;
+    });
+    var hsAniv = document.getElementById('hs-aniversario');
+    var hoAnivList = document.getElementById('hoje-aniversario-list');
+    if(aniversariantes.length && hsAniv && hoAnivList){
+      hsAniv.style.display = 'block';
+      hoAnivList.innerHTML = aniversariantes.map(function(p){
+        return '<div class="taski" style="background:rgba(247,184,75,.08);border-color:#F7B84B">'+
+          '<div style="font-size:14px;font-weight:700">🎉 '+esc(p.nome)+'</div>'+
+        '</div>';
+      }).join('');
+    } else if(hsAniv){
+      hsAniv.style.display = 'none';
+    }
 
     // 1. Tasks com deadline HOJE (pendentes e concluídas)
     var todTasks = TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
@@ -6534,13 +6573,15 @@ function addPagador(){
   nome=nome.trim();
   if(!nome){toast('⚠️ Informe o nome','err');return;}
   var email=((document.getElementById('pag-email')||{}).value||'').trim();
-  var p={id:Date.now(),nome:nome,tel:tel,doc:doc,email:email};
+  var nasc=((document.getElementById('pag-nasc')||{}).value||'');
+  var p={id:Date.now(),nome:nome,tel:tel,doc:doc,email:email,dataNascimento:nasc};
   PAGADORES.unshift(p); savePagadores();
   apiPost('salvarPagador',p,function(){});
   document.getElementById('pag-nome').value='';
   document.getElementById('pag-tel').value='';
   document.getElementById('pag-doc').value='';
   var pe=document.getElementById('pag-email'); if(pe) pe.value='';
+  var pn=document.getElementById('pag-nasc'); if(pn) pn.value='';
   renderRecibos(); toast('✅ Pagador salvo!');
 }
 function delPagador(id){
@@ -6580,6 +6621,7 @@ function editarPagador(id){
   document.getElementById('ep-tel').value   = p.tel   || '';
   document.getElementById('ep-email').value = p.email || '';
   document.getElementById('ep-doc').value   = p.doc   || '';
+  var epn = document.getElementById('ep-nasc'); if(epn) epn.value = p.dataNascimento || '';
   document.getElementById('editpag-modal').style.display = 'flex';
 }
 
@@ -6600,6 +6642,7 @@ function salvarEdicaoPagador(){
   p.tel   = (document.getElementById('ep-tel').value||'').trim();
   p.email = (document.getElementById('ep-email').value||'').trim();
   p.doc   = (document.getElementById('ep-doc').value||'').trim();
+  var epn2 = document.getElementById('ep-nasc'); if(epn2) p.dataNascimento = epn2.value||'';
 
   savePagadores();
   apiPost('salvarPagador', p, function(){});
@@ -7856,6 +7899,24 @@ function setFinSistema(sistema){
   document.getElementById('dv-fin-bullet-hint').style.display = (sistema==='BULLET') ? 'block' : 'none';
   var pfEl = document.getElementById('dv-fin-parcelafixa-wrap');
   if(pfEl) pfEl.style.display = (sistema==='PRICE') ? 'block' : 'none';
+  var dfEl = document.getElementById('dv-fin-datafinal-wrap');
+  if(dfEl) dfEl.style.display = (sistema==='BULLET') ? 'block' : 'none';
+}
+
+// Calcula automaticamente o número de parcelas a partir da data final
+// informada — útil pro Pagamento Único, onde às vezes é mais fácil
+// saber a data de quitação do que contar quantos meses faltam.
+function calcularParcelasPorDataFinal(){
+  var dataIni = document.getElementById('dv-fin-data').value;
+  var dataFim = document.getElementById('dv-fin-datafinal').value;
+  if(!dataIni || !dataFim) return;
+  var ini = new Date(dataIni+'T12:00:00');
+  var fim = new Date(dataFim+'T12:00:00');
+  var meses = (fim.getFullYear()-ini.getFullYear())*12 + (fim.getMonth()-ini.getMonth());
+  if(fim.getDate() >= ini.getDate()) meses += 1; // inclui o mês final se o dia bater ou passar
+  if(meses<1){ toast('⚠️ Data final deve ser depois da 1ª parcela','err'); return; }
+  document.getElementById('dv-fin-parcelas').value = meses;
+  toast('📅 '+meses+' parcela(s) calculada(s) a partir das datas');
 }
 
 // ── Explicações rápidas (ícones "ⓘ" nos formulários de Dívidas) ──
@@ -7995,7 +8056,7 @@ function addFinanciamento(){
   saveDividas();
   apiPost('salvarDivida', fin, function(){});
 
-  ['dv-desc','dv-fin-val','dv-fin-liberado','dv-fin-parcelas','dv-fin-taxa','dv-fin-ioftotal','dv-fin-parcelafixa','dv-fin-saldoinformado','dv-fin-seguro','dv-fin-outrasdespesas'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  ['dv-desc','dv-fin-val','dv-fin-liberado','dv-fin-parcelas','dv-fin-taxa','dv-fin-ioftotal','dv-fin-parcelafixa','dv-fin-saldoinformado','dv-fin-seguro','dv-fin-outrasdespesas','dv-fin-datafinal'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('dv-fin-pagas').value = '0';
   onDvFinPagasChange(); atualizarValorDevido();
   setFinTaxaTipo('fixa');
@@ -8019,6 +8080,7 @@ function abrirEditarRotativo(id){
   document.getElementById('dv-fin-taxa').value = d.taxaMensal||'';
   document.getElementById('dv-rot-iofbasico').value = d.iofBasicoPct||'';
   document.getElementById('dv-rot-iofadicional').value = d.iofAdicionalPct||'';
+  document.getElementById('dv-rot-datafinal').value = d.dataFinalPagamento||'';
   // Valor já utilizado / data não são editáveis aqui — vêm do extrato de
   // movimentos (saques/amortizações), não faz sentido sobrescrever.
   var utilWrap = document.getElementById('dv-rot-utilizado'); if(utilWrap) utilWrap.closest('div').style.display='none';
@@ -8039,6 +8101,7 @@ function addCapitalGiroRotativo(){
   var iofBasico = parseFloat(document.getElementById('dv-rot-iofbasico').value||0);
   var iofAdic   = parseFloat(document.getElementById('dv-rot-iofadicional').value||0);
   var tipoTaxa  = document.getElementById('dv-fin-taxatipo').value || 'fixa';
+  var dataFinal = document.getElementById('dv-rot-datafinal').value || '';
 
   if(!desc){ toast('⚠️ Informe a instituição/descrição','err'); return; }
   if(!liberado || liberado<=0){ toast('⚠️ Informe o valor liberado','err'); return; }
@@ -8049,6 +8112,7 @@ function addCapitalGiroRotativo(){
     if(!existente){ toast('⚠️ Registro não encontrado','err'); rotativoEmEdicaoId=null; return; }
     existente.desc = desc; existente.valorLiberado = liberado; existente.taxaMensal = taxa;
     existente.iofBasicoPct = iofBasico; existente.iofAdicionalPct = iofAdic; existente.tipoTaxa = tipoTaxa;
+    existente.dataFinalPagamento = dataFinal;
     saveDividas();
     apiPost('salvarDivida', existente, function(){});
     rotativoEmEdicaoId = null;
@@ -8056,7 +8120,7 @@ function addCapitalGiroRotativo(){
     var dataEl=document.getElementById('dv-rot-data'); if(dataEl) dataEl.closest('div').style.display='';
     var btnR = document.getElementById('dv-btn-registrar');
     if(btnR) btnR.textContent = '+ Registrar';
-    ['dv-desc','dv-rot-liberado','dv-fin-taxa','dv-rot-iofbasico','dv-rot-iofadicional'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+    ['dv-desc','dv-rot-liberado','dv-fin-taxa','dv-rot-iofbasico','dv-rot-iofadicional','dv-rot-datafinal'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     setFinTaxaTipo('fixa'); setFinSistema('PRICE');
     renderDividas();
     toast('✅ Atualizado!');
@@ -8075,6 +8139,7 @@ function addCapitalGiroRotativo(){
   var fin = {
     id: Date.now()+1, tipo: 'financiamento', pagadorId:'', pagadorNome:'',
     desc: desc, valorOriginal: liberado, valorLiberado: liberado, dataOriginal: data,
+    dataFinalPagamento: dataFinal,
     sistemaAmortizacao: 'ROTATIVO', taxaMensal: taxa,
     valorUtilizado: utilizado, iofBasicoPct: iofBasico, iofAdicionalPct: iofAdic,
     movimentos: movimentos, extras: [], status: utilizado>0?'parcial':'pendente',
@@ -8371,7 +8436,7 @@ function rotativoCardHTML(d){
       '<div style="min-width:0">'+
         '<div style="font-size:10px;font-weight:800;color:#0F9D58;letter-spacing:.5px;margin-bottom:2px">🔄 CAPITAL DE GIRO ROTATIVO</div>'+
         '<div style="font-weight:800;font-size:14px">'+esc(d.desc)+'</div>'+
-        '<div style="font-size:12px;color:var(--t3)">'+(d.taxaMensal||0)+'%/mês · limite '+fmtBRL(r.valorLiberado)+'</div>'+
+        '<div style="font-size:12px;color:var(--t3)">'+(d.taxaMensal||0)+'%/mês · limite '+fmtBRL(r.valorLiberado)+(d.dataFinalPagamento?' · vence '+fmtDate(d.dataFinalPagamento):'')+'</div>'+
       '</div>'+
       '<span style="flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+statusColor+';color:'+statusColor+'">'+statusLabel+'</span>'+
     '</div>'+
