@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260717-144946</title>
+<title>Fluxo v20260717-190857</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -9315,6 +9315,8 @@ function sincronizarDividas(cb){
         pendentes.forEach(function(x){ pendMap[String(x.id)] = true; });
         DIVIDAS = serverList.concat(DIVIDAS.filter(function(x){ return pendMap[String(x.id)]; }));
         saveDividas();
+        console.log('[sincronizarDividas] Lista final de TODOS os financiamentos após sync:',
+          DIVIDAS.filter(function(x){return x.tipo==='financiamento';}).map(function(x){ return {id:x.id, desc:x.desc, status:x.status, criadoEm:x.criadoEm}; }));
         if(cb) cb();
       }
 
