@@ -1378,7 +1378,7 @@ function garantirEstruturaDividas() {
                  'valorLiberado','dataUltimaParcela','iofTotal',
                  'valorUtilizado','iofBasicoPct','iofAdicionalPct','parcelaFixaInformada',
                  'valoresPagosJSON','cor','saldoDevedorInformado','seguroPrestamista','outrasDespesasIniciais',
-                 'diaVencimento','valorParcelaLembrado'];
+                 'diaVencimento','valorParcelaLembrado','dataFinalPagamento'];
   var eraNova = !sh;
   if (!sh) sh = sp.insertSheet('Dívidas');
   var atuais = sh.getRange(1,1,1,Math.max(1,sh.getLastColumn())).getValues()[0];
@@ -1663,6 +1663,43 @@ function testarComDadosReais() {
   }
 }
 
+// ════════════════════════════════════════════════════════════
+//  DIAGNÓSTICO — rode esta função (▶ Executar, selecionando
+//  "verificarGatilhosAtivos") pra ver quais lembretes automáticos
+//  já estão ativos e quais ainda faltam ativar. Não precisa abrir
+//  nenhuma tela de "Acionadores" — o resultado aparece no log.
+// ════════════════════════════════════════════════════════════
+function verificarGatilhosAtivos() {
+  var esperados = [
+    { handler: 'enviarResumoDiario',              label: '☀️ Resumo diário (8h)',                    criar: 'criarTriggerDiario' },
+    { handler: 'atualizarSaldosDividas',          label: '💰 Atualização de índices/saldos',         criar: 'criarTriggerAtualizarIndices' },
+    { handler: 'enviarLembreteAluguel',           label: '🏠 Lembrete de aluguel (8h)',              criar: 'criarTriggerLembreteAluguel' },
+    { handler: 'enviarLembreteFechamentoFatura',  label: '💳 Lembrete de fechamento de fatura',      criar: 'criarTriggerLembreteFatura' },
+    { handler: 'enviarLembreteAniversarios',      label: '🎂 Lembrete de aniversário (9h)',          criar: 'criarTriggerLembreteAniversarios' },
+    { handler: 'enviarLembreteDocumentos',        label: '📄 Alerta de vencimento de documentos (8h)', criar: 'criarTriggerLembreteDocumentos' },
+    { handler: 'enviarLembretesHorario',          label: '⏰ Lembrete de compromissos com horário (a cada 30min)', criar: 'criarTriggerLembretesHorario' }
+  ];
+
+  var ativos = ScriptApp.getProjectTriggers().map(function(t){ return t.getHandlerFunction(); });
+
+  Logger.log('════════════════════════════════════════');
+  Logger.log('GATILHOS ATIVOS: ' + ativos.length + ' no total');
+  Logger.log('════════════════════════════════════════');
+
+  esperados.forEach(function(e){
+    var ativo = ativos.indexOf(e.handler) !== -1;
+    Logger.log((ativo ? '✅ ATIVO   — ' : '❌ FALTA   — ') + e.label + (ativo ? '' : '  →  rode "' + e.criar + '" pra ativar'));
+  });
+
+  // Avisa também se tiver algum gatilho "sobrando" que não reconheço
+  var handlersEsperados = esperados.map(function(e){ return e.handler; });
+  var extras = ativos.filter(function(h){ return handlersEsperados.indexOf(h) === -1; });
+  if (extras.length) {
+    Logger.log('────────────────────────────────────────');
+    Logger.log('⚠️ Gatilhos ativos não listados acima (podem ser antigos/de teste): ' + extras.join(', '));
+  }
+}
+
 function testarSalvarFinanciamento() {
   var testeFin = {
     id: 'TESTE_' + Date.now(),
@@ -1786,7 +1823,8 @@ function salvarDividaEstruturadaInterna(body) {
       seguroPrestamista:     parseFloat(body.seguroPrestamista) || 0,
       outrasDespesasIniciais: parseFloat(body.outrasDespesasIniciais) || 0,
       diaVencimento:          parseInt(body.diaVencimento) || 0,
-      valorParcelaLembrado:   parseFloat(body.valorParcelaLembrado) || 0
+      valorParcelaLembrado:   parseFloat(body.valorParcelaLembrado) || 0,
+      dataFinalPagamento:     body.dataFinalPagamento || ''
     };
     _escreverLinhaPorHeader(sh, rowIdx, valuesByHeader);
 
@@ -1955,6 +1993,7 @@ function getDividasEstruturadas() {
       item.outrasDespesasIniciais = parseFloat(obj.outrasDespesasIniciais) || 0;
       item.diaVencimento = parseInt(obj.diaVencimento) || 0;
       item.valorParcelaLembrado = parseFloat(obj.valorParcelaLembrado) || 0;
+      item.dataFinalPagamento = obj.dataFinalPagamento || '';
     }
 
     result.push(item);
@@ -3588,6 +3627,41 @@ function enviarLembreteDocumentos() {
     }
   });
   Logger.log('Lembretes de vencimento de documentos enviados: ' + avisosEnviados);
+}
+
+// ════════════════════════════════════════════════════════════
+//  LEMBRETE DE ANIVERSÁRIO — roda todo dia de manhã, avisa se
+//  algum contato faz aniversário HOJE (compara só dia+mês, não
+//  o ano — funciona mesmo pra contatos sem ano de nascimento real)
+// ════════════════════════════════════════════════════════════
+function enviarLembreteAniversarios() {
+  var resp = getPagadores();
+  var contatos = (resp && resp.data) ? resp.data.filter(function(p){ return p.dataNascimento; }) : [];
+  if (!contatos.length) { Logger.log('Nenhum contato com data de nascimento cadastrada.'); return; }
+
+  var hoje = Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd');
+  var diaMesHoje = hoje.substring(5,10); // "MM-DD"
+  var avisosEnviados = 0;
+
+  contatos.forEach(function(p){
+    var diaMesNasc = String(p.dataNascimento).substring(5,10);
+    if (diaMesNasc === diaMesHoje) {
+      try {
+        enviarPush('🎂 Aniversário hoje!', p.nome + ' faz aniversário hoje.');
+        avisosEnviados++;
+      } catch(e) { Logger.log('Erro ao enviar push de aniversário: ' + e.message); }
+    }
+  });
+  Logger.log('Lembretes de aniversário enviados: ' + avisosEnviados);
+}
+
+// Execute esta função UMA VEZ para ativar o lembrete diário (roda de manhã, separado dos outros lembretes)
+function criarTriggerLembreteAniversarios() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'enviarLembreteAniversarios') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('enviarLembreteAniversarios').timeBased().everyDays(1).atHour(9).create();
+  Logger.log('✅ Trigger de lembrete de aniversário criado — roda todo dia às 9h.');
 }
 
 // Execute esta função UMA VEZ para ativar o lembrete diário (roda junto com o resumo diário, às 8h)
