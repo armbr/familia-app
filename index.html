@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260720-150053</title>
+<title>Fluxo v20260720-194534</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3199,7 +3199,13 @@ function renderNotaItens(){
   }
 
   var isChecklist = nota.tipo==='checklist';
-  el.innerHTML = nota.itens.map(function(it){
+  // Ordena só para EXIBIÇÃO — itens concluídos vão para o fim da lista,
+  // sem mudar a ordem "de guarda" real (essa só é reordenada de verdade
+  // durante a sincronização, pra refletir no servidor/link compartilhado)
+  var itensParaExibir = isChecklist
+    ? nota.itens.slice().sort(function(a,b){ return (a.concluido?1:0) - (b.concluido?1:0); })
+    : nota.itens;
+  el.innerHTML = itensParaExibir.map(function(it){
     return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)">'+
       (isChecklist
         ? '<span data-toggleitem="'+it.id+'" style="width:22px;height:22px;border-radius:6px;border:2px solid '+(it.concluido?'var(--green)':'var(--border)')+';background:'+(it.concluido?'var(--green)':'transparent')+';display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;color:#0A1A12;font-weight:800">'+(it.concluido?'✓':'')+'</span>'
@@ -3260,6 +3266,21 @@ function sincronizarListas(cb){
         var pendMap = {};
         pendentes.forEach(function(l){ pendMap[String(l.id)] = true; });
         LISTAS = serverList.concat(LISTAS.filter(function(l){ return pendMap[String(l.id)]; }));
+
+        // Reordena de verdade os itens de checklist (concluídos vão pro
+        // fim) — isso é feito só aqui, na sincronização, pra atualizar o
+        // servidor/link compartilhado também, não só a exibição local.
+        LISTAS.forEach(function(l){
+          if(l.tipo!=='checklist' || !(l.itens||[]).length) return;
+          var original = l.itens;
+          var reordenado = original.slice().sort(function(a,b){ return (a.concluido?1:0) - (b.concluido?1:0); });
+          var mudou = reordenado.some(function(it,i){ return it.id !== original[i].id; });
+          if(mudou){
+            l.itens = reordenado;
+            apiPost('salvarLista', l, function(){});
+          }
+        });
+
         saveListas();
         if(cb) cb();
       }
@@ -7296,7 +7317,7 @@ function criarLembreteFatura(cartao, mesAno, total){
   var partes = mesAno.split('-');
   var ano = parseInt(partes[0]), mes = parseInt(partes[1]);
   var mesLabel = MESES_BR[mes-1]+'/'+ano;
-  var novaDesc = '💳 Pagar fatura '+cartao.nome+' — '+mesLabel+' ('+fmtBRL(total)+')';
+  var novaDesc = '💳 Fatura '+cartao.nome+' — '+mesLabel+' ('+fmtBRL(total)+')';
 
   // Já existe um lembrete pra essa fatura (pago ou não)? Atualiza o
   // valor e a descrição em vez de criar outro — é assim que o botão
