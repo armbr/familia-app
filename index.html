@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260720-142612</title>
+<title>Fluxo v20260720-144900</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -1691,6 +1691,9 @@ select option{background:#1A2A3A}
       <div id="div-total-geral" style="font-size:13px;font-weight:800;color:var(--red)"></div>
     </div>
     <div id="div-list"></div>
+
+    <button onclick="toggleQuitados()" style="width:100%;margin-top:14px;margin-bottom:10px;padding:10px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit" id="btn-toggle-quitados">✅ Ver quitados</button>
+    <div id="div-list-quitados" style="display:none"></div>
   </div>
 
 </div>
@@ -8544,6 +8547,28 @@ function financiamentoCardHTML(d){
       '<button data-deldiv="'+d.id+'" style="padding:9px 14px;border:none;border-radius:8px;background:transparent;color:var(--red);font-size:14px;cursor:pointer;font-family:inherit">🗑️</button>'+
     '</div>'+
   '</div>';
+}
+
+var quitadosVisiveis = false;
+function toggleQuitados(){
+  quitadosVisiveis = !quitadosVisiveis;
+  var el = document.getElementById('div-list-quitados');
+  var btn = document.getElementById('btn-toggle-quitados');
+  if(!el || !btn) return;
+  el.style.display = quitadosVisiveis ? 'block' : 'none';
+  btn.textContent = quitadosVisiveis ? '🔼 Esconder quitados' : '✅ Ver quitados';
+  if(quitadosVisiveis) renderQuitados();
+}
+
+function renderQuitados(){
+  var el = document.getElementById('div-list-quitados');
+  if(!el) return;
+  var quitados = DIVIDAS.filter(function(d){ return d.status==='pago'; });
+  if(!quitados.length){
+    el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:16px;font-size:12px">Nenhum quitado ainda</div>';
+    return;
+  }
+  el.innerHTML = quitados.map(function(d){ return dividaCardHTML(d); }).join('');
 }
 
 function renderDividas(){
