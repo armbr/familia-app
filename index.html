@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260720-144900</title>
+<title>Fluxo v20260720-150053</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -8133,6 +8133,11 @@ function addCapitalGiroRotativo(){
     existente.desc = desc; existente.valorLiberado = liberado; existente.taxaMensal = taxa;
     existente.iofBasicoPct = iofBasico; existente.iofAdicionalPct = iofAdic; existente.tipoTaxa = tipoTaxa;
     existente.dataFinalPagamento = dataFinal;
+    // Recalcula o status com a fórmula corrigida — antes essa edição não
+    // atualizava o status, então um item preso como "pago" indevidamente
+    // continuava preso mesmo depois de editar e salvar.
+    var rNovo = resumoRotativo(existente);
+    existente.status = rNovo.quitado ? 'pago' : (rNovo.valorUtilizado>0 ? 'parcial' : 'pendente');
     saveDividas();
     apiPost('salvarDivida', existente, function(){});
     rotativoEmEdicaoId = null;
@@ -8143,6 +8148,7 @@ function addCapitalGiroRotativo(){
     ['dv-desc','dv-rot-liberado','dv-fin-taxa','dv-rot-iofbasico','dv-rot-iofadicional','dv-rot-datafinal'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     setFinTaxaTipo('fixa'); setFinSistema('PRICE');
     renderDividas();
+    if(typeof renderQuitados==='function' && typeof quitadosVisiveis!=='undefined' && quitadosVisiveis) renderQuitados();
     toast('✅ Atualizado!');
     return;
   }
