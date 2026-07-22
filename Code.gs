@@ -195,6 +195,18 @@ function fmtDate(v) {
   return v ? String(v) : '';
 }
 
+// Normaliza o campo time: se vier como objeto Date do Sheets (tipo horário),
+// extrai apenas HH:MM. Se já for string, retorna os primeiros 5 caracteres.
+function fmtTime(v) {
+  if (!v) return '';
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, 'America/Sao_Paulo', 'HH:mm');
+  }
+  var s = String(v).trim();
+  // Pode vir como "14:30:00" — truncar para "14:30"
+  return s.substring(0, 5);
+}
+
 function sheetRows(name) {
   var sheet = ss().getSheetByName(name);
   if (!sheet) return { sheet: null, headers: [], rows: [] };
@@ -289,7 +301,7 @@ function getTasks() {
   var data = r.rows.map(function(row) {
     var obj = {};
     r.headers.forEach(function(h, i) {
-      obj[h] = (h === 'deadline') ? fmtDate(row[i]) : row[i];
+      obj[h] = (h === 'deadline') ? fmtDate(row[i]) : (h === 'time') ? fmtTime(row[i]) : row[i];
     });
     if (!obj.comprovUrl) obj.comprovUrl = '';
     if (!obj.cat)       obj.cat = '';
@@ -4262,4 +4274,3 @@ function testarSync() {
     }
   });
 }
-rmos!
