@@ -77,6 +77,7 @@ function doGetInternal(action, body) {
     case 'addTransaction':    return addTransaction(body);
     case 'deleteTransaction': return deleteTransaction(body.id);
     case 'getTasks':          return getTasks();
+    case 'getTaskStatus':     return getTaskStatus(body);
     case 'addTask':           return addTask(body);
     case 'updateTask':        return updateTask(body);
     case 'deleteTask':        return deleteTask(body.id);
@@ -239,9 +240,15 @@ function addTransaction(body) {
   var sheet = ss().getSheetByName('Transações');
   if (!sheet) {
     sheet = ss().insertSheet('Transações');
-    sheet.appendRow(['id','type','desc','value','cat','date','createdAt','fromAgenda','recurId']);
+    sheet.appendRow(['id','type','desc','value','cat','date','createdAt','fromAgenda','recurId','codigoBarras']);
     sheet.setFrozenRows(1);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#1E3A5F').setFontColor('#FFF');
+  } else {
+    // Migração não-destrutiva — adiciona coluna codigoBarras se ainda não existir
+    var headerAtual = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headerAtual.indexOf('codigoBarras') === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue('codigoBarras');
+    }
   }
   // Usar o id enviado pelo cliente se disponível, para manter consistência no sync
   var id = body.id ? String(body.id) : String(Date.now());
@@ -250,7 +257,7 @@ function addTransaction(body) {
   // duplicar (necessário para permitir reenvio seguro em caso de falha
   // de rede na primeira tentativa, sem risco de criar duas linhas).
   var dados = sheet.getDataRange().getValues();
-  var novaLinha = [id, body.type, body.desc, parseFloat(body.value), body.cat, body.date, new Date().toISOString(), body.fromAgenda ? 'true' : '', body.recurId ? String(body.recurId) : ''];
+  var novaLinha = [id, body.type, body.desc, parseFloat(body.value), body.cat, body.date, new Date().toISOString(), body.fromAgenda ? 'true' : '', body.recurId ? String(body.recurId) : '', body.codigoBarras ? String(body.codigoBarras) : ''];
   for (var i = 1; i < dados.length; i++) {
     if (String(dados[i][0]) === id) {
       sheet.getRange(i+1, 1, 1, novaLinha.length).setValues([novaLinha]);
@@ -472,6 +479,36 @@ function deleteTask(id) {
 }
 
 // ════════════════════════════════════════════════════════════
+//  STATUS DE TAREFA — usado pelo index.html para verificar se
+//  outro dispositivo já deu baixa antes de lançar em Finanças,
+//  evitando baixa duplicada quando dois usuários agem ao mesmo
+//  tempo sem ter sincronizado antes.
+// ════════════════════════════════════════════════════════════
+function getTaskStatus(body) {
+  try {
+    var r = sheetRows('Tarefas');
+    if (!r.sheet) return { ok: false, error: 'Aba Tarefas não encontrada' };
+    var idIdx     = r.headers.indexOf('id');
+    var statusIdx = r.headers.indexOf('status');
+    var doneIdx   = r.headers.indexOf('doneDate');
+    if (idIdx < 0 || statusIdx < 0) return { ok: false, error: 'Colunas não encontradas' };
+    for (var i = 0; i < r.rows.length; i++) {
+      if (String(r.rows[i][idIdx]) === String(body.id)) {
+        return {
+          ok:       true,
+          status:   String(r.rows[i][statusIdx] || 'pend'),
+          doneDate: doneIdx >= 0 ? String(r.rows[i][doneIdx] || '') : ''
+        };
+      }
+    }
+    // Tarefa não encontrada no servidor — tratar como pendente
+    return { ok: true, status: 'pend', doneDate: '' };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ════════════════════════════════════════════════════════════
 //  DOCUMENTOS
 // ════════════════════════════════════════════════════════════
 function getDocs() {
@@ -557,20 +594,27 @@ function addRecur(body) {
   var sheet = ss2.getSheetByName('Recorrentes');
   if (!sheet) {
     sheet = ss2.insertSheet('Recorrentes');
-    sheet.appendRow(['id','type','desc','value','cat','date','updatedAt','cartaoId']);
+    sheet.appendRow(['id','type','desc','value','cat','date','updatedAt','cartaoId','codigoBarras']);
     sheet.setFrozenRows(1);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#162030').setFontColor('#FFF');
+  } else {
+    // Migração não-destrutiva — adiciona coluna codigoBarras se ainda não existir
+    var headerAtualR = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headerAtualR.indexOf('codigoBarras') === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue('codigoBarras');
+    }
   }
   var id = String(body.id || Date.now());
   var now = new Date().toISOString();
   var cartaoId = body.cartaoId || '';
+  var codigoBarras = body.codigoBarras ? String(body.codigoBarras) : '';
 
   // Verificar se já existe linha com esse id — se sim, atualizar
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][0]) === id) {
       // Atualizar linha existente
-      sheet.getRange(i + 1, 1, 1, 8).setValues([[
+      sheet.getRange(i + 1, 1, 1, 9).setValues([[
         id,
         body.type  || data[i][1],
         body.desc  || data[i][2],
@@ -578,7 +622,8 @@ function addRecur(body) {
         body.cat   || data[i][4],
         body.date  || data[i][5],
         now,
-        cartaoId
+        cartaoId,
+        codigoBarras
       ]]);
       Logger.log('addRecur: atualizado id=' + id + ' valor=' + body.value + ' cat=' + body.cat);
       return { ok: true, id: id, updated: true };
@@ -586,7 +631,7 @@ function addRecur(body) {
   }
 
   // Não existe — inserir nova linha
-  sheet.appendRow([id, body.type, body.desc, parseFloat(body.value)||0, body.cat, body.date, now, cartaoId]);
+  sheet.appendRow([id, body.type, body.desc, parseFloat(body.value)||0, body.cat, body.date, now, cartaoId, codigoBarras]);
   Logger.log('addRecur: criado id=' + id + ' valor=' + body.value);
   return { ok: true, id: id, created: true };
 }
@@ -4217,3 +4262,4 @@ function testarSync() {
     }
   });
 }
+rmos!
