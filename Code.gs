@@ -347,6 +347,14 @@ function addTask(body) {
     sheet.getRange(1, sheet.getLastColumn() + 1).setValue('fatMesRef');
     headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   }
+  if (headers.indexOf('codigoBarras') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('codigoBarras');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
+  if (headers.indexOf('formaPagamento') === -1) {
+    sheet.getRange(1, sheet.getLastColumn() + 1).setValue('formaPagamento');
+    headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  }
 
   // Verificar duplicata antes de inserir
   var descIdx2    = headers.indexOf('desc');
@@ -413,6 +421,8 @@ function addTask(body) {
   set('time',      body.time || '');
   set('cartaoIdFatura', newCartaoFat);
   set('fatMesRef',      newFatMes);
+  set('codigoBarras',   body.codigoBarras   ? String(body.codigoBarras)   : '');
+  set('formaPagamento', body.formaPagamento ? String(body.formaPagamento) : '');
 
   sheet.appendRow(row);
   return { ok: true, id: id };
@@ -427,6 +437,8 @@ function updateTask(body) {
   var timeIdx     = r.headers.indexOf('time');
   var deadlineIdx = r.headers.indexOf('deadline');
   var descIdx     = r.headers.indexOf('desc');
+  var cbIdx       = r.headers.indexOf('codigoBarras');
+  var fpIdx       = r.headers.indexOf('formaPagamento');
 
   // Criar coluna comprovUrl se não existir
   if (comprovIdx === -1 && body.comprovUrl) {
@@ -439,6 +451,17 @@ function updateTask(body) {
     r.sheet.getRange(1, r.headers.length + 1).setValue('time');
     timeIdx = r.headers.length;
     r.headers.push('time');
+  }
+  // Criar colunas codigoBarras/formaPagamento se não existirem
+  if (cbIdx === -1 && body.codigoBarras !== undefined) {
+    r.sheet.getRange(1, r.headers.length + 1).setValue('codigoBarras');
+    cbIdx = r.headers.length;
+    r.headers.push('codigoBarras');
+  }
+  if (fpIdx === -1 && body.formaPagamento !== undefined) {
+    r.sheet.getRange(1, r.headers.length + 1).setValue('formaPagamento');
+    fpIdx = r.headers.length;
+    r.headers.push('formaPagamento');
   }
 
   for (var i = 0; i < r.rows.length; i++) {
@@ -470,6 +493,14 @@ function updateTask(body) {
       // Atualizar descrição (ex: valor da fatura corrigido no texto)
       if (body.desc !== undefined && body.desc !== null && descIdx > -1) {
         r.sheet.getRange(i + 2, descIdx + 1).setValue(body.desc);
+      }
+      // Atualizar código de barras do boleto
+      if (body.codigoBarras !== undefined && cbIdx > -1) {
+        r.sheet.getRange(i + 2, cbIdx + 1).setValue(String(body.codigoBarras || ''));
+      }
+      // Atualizar forma de pagamento
+      if (body.formaPagamento !== undefined && fpIdx > -1) {
+        r.sheet.getRange(i + 2, fpIdx + 1).setValue(String(body.formaPagamento || ''));
       }
       return { ok: true };
     }
