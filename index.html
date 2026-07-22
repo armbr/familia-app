@@ -3667,6 +3667,20 @@ function syncAll(){
           // Se vier como número (timestamp Excel), converter
           if(typeof dl === 'number') dl = new Date(dl).toISOString();
           var dlNorm = ymds(String(dl));
+          // Normalizar time: pode vir como Date serializado (ex: "1899-12-30T14:30:00.000Z")
+          // ou string "HH:MM:SS" — garantir que fique somente "HH:MM"
+          var rawTime = t.time || '';
+          var normTime = '';
+          if (rawTime) {
+            var ts = String(rawTime).trim();
+            // Se vier como ISO date string com horário embutido (objeto Date do Sheets)
+            var isoMatch = ts.match(/T(\d{2}:\d{2})/);
+            if (isoMatch) {
+              normTime = isoMatch[1];
+            } else {
+              normTime = ts.substring(0, 5);
+            }
+          }
           return Object.assign({}, t, {
             deadline:  dlNorm,
             desc:      String(t.desc || t.description || t.descricao || ''),
@@ -3674,7 +3688,8 @@ function syncAll(){
             type:      String(t.type   || t.tipo || 'exp'),
             id:        String(t.id     || t.ID   || Date.now()),
             recurId:   t.recurId ? String(t.recurId) : '',
-            value:     parseFloat(t.value || 0)
+            value:     parseFloat(t.value || 0),
+            time:      normTime
           });
         }).filter(function(t){ return !exclTasksSet[String(t.id)]; }); // não ressuscitar excluídas
 
