@@ -974,6 +974,10 @@ select option{background:#1A2A3A}
             </div>
           </div>
         </div>
+        <div id="tx-boleto-row" style="display:none;margin-bottom:10px">
+          <div class="fl">📄 Código de Barras</div>
+          <input id="tx-boleto-cod" type="text" placeholder="Cole o código de barras aqui" maxlength="200" style="font-family:monospace;font-size:13px">
+        </div>
         <button class="btn" id="btn-add-tx" onclick="addTx()">Registrar ✓</button>
 
         <!-- Comprovante -->
@@ -1696,6 +1700,31 @@ select option{background:#1A2A3A}
     <div id="div-list-quitados" style="display:none"></div>
   </div>
 
+</div>
+
+<!-- Modal: Editar Cartão -->
+<div id="editcartao-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:360px;width:100%">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:800">✏️ Editar Cartão</div>
+      <button onclick="document.getElementById('editcartao-modal').style.display='none'" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
+    </div>
+    <div style="margin-bottom:10px"><div class="fl">Nome do cartão</div>
+      <input id="editcc-nome" type="text" maxlength="40">
+    </div>
+    <div class="row2" style="margin-bottom:10px">
+      <div><div class="fl">Dia fechamento</div>
+        <input id="editcc-fech" type="number" min="1" max="31">
+      </div>
+      <div><div class="fl">Dia vencimento</div>
+        <input id="editcc-venc" type="number" min="1" max="31">
+      </div>
+    </div>
+    <div style="margin-bottom:14px"><div class="fl">Limite (R$)</div>
+      <div class="r-wrap"><input id="editcc-limite" type="number" step="0.01" min="0" inputmode="decimal"></div>
+    </div>
+    <button class="btn" onclick="salvarEdicaoCartaoModal()">💾 Salvar Alterações</button>
+  </div>
 </div>
 
 <!-- Modal: Histórico da Dívida -->
@@ -3830,15 +3859,18 @@ function setPM(pm){
   });
   var row = document.getElementById('tx-cartao-row');
   var sel = document.getElementById('tx-cartao-sel');
-  if(!row || !sel) return;
-  var isCC = pm === 'cartao';
-  row.style.display = isCC ? 'block' : 'none';
-  if(isCC){
-    sel.innerHTML = '<option value="">— selecione o cartão —</option>'+
-      CARTOES.map(function(cc){
-        return '<option value="'+cc.id+'">'+esc(cc.nome)+'</option>';
-      }).join('');
+  var boletoRow = document.getElementById('tx-boleto-row');
+  if(row && sel){
+    var isCC = pm === 'cartao';
+    row.style.display = isCC ? 'block' : 'none';
+    if(isCC){
+      sel.innerHTML = '<option value="">— selecione o cartão —</option>'+
+        CARTOES.map(function(cc){
+          return '<option value="'+cc.id+'">'+esc(cc.nome)+'</option>';
+        }).join('');
+    }
   }
+  if(boletoRow) boletoRow.style.display = (pm === 'boleto') ? 'block' : 'none';
 }
 
 function onTxCatChange(){
@@ -4856,6 +4888,7 @@ function renderFinCC(){
           '<div style="font-size:14px;font-weight:700;color:'+(isOn?'var(--green)':'var(--t1)')+'">'+esc(cc.nome)+'</div>'+
           '<div style="font-size:12px;color:var(--t3)">Fecha dia '+cc.fech+' · Vence dia '+cc.venc+(total>0?' · '+fmtBRL(total)+' pendente':'')+'</div>'+
         '</div>'+
+        '<button onclick="abrirEditarCartaoModal(\''+cc.id+'\')" style="background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0" title="Editar cartão">✏️</button>'+
         '<button class="tdel2" data-delcc="'+cc.id+'" style="flex-shrink:0">🗑️</button>'+
       '</div>';
     });
@@ -5793,7 +5826,8 @@ function taskCard(t,wrap){
   var tod=ymd(new Date());
   var ov=t.deadline&&ymds(t.deadline)<tod&&!done;
   var dead=t.deadline?'<span class="'+(ov?'ov':'')+'">📅 '+fmtDate(t.deadline)+(ov?' ⚠️':'')+'</span>':'';
-  var timeTag = t.time ? '<span data-edittime="'+String(t.id)+'" style="cursor:pointer;border-bottom:1px dotted currentColor" title="Clique para alterar o horário">⏰ '+esc(t.time)+'</span>' : '';
+  // Ajuste 4: exibe horário no formato limpo HH:mm (substring evita segundos extras)
+  var timeTag = t.time ? '<span data-edittime="'+String(t.id)+'" style="cursor:pointer;border-bottom:1px dotted currentColor" title="Clique para alterar o horário">⏰ '+esc(String(t.time).substring(0,5))+'</span>' : '';
   var addTimeBtn = (!t.time && t.deadline) ? '<span data-edittime="'+String(t.id)+'" style="cursor:pointer;color:var(--t3);font-size:11px;border-bottom:1px dotted currentColor" title="Adicionar horário">+ horário</span>' : '';
   var comprovHTML=t.comprovUrl
     ?'<a href="'+esc(t.comprovUrl)+'" target="_blank" class="task-comprov-link">📎 Ver comprovante</a>':'';
@@ -5813,6 +5847,23 @@ function taskCard(t,wrap){
   var recurTag = recurRid
     ? '<button id="'+recurBtnId+'" class="tag trecur" data-rid="'+recurRid+'" title="Editar valor desta recorrência ('+recurRid+')">🔁 Mensal</button>'
     : '';
+  // Ajuste 2: código de barras expansível com botão Copiar
+  var boletoHTML = '';
+  if(t.codigoBarras){
+    var cbId = 'cb-'+String(t.id);
+    var cbCod = esc(t.codigoBarras);
+    var cbCodJs = String(t.codigoBarras).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    boletoHTML = '<div style="margin-top:8px">'+
+      '<button onclick="(function(){var el=document.getElementById(\''+cbId+'\');el.style.display=el.style.display===\'none\'?\'block\':\'none\';})()" '+
+        'style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--t2);cursor:pointer;font-family:inherit">'+
+        '📄 Ver código de barras</button>'+
+      '<div id="'+cbId+'" style="display:none;margin-top:6px;background:var(--bg3);border-radius:8px;padding:8px">'+
+        '<div style="font-family:monospace;font-size:11px;word-break:break-all;color:var(--t1);margin-bottom:6px">'+cbCod+'</div>'+
+        '<button onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+cbCodJs+'\').then(function(){toast(\'✅ Código copiado!\')})" '+
+          'style="background:var(--green);color:#0A1A12;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">'+
+          '📋 Copiar</button>'+
+      '</div></div>';
+  }
   var sid=String(t.id);
   var html='<div class="taski'+(wrap?' '+wrap:'')+'" data-id="'+sid+'">'+
     '<div class="taski-hdr">'+
@@ -5824,7 +5875,8 @@ function taskCard(t,wrap){
     '<div class="tmeta">'+dead+timeTag+addTimeBtn+
     (t.value?'<span>💰 '+fmtBRL(parseFloat(t.value))+'</span>':'')+
     (done?comprovHTML:'')+
-    '</div></div>';
+    '</div>'+boletoHTML+
+    '</div>';
   return html;
 }
 
@@ -7146,6 +7198,37 @@ function cancelarEdicaoCartao(){
   var btn = document.querySelector('[onclick="addCartao()"]');
   if(btn) btn.textContent = '+ Salvar Cartão';
   ['cc-nome','cc-fech','cc-venc','cc-limite'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+}
+
+// Modal de edição rápida de cartão (aba Finanças)
+var _editCartaoModalId = null;
+function abrirEditarCartaoModal(id){
+  var cc = CARTOES.find(function(c){ return String(c.id)===String(id); });
+  if(!cc) return;
+  _editCartaoModalId = id;
+  document.getElementById('editcc-nome').value   = cc.nome||'';
+  document.getElementById('editcc-fech').value   = cc.fech||25;
+  document.getElementById('editcc-venc').value   = cc.venc||5;
+  document.getElementById('editcc-limite').value = cc.limite||'';
+  document.getElementById('editcartao-modal').style.display = 'flex';
+}
+function salvarEdicaoCartaoModal(){
+  var cc = CARTOES.find(function(c){ return String(c.id)===String(_editCartaoModalId); });
+  if(!cc){ toast('⚠️ Cartão não encontrado','err'); return; }
+  var novoNome   = (document.getElementById('editcc-nome').value||'').trim();
+  var novoFech   = parseInt(document.getElementById('editcc-fech').value)||cc.fech;
+  var novoVenc   = parseInt(document.getElementById('editcc-venc').value)||cc.venc;
+  var novoLimite = parseFloat(document.getElementById('editcc-limite').value)||cc.limite;
+  if(!novoNome){ toast('⚠️ Informe o nome do cartão','err'); return; }
+  cc.nome  = novoNome;
+  cc.fech  = novoFech;
+  cc.venc  = novoVenc;
+  cc.limite= novoLimite;
+  saveCartoes();
+  apiCall('salvarCartao', cc, function(){});
+  document.getElementById('editcartao-modal').style.display = 'none';
+  renderFinCC(); renderCC();
+  toast('✅ Cartão atualizado!');
 }
 
 function delCartao(id){
