@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260723-192518</title>
+<title>Fluxo v20260723-230203</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -8846,13 +8846,14 @@ function financiamentoCardHTML(d){
     : d.taxaMensal;
 
   var corBorda = d.cor || '#6D28D9';
+  var dataFinalExibida = resumo.tabela.length ? resumo.tabela[resumo.tabela.length-1].data : d.dataUltimaParcela;
 
   return '<div class="card" style="margin-bottom:10px;border-left:3px solid '+corBorda+'">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;gap:8px">'+
       '<div style="min-width:0">'+
         '<div style="font-size:10px;font-weight:800;color:#6D28D9;letter-spacing:.5px;margin-bottom:2px">'+(d.sistemaAmortizacao==='BULLET' ? '💼 CAPITAL DE GIRO' : '🏦 FINANCIAMENTO')+(isIndexada?' · 📊 INDEXADA':'')+'</div>'+
         '<div style="font-weight:800;font-size:14px">'+esc(d.desc)+'</div>'+
-        '<div style="font-size:12px;color:var(--t3)">'+sistemaLabel+' · '+(taxaAtualExibida||0).toFixed(2)+'%/mês'+(isIndexada?' (atual)':'')+' · '+resumo.numParcelas+'x</div>'+
+        '<div style="font-size:12px;color:var(--t3)">'+sistemaLabel+' · '+(taxaAtualExibida||0).toFixed(2)+'%/mês'+(isIndexada?' (atual)':'')+' · '+resumo.numParcelas+'x'+(dataFinalExibida&&!resumo.quitado?' · quita em '+fmtDate(dataFinalExibida):'')+'</div>'+
       '</div>'+
       '<span style="flex-shrink:0;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;border:1px solid '+statusColor+';color:'+statusColor+'">'+statusLabel+'</span>'+
     '</div>'+
