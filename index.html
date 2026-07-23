@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260720-194534</title>
+<title>Fluxo v20260723-125842</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3711,49 +3711,19 @@ function syncAll(){
         // Mesclar: preservar tarefas locais que o servidor ainda não tem
         // (ex: criadas há poucos segundos, antes do servidor confirmar)
         var serverIds = {};
-        // Índice secundário: desc normalizada + mês — para barrar duplicatas
-        // de tasks recorrentes cujo ID local ainda não foi substituído pelo real
-        var serverDescMo = {};
-        var serverRidMo  = {};
-        fresh.forEach(function(t){
-          serverIds[String(t.id)] = true;
-          var mo = String(t.deadline||'').substring(0,7);
-          var dn = String(t.desc||'').trim().toLowerCase();
-          serverDescMo[dn+'|'+mo] = true;
-          if(t.recurId) serverRidMo[String(t.recurId)+'|'+mo] = true;
-        });
-        var localOnly = TASKS.filter(function(t){
-          if(serverIds[String(t.id)]) return false;         // já tem pelo ID
-          if(exclTasksSet[String(t.id)]) return false;      // excluída
-          var mo = String(t.deadline||'').substring(0,7);
-          var dn = String(t.desc||'').trim().toLowerCase();
-          // Se já existe no servidor com mesma desc+mês → é duplicata,
-          // descartar a cópia local temporária
-          if(mo && serverDescMo[dn+'|'+mo]) return false;
-          // Se já existe no servidor com mesmo recurId+mês → duplicata
-          if(t.recurId && mo && serverRidMo[String(t.recurId)+'|'+mo]) return false;
-          return true;
-        });
-        // Reenviar ao servidor tasks que só existem localmente.
-        // Se o servidor responder duplicate/alreadyExists com outro ID,
-        // descartamos a cópia local para não duplicar.
+        fresh.forEach(function(t){ serverIds[String(t.id)] = true; });
+        var localOnly = TASKS.filter(function(t){ return !serverIds[String(t.id)] && !exclTasksSet[String(t.id)]; });
+        // Reenviar ao servidor — agora seguro, pois addTask verifica o ID
+        // antes de inserir (não duplica se já existir). Se o servidor
+        // responder que já existia (mesma descrição+mês) com outro ID,
+        // removemos nossa cópia local otimista pra não ficar duplicada.
         localOnly.forEach(function(t){
           var localId = t.id;
           apiCall('addTask', t, function(err, resp){
-            if(!err && resp && resp.id){
-              var realId = String(resp.id);
-              if(resp.duplicate || resp.alreadyExists){
-                // Servidor já tem esse item com outro ID — remover cópia local
-                if(realId !== String(localId)){
-                  TASKS = TASKS.filter(function(x){ return String(x.id)!==String(localId); });
-                  save();
-                  try{ renderTasks(); }catch(e){}
-                }
-              } else if(realId !== String(localId)){
-                // Servidor salvou com ID diferente — atualizar local
-                var idx = TASKS.findIndex(function(x){ return String(x.id)===String(localId); });
-                if(idx >= 0){ TASKS[idx].id = realId; save(); }
-              }
+            if(!err && resp && (resp.duplicate || resp.alreadyExists) && resp.id && String(resp.id)!==String(localId)){
+              TASKS = TASKS.filter(function(x){ return String(x.id)!==String(localId); });
+              save();
+              try{ renderTasks(); }catch(e){}
             }
           });
         });
@@ -4349,9 +4319,7 @@ function processRecur(){
         var fatTotal = totalFaturaCartao(r.cartaoId);
         if(fatTotal > 0) taskVal = fatTotal;
       }
-      var tmp = String(Date.now()) + String(Math.floor(Math.random()*10000));
       var task = {
-        id:       tmp,
         desc:     r.desc,
         type:     r.type||'exp',
         deadline: dl,
@@ -4360,7 +4328,8 @@ function processRecur(){
         status:   'pend',
         recurId:  rid
       };
-      TASKS.unshift(Object.assign({}, task));
+      var tmp = Date.now()+Math.random();
+      TASKS.unshift(Object.assign({id:tmp}, task));
       // Marcar nos dois índices para não duplicar neste loop
       ridIdx[rk]   = true;
       descIdx2[dk] = true;
@@ -4371,21 +4340,15 @@ function processRecur(){
   if(!added.length) return;
   localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
   added.forEach(function(task, i){
-    var localTmpId = task.id;
+    var localTmp = TASKS.find(function(t){ return t.desc===task.desc && t.recurId===task.recurId && t.deadline===task.deadline; });
+    var localTmpId = localTmp ? localTmp.id : null;
     setTimeout(function(){
       apiCall('addTask', task, function(err, resp){
-        if(!err && resp && resp.id){
-          var realId = String(resp.id);
-          if(realId !== String(localTmpId)){
-            // Servidor gerou ID real diferente do temporário:
-            // substituir localmente para que o syncAll não enxergue
-            // essa task como "localOnly" e não crie um card duplo.
-            var idx = TASKS.findIndex(function(t){ return String(t.id)===String(localTmpId); });
-            if(idx >= 0){
-              TASKS[idx].id = realId;
-              localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
-            }
-          }
+        if(!err && resp && resp.id && localTmpId && String(resp.id) !== String(localTmpId)){
+          // Substituir ID temporário pelo ID real do servidor para não ficar card fantasma
+          var idx = TASKS.findIndex(function(t){ return String(t.id)===String(localTmpId); });
+          if(idx >= 0) TASKS[idx].id = String(resp.id);
+          localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
         }
       });
     }, i*300);
@@ -8578,6 +8541,12 @@ function addFinanciamentoSPV(){
     existente.desc = desc; existente.taxaMensal = taxa; existente.diaVencimento = diaVenc||0;
     existente.tipoTaxa = tipoTaxa; existente.indexador = tipoTaxa==='indexada' ? indexador : '';
     if(saldoAtualInformado>0) existente.valorUtilizado = saldoAtualInformado;
+    // Recalcula o status com a fórmula corrigida — antes essa edição não
+    // atualizava o status, então um item preso como "pago" indevidamente
+    // continuava preso mesmo depois de editar e salvar (mesmo bug que já
+    // tinha sido corrigido no Rotativo, mas não aqui no SPV).
+    var rNovoSpv = resumoSPV(existente);
+    existente.status = rNovoSpv.quitado ? 'pago' : 'parcial';
     saveDividas();
     apiPost('salvarDivida', existente, function(){});
     spvEmEdicaoId = null;
@@ -8588,6 +8557,7 @@ function addFinanciamentoSPV(){
     ['dv-desc','dv-spv-diavenc','dv-spv-saldoatual'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
     setFinTaxaTipo('fixa'); setFinSistema('PRICE');
     renderDividas();
+    if(typeof renderQuitados==='function' && typeof quitadosVisiveis!=='undefined' && quitadosVisiveis) renderQuitados();
     toast('✅ Atualizado!');
     return;
   }
@@ -8647,7 +8617,11 @@ function resumoSPV(d){
     saldoAtual: saldo, totalPago: totalPago, totalJuros: totalJuros,
     totalAmortizado: totalAmortizado, movimentos: movs,
     diasDesdeUltimoPagamento: diasDesdeUltimo, jurosProjetados: jurosProjetados,
-    quitado: saldo<=0.01 && movs.length>0
+    // Proteção igual à do Rotativo: só considera quitado se realmente
+    // existia um valor original válido — senão, um saldo que já nasceu
+    // zerado (por dado ausente/errado) seria erroneamente considerado
+    // "quitado" no primeiro movimento registrado.
+    quitado: saldo<=0.01 && movs.length>0 && parseFloat(d.valorOriginal)>0
   };
 }
 
