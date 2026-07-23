@@ -406,7 +406,12 @@ function addTask(body) {
   }
 
   // Montar linha com posições corretas
-  var id  = Date.now();
+  // Usar o ID enviado pelo cliente (quando vier) para garantir idempotência
+  // no sync: o frontend salva localmente com esse ID temporário e, depois
+  // que o servidor confirma, substituirá o ID local pelo real. Se o servidor
+  // gera um ID diferente do que está no localStorage, o syncAll vê a cópia
+  // local como "localOnly" e cria um card duplicado.
+  var id  = body.id ? String(body.id) : String(Date.now());
   var row = new Array(headers.length).fill('');
   var set = function(col, val){ var i=headers.indexOf(col); if(i>=0) row[i]=val; };
   set('id',        id);
