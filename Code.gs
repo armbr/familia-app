@@ -2006,9 +2006,24 @@ function salvarDividaEstruturadaInterna(body) {
 
 function sincronizarSubArrayDivida(sheet, dividaId, novosItens, mapFn) {
   var dados = sheet.getDataRange().getValues();
+  var linhasExistentes = [];
   for (var i = dados.length - 1; i >= 1; i--) {
-    if (String(dados[i][1]) === String(dividaId)) sheet.deleteRow(i + 1);
+    if (String(dados[i][1]) === String(dividaId)) linhasExistentes.push(i);
   }
+
+  // PROTEÇÃO: se a lista nova tem MENOS itens do que já existe salvo,
+  // é um sinal forte de que o cliente mandou uma cópia parcial/velha
+  // (por exemplo, um sync incompleto) — em vez de apagar tudo e perder
+  // movimentos de verdade (como um saque original), preserva o que já
+  // está salvo e ignora a substituição, registrando o ocorrido no log.
+  if (linhasExistentes.length > 0 && novosItens.length < linhasExistentes.length) {
+    Logger.log('⚠️ AVISO: sincronizarSubArrayDivida recebeu ' + novosItens.length +
+      ' item(ns) pra dívida ' + dividaId + ', mas já existiam ' + linhasExistentes.length +
+      ' salvos — ignorando a substituição pra não perder dados (provável cópia parcial do cliente).');
+    return;
+  }
+
+  linhasExistentes.forEach(function(i){ sheet.deleteRow(i + 1); });
   novosItens.forEach(function(item) { sheet.appendRow(mapFn(item)); });
 }
 
