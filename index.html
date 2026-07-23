@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260723-182555</title>
+<title>Fluxo v20260723-192518</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -3119,13 +3119,13 @@ function saveListas(){ localStorage.setItem('ff_listas', JSON.stringify(LISTAS))
 
 var curNotaAberta = null;
 
-var TIPO_NOTA_ICONE = { texto:'📄', lista:'📋', checklist:'✅' };
+var TIPO_NOTA_ICONE = { texto:'📄', lista:'📋', checklist:'✅', combustivel:'⛽' };
 
 function criarNovaNota(tipo){
   var nota = { id: Date.now(), tipo: tipo, titulo: '', conteudoTexto: '', itens: [], criadoEm: new Date().toISOString() };
   LISTAS.unshift(nota);
   saveListas();
-  apiCall('salvarLista', nota, function(){});
+  apiPost('salvarLista', nota, function(){});
   abrirNota(nota.id);
 }
 
@@ -3148,6 +3148,9 @@ function notaPreview(n){
   if(n.tipo==='texto') return esc(n.conteudoTexto||'').substring(0,140);
   var itens = n.itens||[];
   if(!itens.length) return '<span style="color:var(--t3)">Vazia</span>';
+  if(n.tipo==='combustivel'){
+    return itens.length+' abastecimento'+(itens.length!==1?'s':'')+' registrado'+(itens.length!==1?'s':'');
+  }
   return itens.slice(0,5).map(function(it){
     var marcado = n.tipo==='checklist' && it.concluido;
     return '<div style="'+(marcado?'text-decoration:line-through;color:var(--t3)':'')+'">'+(n.tipo==='checklist'?(marcado?'☑ ':'☐ '):'• ')+esc(it.texto)+'</div>';
@@ -3158,11 +3161,11 @@ function notaCardHTML(n){
   var titulo = n.titulo || '(sem título)';
   return '<div class="card" data-abrirlista="'+n.id+'" style="margin-bottom:10px;cursor:pointer">'+
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">'+
-      '<div style="font-weight:800;font-size:14px">'+esc(titulo)+'</div>'+
-      '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
-        '<div style="font-size:14px">'+TIPO_NOTA_ICONE[n.tipo]+'</div>'+
-        '<button data-delnotacard="'+n.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px" title="Excluir">🗑️</button>'+
+      '<div style="display:flex;align-items:center;gap:6px;min-width:0">'+
+        '<span style="font-size:14px;flex-shrink:0">'+TIPO_NOTA_ICONE[n.tipo]+'</span>'+
+        '<span style="font-weight:800;font-size:14px">'+esc(titulo)+'</span>'+
       '</div>'+
+      '<button data-delnotacard="'+n.id+'" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:2px;flex-shrink:0" title="Excluir">🗑️</button>'+
     '</div>'+
     '<div style="font-size:12px;color:var(--t2);line-height:1.5">'+notaPreview(n)+'</div>'+
   '</div>';
@@ -3221,7 +3224,7 @@ function salvarNotaAtual(){
   saveListas();
   clearTimeout(_salvarNotaTimeout);
   _salvarNotaTimeout = setTimeout(function(){
-    apiCall('salvarLista', nota, function(){});
+    apiPost('salvarLista', nota, function(){});
   }, 600);
 }
 
@@ -3329,7 +3332,7 @@ function adicionarItemNota(){
 
   nota.itens = (nota.itens||[]).concat([item]);
   saveListas();
-  apiCall('salvarLista', nota, function(){});
+  apiPost('salvarLista', nota, function(){});
   inputEl.value = '';
   renderNotaItens();
 }
@@ -3341,7 +3344,7 @@ function toggleItemLocal(itemId){
   if(!item) return;
   item.concluido = !item.concluido;
   saveListas();
-  apiCall('salvarLista', nota, function(){});
+  apiPost('salvarLista', nota, function(){});
   renderNotaItens();
 }
 
@@ -3350,7 +3353,7 @@ function delItemLista(itemId){
   if(!nota) return;
   nota.itens = (nota.itens||[]).filter(function(it){ return String(it.id)!==String(itemId); });
   saveListas();
-  apiCall('salvarLista', nota, function(){});
+  apiPost('salvarLista', nota, function(){});
   renderNotaItens();
 }
 
@@ -3418,7 +3421,7 @@ function sincronizarListas(cb){
     var exclSet = {};
     exclusoes.forEach(function(id){ exclSet[String(id)] = true; });
 
-    apiCall('getListas', null, function(err, d){
+    apiCallSemCache('getListas', null, function(err, d){
       var serverList = (!err && d && d.ok && d.data) ? d.data : [];
       serverList = serverList.filter(function(l){ return !exclSet[String(l.id)]; });
       var serverMap = {};
@@ -3452,13 +3455,13 @@ function sincronizarListas(cb){
       }
 
       if(pendentes.length === 0){ finalizar(); return; }
-      var enviados = 0;
-      pendentes.forEach(function(l){
-        apiCall('salvarLista', l, function(){
-          enviados++;
-          if(enviados === pendentes.length) finalizar();
-        });
-      });
+      var idxL = 0;
+      function enviarProximaLista(){
+        if(idxL >= pendentes.length){ finalizar(); return; }
+        var l = pendentes[idxL++];
+        apiPost('salvarLista', l, function(){ enviarProximaLista(); });
+      }
+      enviarProximaLista();
     });
   });
 }
