@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fluxo v20260723-125842</title>
+<title>Fluxo v20260723-182555</title>
 <meta name="version" content="20260522-205245">
 <link rel="manifest" href="manifest.json">
 
@@ -2294,10 +2294,11 @@ select option{background:#1A2A3A}
 
   <!-- Grade de notas (visão geral, estilo Google Keep) -->
   <div id="notas-overview">
-    <div style="display:flex;gap:6px;margin-bottom:16px">
-      <button type="button" onclick="criarNovaNota('texto')" style="flex:1;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📄 Texto</button>
-      <button type="button" onclick="criarNovaNota('lista')" style="flex:1;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Lista</button>
-      <button type="button" onclick="criarNovaNota('checklist')" style="flex:1;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ Checklist</button>
+    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+      <button type="button" onclick="criarNovaNota('texto')" style="flex:1;min-width:70px;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📄 Texto</button>
+      <button type="button" onclick="criarNovaNota('lista')" style="flex:1;min-width:70px;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">📋 Lista</button>
+      <button type="button" onclick="criarNovaNota('checklist')" style="flex:1;min-width:70px;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">✅ Checklist</button>
+      <button type="button" onclick="criarNovaNota('combustivel')" style="flex:1;min-width:70px;padding:12px 4px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">⛽ Combustível</button>
     </div>
     <div id="notas-cards"></div>
   </div>
@@ -2323,6 +2324,30 @@ select option{background:#1A2A3A}
         <button class="btn" onclick="adicionarItemNota()" style="width:auto;padding:0 18px">+</button>
       </div>
       <div id="nota-itens"></div>
+    </div>
+
+    <!-- Corpo para nota tipo COMBUSTÍVEL -->
+    <div id="nota-corpo-combustivel" style="display:none">
+      <div id="combustivel-resumo" style="display:flex;gap:8px;margin-bottom:14px"></div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:800;color:var(--t3);margin-bottom:10px">⛽ Novo abastecimento</div>
+        <div class="row2" style="margin-bottom:8px">
+          <div><div class="fl" style="font-size:11px">Data</div><input id="abast-data" type="date"></div>
+          <div><div class="fl" style="font-size:11px">Combustível</div>
+            <select id="abast-tipo">
+              <option value="gasolina">⛽ Gasolina</option>
+              <option value="etanol">🌿 Etanol</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2" style="margin-bottom:8px">
+          <div><div class="fl" style="font-size:11px">Litros</div><input id="abast-litros" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div>
+          <div><div class="fl" style="font-size:11px">Valor pago (R$)</div><div class="r-wrap"><input id="abast-valor" type="number" placeholder="0,00" step="0.01" min="0" inputmode="decimal"></div></div>
+        </div>
+        <div style="margin-bottom:10px"><div class="fl" style="font-size:11px">Odômetro (km no painel)</div><input id="abast-odometro" type="number" placeholder="Ex: 45230" step="1" min="0" inputmode="numeric"></div>
+        <button class="btn" onclick="adicionarAbastecimento()">+ Registrar Abastecimento</button>
+      </div>
+      <div id="combustivel-lista"></div>
     </div>
   </div>
 </div>
@@ -3162,11 +3187,16 @@ function abrirNota(id){
   document.getElementById('nota-titulo').value = nota.titulo || '';
 
   var isTexto = nota.tipo === 'texto';
+  var isCombustivel = nota.tipo === 'combustivel';
   document.getElementById('nota-corpo-texto').style.display = isTexto ? 'block' : 'none';
-  document.getElementById('nota-corpo-lista').style.display = isTexto ? 'none' : 'block';
+  document.getElementById('nota-corpo-lista').style.display = (!isTexto && !isCombustivel) ? 'block' : 'none';
+  document.getElementById('nota-corpo-combustivel').style.display = isCombustivel ? 'block' : 'none';
 
   if(isTexto){
     document.getElementById('nota-texto-conteudo').value = nota.conteudoTexto || '';
+  } else if(isCombustivel){
+    document.getElementById('abast-data').value = ymd(new Date());
+    renderNotaCombustivel();
   } else {
     renderNotaItens();
   }
@@ -3193,6 +3223,98 @@ function salvarNotaAtual(){
   _salvarNotaTimeout = setTimeout(function(){
     apiCall('salvarLista', nota, function(){});
   }, 600);
+}
+
+function adicionarAbastecimento(){
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota) return;
+
+  var data = document.getElementById('abast-data').value || ymd(new Date());
+  var tipoCombustivel = document.getElementById('abast-tipo').value;
+  var litros = parseFloat(document.getElementById('abast-litros').value||0);
+  var valor = parseFloat(document.getElementById('abast-valor').value||0);
+  var odometro = parseFloat(document.getElementById('abast-odometro').value||0);
+
+  if(!litros || litros<=0){ toast('⚠️ Informe os litros','err'); return; }
+  if(!valor || valor<=0){ toast('⚠️ Informe o valor pago','err'); return; }
+  if(!odometro || odometro<=0){ toast('⚠️ Informe o odômetro','err'); return; }
+
+  var item = { id: Date.now(), data: data, tipoCombustivel: tipoCombustivel, litros: litros, valor: valor, odometro: odometro };
+  nota.itens = (nota.itens||[]).concat([item]);
+  saveListas();
+  apiPost('salvarLista', nota, function(){});
+
+  ['abast-litros','abast-valor','abast-odometro'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  renderNotaCombustivel();
+  toast('⛽ Abastecimento registrado!');
+}
+
+function excluirAbastecimento(itemId){
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota) return;
+  if(!confirm('Excluir este abastecimento?')) return;
+  nota.itens = (nota.itens||[]).filter(function(it){ return String(it.id)!==String(itemId); });
+  saveListas();
+  apiPost('salvarLista', nota, function(){});
+  renderNotaCombustivel();
+}
+
+function renderNotaCombustivel(){
+  var nota = LISTAS.find(function(l){ return String(l.id)===String(curNotaAberta); });
+  if(!nota) return;
+
+  // Ordena por data pra calcular km rodado corretamente entre abastecimentos consecutivos
+  var itens = (nota.itens||[]).slice().sort(function(a,b){ return a.data<b.data?-1:(a.data>b.data?1:(a.id-b.id)); });
+
+  // Calcula km rodado e consumo de cada abastecimento em relação ao anterior
+  var calculados = itens.map(function(it, i){
+    var kmRodados = null, consumo = null;
+    if(i>0){
+      var diff = it.odometro - itens[i-1].odometro;
+      if(diff>0){ kmRodados = diff; consumo = diff/it.litros; }
+    }
+    return Object.assign({}, it, { kmRodados: kmRodados, consumo: consumo, valorPorLitro: it.valor/it.litros });
+  });
+
+  // Resumo: 3 médias (geral, só gasolina, só etanol) — soma km/soma litros
+  // de cada grupo, não média das médias (mais preciso com tanques de tamanhos diferentes)
+  function calcularMedia(filtro){
+    var validos = calculados.filter(function(c){ return c.kmRodados!==null && (!filtro || c.tipoCombustivel===filtro); });
+    var totalKm = validos.reduce(function(s,c){ return s+c.kmRodados; }, 0);
+    var totalLitros = validos.reduce(function(s,c){ return s+c.litros; }, 0);
+    return totalLitros>0 ? totalKm/totalLitros : null;
+  }
+  var mediaGeral = calcularMedia(null);
+  var mediaGasolina = calcularMedia('gasolina');
+  var mediaEtanol = calcularMedia('etanol');
+
+  var resumoEl = document.getElementById('combustivel-resumo');
+  function cardResumo(label, valor){
+    return '<div style="flex:1;background:var(--bg3);border-radius:8px;padding:10px 6px;text-align:center">'+
+      '<div style="font-size:10px;color:var(--t3);text-transform:uppercase">'+label+'</div>'+
+      '<div style="font-size:15px;font-weight:800;color:var(--t1)">'+(valor!==null?valor.toFixed(2)+' km/L':'—')+'</div>'+
+    '</div>';
+  }
+  resumoEl.innerHTML = cardResumo('Geral', mediaGeral) + cardResumo('⛽ Gasolina', mediaGasolina) + cardResumo('🌿 Etanol', mediaEtanol);
+
+  var listaEl = document.getElementById('combustivel-lista');
+  if(!calculados.length){
+    listaEl.innerHTML = '<div style="text-align:center;color:var(--t3);padding:16px;font-size:12px">Nenhum abastecimento registrado ainda</div>';
+    return;
+  }
+  listaEl.innerHTML = calculados.slice().reverse().map(function(c){
+    var icone = c.tipoCombustivel==='etanol' ? '🌿' : '⛽';
+    return '<div style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:8px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<div style="font-weight:700;font-size:13px">'+icone+' '+fmtDate(c.data)+'</div>'+
+        '<button onclick="excluirAbastecimento(\''+c.id+'\')" style="background:none;border:none;color:var(--red);font-size:13px;cursor:pointer">🗑️</button>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--t3);line-height:1.6">'+
+        c.litros.toFixed(2)+'L · '+fmtBRL(c.valor)+' · '+fmtBRL(c.valorPorLitro)+'/L · odômetro '+c.odometro.toLocaleString('pt-BR')+'km'+
+        (c.consumo!==null ? '<br>'+c.kmRodados+'km rodados · <b style="color:var(--t1)">'+c.consumo.toFixed(2)+' km/L</b>' : '<br><span style="opacity:.7">Primeiro registro — sem km de referência anterior</span>')+
+      '</div>'+
+    '</div>';
+  }).join('');
 }
 
 function adicionarItemNota(){
