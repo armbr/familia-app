@@ -3815,12 +3815,20 @@ function enviarLembretesHorario() {
   for (var i = 0; i < dados.length; i++) {
     var row = dados[i];
     var status = String(row[idxStatus] || '');
-    var time = String(row[idxTime] || '').trim();
+    var timeRaw = row[idxTime];
+    var time = (timeRaw instanceof Date)
+      ? Utilities.formatDate(timeRaw, 'America/Sao_Paulo', 'HH:mm')
+      : String(timeRaw || '').trim().substring(0, 5);
     var deadlineRaw = row[idxDeadline];
     var deadlineStr = deadlineRaw instanceof Date
       ? Utilities.formatDate(deadlineRaw, 'America/Sao_Paulo', 'yyyy-MM-dd')
       : String(deadlineRaw || '').substring(0,10);
     var jaEnviado = row[idxLembrete];
+
+    if (status === 'done') continue;
+    if (!time || !deadlineStr) continue;
+    if (deadlineStr !== hojeStr) continue;
+    if (jaEnviado === true || jaEnviado === 'true') continue;
 
     if (status === 'done') continue;
     if (!time || !deadlineStr) continue;
@@ -4324,4 +4332,124 @@ function testarSync() {
       }
     }
   });
+}
+
+function diagnosticarFechamentoFatura() {
+  var hoje = new Date();
+  var diaHoje = hoje.getDate();
+  var ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate();
+  var mesAtual = Utilities.formatDate(hoje, 'America/Sao_Paulo', 'yyyy-MM');
+
+  Logger.log('=== DIAGNÓSTICO: Fechamento de Fatura ===');
+  Logger.log('Hoje: ' + diaHoje + ' | Mês atual: ' + mesAtual);
+
+  var cartoesResp = getItemsSheet('Cartoes');
+  var cartoes = (cartoesResp && cartoesResp.data) ? cartoesResp.data : [];
+  Logger.log('Cartões encontrados: ' + cartoes.length);
+
+  if (!cartoes.length) {
+    Logger.log('❌ Nenhum cartão cadastrado na aba Cartoes');
+    return;
+  }
+
+  cartoes.forEach(function(cc) {
+    var diaFech = parseInt(cc.fech) || 25;
+    var diaFechEfetivo = Math.min(diaFech, ultimoDiaMes);
+    Logger.log('Cartão: ' + cc.nome + ' | Fecha dia: ' + diaFech + ' (efetivo: ' + diaFechEfetivo + ') | Hoje é dia ' + diaHoje + ' → ' + (diaHoje === diaFechEfetivo ? '✅ FECHA HOJE' : '⏭ não é hoje'));
+  });
+
+  var gastosResp = getItemsSheet('GastosCartao');
+  var gastos = (gastosResp && gastosResp.data) ? gastosResp.data : [];
+  Logger.log('\nTotal de gastos no cartão encontrados: ' + gastos.length);
+
+  // Mostrar os primeiros 5 para ver o formato do fatMes
+  gastos.slice(0, 5).forEach(function(g, i) {
+    Logger.log('Gasto[' + i + ']: cartaoId=' + g.cartaoId + ' | fatMes="' + g.fatMes + '" | pago=' + g.pago + ' | val=' + g.val + ' | desc=' + g.desc);
+  });
+
+  Logger.log('\nVerificando pendentes para mesAtual="' + mesAtual + '":');
+  cartoes.forEach(function(cc) {
+    var pendentes = gastos.filter(function(g) {
+      return String(g.cartaoId) === String(cc.id) && g.fatMes === mesAtual && !g.pago;
+    });
+    Logger.log('Cartão "' + cc.nome + '" (id=' + cc.id + '): ' + pendentes.length + ' pendente(s)');
+    if (pendentes.length === 0 && gastos.length > 0) {
+      // Mostrar por que não encontrou — comparar os IDs manualmente
+      var doCartao = gastos.filter(function(g) { return String(g.cartaoId) === String(cc.id); });
+      Logger.log('  → Gastos com este cartaoId: ' + doCartao.length);
+      doCartao.slice(0,3).forEach(function(g) {
+        Logger.log('    fatMes="' + g.fatMes + '" vs mesAtual="' + mesAtual + '" → ' + (g.fatMes === mesAtual ? 'IGUAL' : 'DIFERENTE') + ' | pago=' + g.pago);
+      });
+    }
+  });
+}
+
+function diagnosticarLembretesHorario() {
+  Logger.log('=== DIAGNÓSTICO: Lembretes com Horário ===');
+
+  var sheet = ss().getSheetByName('Tarefas');
+  if (!sheet) { Logger.log('❌ Aba Tarefas não encontrada'); return; }
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var idxDesc     = headers.indexOf('desc');
+  var idxDeadline = headers.indexOf('deadline');
+  var idxStatus   = headers.indexOf('status');
+  var idxTime     = headers.indexOf('time');
+  var idxLembrete = headers.indexOf('lembreteHorarioEnviado');
+
+  Logger.log('Colunas: desc=' + idxDesc + ' deadline=' + idxDeadline + ' status=' + idxStatus + ' time=' + idxTime + ' lembreteHorarioEnviado=' + idxLembrete);
+
+  if (idxTime === -1) {
+    Logger.log('❌ Coluna "time" não existe na planilha — crie manualmente ou rode o app para criar');
+    return;
+  }
+
+  var agora = new Date();
+  var hojeStr = Utilities.formatDate(agora, 'America/Sao_Paulo', 'yyyy-MM-dd');
+  Logger.log('Hoje: ' + hojeStr + ' | Agora: ' + Utilities.formatDate(agora, 'America/Sao_Paulo', 'HH:mm'));
+
+  if (sheet.getLastRow() <= 1) { Logger.log('Nenhuma tarefa cadastrada'); return; }
+
+  var dados = sheet.getRange(2, 1, sheet.getLastRow()-1, headers.length).getValues();
+  var comHorario = 0;
+
+  dados.forEach(function(row, i) {
+    var status = String(row[idxStatus] || '');
+    var timeRaw = row[idxTime];
+    var timeStr = String(timeRaw || '').trim();
+    var deadlineRaw = row[idxDeadline];
+    var deadlineStr = deadlineRaw instanceof Date
+      ? Utilities.formatDate(deadlineRaw, 'America/Sao_Paulo', 'yyyy-MM-dd')
+      : String(deadlineRaw || '').substring(0, 10);
+    var jaEnviado = row[idxLembrete];
+    var desc = String(row[idxDesc] || '');
+
+    if (!timeStr || timeStr === '') return;
+    comHorario++;
+
+    Logger.log('\nTarefa: "' + desc + '"');
+    Logger.log('  deadline: "' + deadlineStr + '" | hoje: "' + hojeStr + '" → ' + (deadlineStr === hojeStr ? '✅ É hoje' : '⏭ não é hoje'));
+    Logger.log('  status: "' + status + '" | jaEnviado: "' + jaEnviado + '"');
+    Logger.log('  time (raw): ' + JSON.stringify(timeRaw) + ' | tipo: ' + typeof timeRaw);
+    Logger.log('  time (string): "' + timeStr + '"');
+
+    // Testar o parse do horário
+    var partesHora = timeStr.split(':');
+    Logger.log('  split(":"): ' + JSON.stringify(partesHora) + ' | hora=' + partesHora[0] + ' min=' + partesHora[1]);
+    if (partesHora.length >= 2) {
+      var hora = parseInt(partesHora[0], 10);
+      var min  = parseInt(partesHora[1], 10);
+      Logger.log('  parseInt: hora=' + hora + ' min=' + min + ' | válido: ' + (!isNaN(hora) && !isNaN(min)));
+      if (!isNaN(hora) && !isNaN(min)) {
+        var dataComp = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), hora, min);
+        var diffMin = (dataComp - agora) / 60000;
+        Logger.log('  diffMin até o horário: ' + diffMin.toFixed(1) + ' | na janela (-5 a 35): ' + (diffMin >= -5 && diffMin <= 35));
+      }
+    }
+  });
+
+  Logger.log('\nTotal de tarefas com horário definido: ' + comHorario);
+  if (comHorario === 0) {
+    Logger.log('⚠️ Nenhuma tarefa tem horário definido — defina um horário na Agenda para testar');
+  }
 }
