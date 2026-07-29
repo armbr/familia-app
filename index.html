@@ -2706,6 +2706,13 @@ function txValida(t){
     var todosExcluidos = t.cgastoIds.every(function(gid){ return isTombstoned('cgastos', gid); });
     if(todosExcluidos) return false;
   }
+  // Rejeitar qualquer TX que seja lembrete de pagamento de fatura de cartão
+  // (marcador cartaoIdFatura) — os gastos já estão contabilizados individualmente
+  // via CGASTOS; somar o valor total da fatura de novo seria duplicidade.
+  if(t.cartaoIdFatura && String(t.cartaoIdFatura) !== '') return false;
+  // Rejeitar TXS antigos de "Fechar Fatura" reconhecíveis pela descrição
+  // ("💳 Fatura <Nome> — MM/AAAA (R$ ...)") criados por versões anteriores.
+  if(t.fromAgenda && typeof t.desc === 'string' && /^💳 Fatura .+ — \d{2}\/\d{4}/.test(t.desc)) return false;
   return true;
 }
 function balOf(list){
@@ -4635,7 +4642,23 @@ function encontrarLancamentosLegado(){
     return !!cgastoChaves[chave];
   });
 
-  return padrao1.concat(padrao2);
+  // Padrão 3: TXS com cartaoIdFatura preenchido (lembrete de pagamento de
+  // fatura marcado como pago na Agenda) OU descrição no padrão antigo
+  // "💳 Fatura <Nome> — MM/AAAA" — em ambos os casos os gastos individuais
+  // já estão em CGASTOS, então este TX é pura duplicidade.
+  var idsJaVistos = {};
+  padrao1.forEach(function(t){ idsJaVistos[String(t.id)] = true; });
+  padrao2.forEach(function(t){ idsJaVistos[String(t.id)] = true; });
+
+  var padrao3 = TXS.filter(function(t){
+    if(idsJaVistos[String(t.id)]) return false;
+    if(t.type !== 'exp') return false;
+    var temMarcador = !!(t.cartaoIdFatura && String(t.cartaoIdFatura) !== '');
+    var temDescFatura = typeof t.desc === 'string' && /^💳 Fatura .+ — \d{2}\/\d{4}/.test(t.desc);
+    return temMarcador || temDescFatura;
+  });
+
+  return padrao1.concat(padrao2).concat(padrao3);
 }
 
 function verificarDuplicidadeFaturas(){
