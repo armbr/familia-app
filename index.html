@@ -5092,7 +5092,7 @@ function renderFinCC(){
       '<button onclick="shiftFinCCMes(1)" style="padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--t1);cursor:pointer;font-family:inherit;font-size:16px">›</button>'+
     '</div>';
 
-    if(!window._finCCMes) window._finCCMes = mes;
+    if(!window._finCCMes) window._finCCMes = mesFaturaAberta(cc);
     var moStr  = window._finCCMes;
     var partes = moStr.split('-');
     var meses_br = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -5401,7 +5401,13 @@ function setTaskPM(pm){
   }
 }
 
+// Flag global para evitar submissão dupla em addTask
+var _addTaskEmAndamento = false;
+
 function addTask(){
+  // Guard contra duplo clique / submissão enquanto a requisição está em voo
+  if(_addTaskEmAndamento){ toast('⏳ Aguarde o compromisso anterior ser salvo...','err'); return; }
+
   var desc=document.getElementById('t-desc').value.trim();
   var type=document.getElementById('t-type').value;
   var dead=document.getElementById('t-dead').value;
@@ -5414,15 +5420,41 @@ function addTask(){
   var formaPagamento = type!=='task' ? (curTaskPM||'dinheiro') : '';
   if(!desc){toast('⚠️ Informe a descrição','err');return;}
   if(type!=='task' && (!val||val<=0)){toast('⚠️ Informe o valor para '+( type==='exp'?'despesa':'receita'),'err');return;}
+
   var btn=document.getElementById('btn-add-task'); btn.disabled=true;
-  var task={desc:desc,type:type,deadline:dead,time:time,value:val,cat:cat,status:'pend',formaPagamento:formaPagamento,codigoBarras:codigoBarras};
-  var tmp=Date.now(); TASKS.unshift(Object.assign({id:tmp},task)); renderTasks();
+  _addTaskEmAndamento = true;
+
+  // ID único: timestamp + random para garantir unicidade mesmo com clicks rápidos
+  var tmp = Date.now() + '-' + Math.random().toString(36).slice(2,7);
+  var task={desc:desc,type:type,deadline:dead,time:time,value:val,cat:cat,status:'pend',formaPagamento:formaPagamento,codigoBarras:codigoBarras,id:tmp};
+
+  // Verificar se já existe tarefa idêntica (mesmo desc normalizado + mesmo mês)
+  // para evitar duplicata local antes mesmo de ir ao servidor
+  var normD = function(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); };
+  var mesTask = dead ? dead.substring(0,7) : 'none';
+  var jaExiste = TASKS.some(function(t){
+    return normD(t.desc)===normD(desc) && (String(t.deadline||'').substring(0,7)||'none')===mesTask && t.status!=='done';
+  });
+  if(jaExiste){
+    toast('⚠️ Já existe um compromisso com essa descrição neste período','err');
+    btn.disabled=false; _addTaskEmAndamento=false; return;
+  }
+
+  // Inserir otimisticamente e renderizar UMA ÚNICA VEZ
+  TASKS.unshift(Object.assign({},task));
+  save();
+  renderTasks();
+  if(curSection==='hoje') renderHoje();
+
+  // Tratar recorrência antes de enviar ao servidor
   if(curRecur){
-    var newRecurId = Date.now();
+    // Usar timestamp diferente para o recurId (garantir unicidade)
+    var newRecurId = Date.now()+1;
     var rcSel = document.getElementById('recur-cartao-sel');
     var rcId  = rcSel ? rcSel.value : '';
     addRecur({id:newRecurId,type:type,desc:desc,value:val||0,cat:cat||'',date:dead||ymd(new Date()),cartaoId:rcId});
-    task.recurId = newRecurId; // salvar referência na tarefa
+    task.recurId = newRecurId;
+    TASKS[0].recurId = newRecurId; // atualizar a cópia já inserida
     curRecur=false;
     var togR=document.getElementById('recur-toggle');
     var dotR=document.getElementById('recur-dot');
@@ -5430,30 +5462,49 @@ function addTask(){
     if(togR) togR.classList.remove('on');
     if(dotR) dotR.textContent='';
     if(badgeR) badgeR.textContent='inativo';
+    var rcRow=document.getElementById('recur-cartao-row');
+    if(rcRow) rcRow.style.display='none';
   }
-  apiCall('addTask',task,function(err, resp){
-    if(err){TASKS=TASKS.filter(function(t){return t.id!==tmp;});renderTasks();toast('❌ Erro ao criar','err');}
-    else{
-      // Se o servidor detectou duplicata (mesma descrição+mês) e não
-      // criou uma linha nova, remove nossa cópia local otimista com o
-      // ID temporário — senão fica um card fantasma duplicado.
-      if(resp && (resp.duplicate || resp.alreadyExists) && resp.id && String(resp.id)!==String(tmp)){
-        TASKS = TASKS.filter(function(t){ return t.id!==tmp; });
-      }
-      // Não chamar syncAll aqui: processRecur geraria uma 2ª task
-      // para o mês atual (duplicata). A task já foi criada acima.
-      // Processar apenas meses futuros (flag para processRecur ignorar mês atual).
-      renderTasks();
-      toast('📌 Compromisso criado!');
-    }
-    btn.disabled=false;
-  });
+
+  // Limpar formulário imediatamente (antes do callback do servidor)
   document.getElementById('t-desc').value='';
   document.getElementById('t-val').value='';
   if(timeEl) timeEl.value='';
   if(document.getElementById('t-cat')) document.getElementById('t-cat').value='📦 Outros';
   var bCodEl = document.getElementById('t-boleto-cod'); if(bCodEl) bCodEl.value='';
   setTaskPM('dinheiro');
+
+  // Enviar ao servidor (sem ID temporário — servidor gera o definitivo)
+  var taskParaServidor = Object.assign({},task);
+  delete taskParaServidor.id; // deixar o servidor gerar o ID definitivo
+  apiCall('addTask', taskParaServidor, function(err, resp){
+    if(err){
+      // Reverter a inserção otimista em caso de erro
+      TASKS = TASKS.filter(function(t){ return String(t.id)!==String(tmp); });
+      save();
+      renderTasks();
+      toast('❌ Erro ao criar compromisso','err');
+    } else {
+      // Substituir o ID temporário pelo ID real do servidor
+      var idxLocal = TASKS.findIndex(function(t){ return String(t.id)===String(tmp); });
+      if(idxLocal>=0){
+        if(resp && resp.id && String(resp.id)!==String(tmp)){
+          TASKS[idxLocal].id = String(resp.id);
+        }
+        // Se o servidor indicou duplicata com ID diferente, remover nossa cópia extra
+        if(resp && (resp.duplicate || resp.alreadyExists) && resp.id && String(resp.id)!==String(tmp)){
+          TASKS = TASKS.filter(function(t){ return String(t.id)!==String(tmp); });
+        }
+      }
+      save();
+      // Renderizar apenas UMA vez após confirmação do servidor
+      renderTasks();
+      if(curSection==='hoje') renderHoje();
+      toast('📌 Compromisso criado!');
+    }
+    btn.disabled=false;
+    _addTaskEmAndamento=false;
+  });
 }
 
 function editarCodigoBarras(id){
@@ -6101,9 +6152,16 @@ function taskCard(t,wrap){
 
 // LIST VIEW
 function renderTL(){
+  // Limpar containers antes de renderizar para evitar acúmulo/duplicação visual
+  var toEl=document.getElementById('task-open'); if(toEl) toEl.innerHTML='';
+  var tdEl=document.getElementById('task-done'); if(tdEl) tdEl.innerHTML='';
+
   var tod=ymd(new Date());
-  var open=TASKS.filter(function(t){return t.status!=='done';});
-  var done=TASKS.filter(function(t){return t.status==='done';});
+  // Deduplicar TASKS em memória por ID antes de renderizar
+  var seenIds={}; var tasksDedup=[];
+  TASKS.forEach(function(t){ if(!seenIds[String(t.id)]){ seenIds[String(t.id)]=true; tasksDedup.push(t); } });
+  var open=tasksDedup.filter(function(t){return t.status!=='done';});
+  var done=tasksDedup.filter(function(t){return t.status==='done';});
   var byDate=function(a,b){ return ymds(a.deadline) < ymds(b.deadline) ? -1 : 1; };
   var ov=open.filter(function(t){return t.deadline&&ymds(t.deadline)<tod;}).sort(byDate);
   var tdy=open.filter(function(t){return ymds(t.deadline)===tod;});
@@ -6123,6 +6181,9 @@ function renderTL(){
 
 // TASK DAY
 function renderTD(){
+  // Limpar container antes de renderizar para evitar acúmulo/duplicação visual
+  var tdListEl=document.getElementById('td-list'); if(tdListEl) tdListEl.innerHTML='';
+
   var d=tdDate; var dy=ymd(d);
   var mo=dy.substring(0,7);
   var tdLbl = document.getElementById('td-lbl');
@@ -6132,7 +6193,10 @@ function renderTD(){
   if(tdLbl) tdLbl.textContent = dStr;
   if(tdDate2) tdDate2.textContent = dStr;
   if(tdSub) tdSub.textContent = '';
-  var tasks=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
+  // Deduplicar por ID antes de filtrar
+  var seenIdsTD={}; var tasksDedup2=[];
+  TASKS.forEach(function(t){ if(!seenIdsTD[String(t.id)]){ seenIdsTD[String(t.id)]=true; tasksDedup2.push(t); } });
+  var tasks=tasksDedup2.filter(function(t){return ymds(t.deadline)===dy;});
   var all=tasks.map(function(t){return {t:t,isA:false};});
   // Totais do dia (só pendentes) — pagamentos e recebimentos agendados
   var pendDia = all.map(function(x){return x.t;}).filter(function(t){return t.status!=='done';});
@@ -6155,6 +6219,11 @@ function renderTD(){
 }
 
 function renderTW(){
+  // Limpar e deduplicar antes de renderizar
+  var twListEl=document.getElementById('tw-list'); if(twListEl) twListEl.innerHTML='';
+  var seenIdsTW={}; var tasksTWDedup=[];
+  TASKS.forEach(function(t){ if(!seenIdsTW[String(t.id)]){ seenIdsTW[String(t.id)]=true; tasksTWDedup.push(t); } });
+
   var days=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
   var tod=ymd(new Date());
   var we=new Date(twStart); we.setDate(we.getDate()+6);
@@ -6166,11 +6235,11 @@ function renderTW(){
   for(var i=0;i<7;i++){
     var d=new Date(twStart); d.setDate(d.getDate()+i);
     var dy=ymd(d); dates.push(dy);
-    var has=TASKS.some(function(t){return ymds(t.deadline)===dy;});
+    var has=tasksTWDedup.some(function(t){return ymds(t.deadline)===dy;});
     sh+='<div class="wdc"><div class="wdc-lbl">'+days[i]+'</div>'+
       '<div class="wdc-num'+(dy===tod?' today':'')+'" onclick="taskWkDay(\''+dy+'\')">'+d.getDate()+'</div>'+
       '<div class="wdc-dots">'+(has?'<div class="dot" style="background:var(--yellow)"></div>':'')+'</div></div>';
-    var diaPend=TASKS.filter(function(t){return ymds(t.deadline)===dy && t.status!=='done';});
+    var diaPend=tasksTWDedup.filter(function(t){return ymds(t.deadline)===dy && t.status!=='done';});
     totalPagarSemana += diaPend.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
     totalReceberSemana += diaPend.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
   }
@@ -6182,7 +6251,7 @@ function renderTW(){
   if(twSubEl) twSubEl.innerHTML = twSubParts.join(' · ');
   var h='';
   dates.forEach(function(dy){
-    var dt=TASKS.filter(function(t){return ymds(t.deadline)===dy;});
+    var dt=tasksTWDedup.filter(function(t){return ymds(t.deadline)===dy;});
     if(!dt.length)return; total+=dt.length;
     var p=dy.split('-');
     var lbl=new Date(p[0],parseInt(p[1])-1,parseInt(p[2])).toLocaleDateString('pt-BR',{weekday:'short',day:'numeric',month:'short'});
@@ -6270,6 +6339,11 @@ function taskCardComAlug(t){
 }
 
 function renderTM(){
+  // Limpar e deduplicar antes de renderizar
+  var tmListEl=document.getElementById('tm-list'); if(tmListEl) tmListEl.innerHTML='';
+  var seenIdsTM={}; var tasksTMDedup=[];
+  TASKS.forEach(function(t){ if(!seenIdsTM[String(t.id)]){ seenIdsTM[String(t.id)]=true; tasksTMDedup.push(t); } });
+
   var yr=tmDate.getFullYear(); var mo=tmDate.getMonth();
   var tod=ymd(new Date());
   document.getElementById('tm-lbl').textContent=
@@ -6284,7 +6358,7 @@ function renderTM(){
     if(dn<1||dn>ld.getDate()){gh+='<div class="mgc om"><div class="mgn"></div></div>';continue;}
     var d=new Date(yr,mo,dn); var dy=ymd(d);
     var isT=dy===tod;
-    var dTasks=TASKS.filter(function(t){return ymds(t.deadline)===dy&&t.status!=='done';});
+    var dTasks=tasksTMDedup.filter(function(t){return ymds(t.deadline)===dy&&t.status!=='done';});
     var dots=dTasks.slice(0,3).map(function(t){
       var col=t.status==='done'?'var(--green)':'var(--yellow)';
       return '<div class="dot" style="background:'+col+'"></div>';
@@ -6295,7 +6369,7 @@ function renderTM(){
   }
   document.getElementById('tm-grid').innerHTML=gh;
   var ms=yr+'-'+pad(mo+1);
-  var allTasks=TASKS.filter(function(t){return t.deadline&&ymds(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
+  var allTasks=tasksTMDedup.filter(function(t){return t.deadline&&ymds(t.deadline).startsWith(ms)&&t.status!=='done';}).sort(function(a,b){return String(a.deadline).localeCompare(String(b.deadline));});
 
   var totalPagarMes = allTasks.filter(function(t){return t.type==='exp';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
   var totalReceberMes = allTasks.filter(function(t){return t.type==='inc';}).reduce(function(s,t){return s+parseFloat(t.value||0);},0);
@@ -6328,6 +6402,11 @@ function taskMoDay(d){ tdDate=new Date(d+'T00:00:00'); setTaskView('day'); }
 
 // TASK PLAN — próximos 90 dias agrupado por semana e mês
 function renderTP(){
+  // Limpar container e deduplicar antes de renderizar
+  var tpBodyEl=document.getElementById('tp-body'); if(tpBodyEl) tpBodyEl.innerHTML='';
+  var seenIdsTP={}; var tasksTPDedup=[];
+  TASKS.forEach(function(t){ if(!seenIdsTP[String(t.id)]){ seenIdsTP[String(t.id)]=true; tasksTPDedup.push(t); } });
+
   var now=new Date(); now.setHours(0,0,0,0);
   var html='';
 
@@ -6341,11 +6420,11 @@ function renderTP(){
     var ld=new Date(yr,mo+1,0).getDate();
     var isCur=mOff===0;
 
-    // tarefas do mês
-    var moTasks=TASKS.filter(function(t){
+    // tarefas do mês — usando lista deduplicada
+    var moTasks=tasksTPDedup.filter(function(t){
       return t.deadline && ymds(t.deadline).startsWith(ms) && t.status!=='done';
     });
-    var doneCount=TASKS.filter(function(t){
+    var doneCount=tasksTPDedup.filter(function(t){
       return t.deadline && ymds(t.deadline).startsWith(ms) && t.status==='done';
     }).length;
 
@@ -6384,11 +6463,11 @@ function renderTP(){
       // só mostrar semanas a partir de hoje
       if(to < ymd(now)) { wNum++; continue; }
 
-      var wTasks=TASKS.filter(function(t){
+      var wTasks=tasksTPDedup.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status!=='done';
       }).sort(function(a,b){ return String(a.deadline).localeCompare(String(b.deadline)); });
-      var wDone=TASKS.filter(function(t){
+      var wDone=tasksTPDedup.filter(function(t){
         var d=ymds(t.deadline);
         return t.deadline && d>=from && d<=to && t.status==='done';
       }).length;
@@ -6474,12 +6553,26 @@ function renderHoje(){
       hsAniv.style.display = 'none';
     }
 
+    // Deduplicar TASKS por ID antes de qualquer filtro — evita que a
+    // inserção otimista + confirmação do servidor gerem cards duplicados
+    var seenIdsHoje = {};
+    var tasksHojeDedup = TASKS.filter(function(t){
+      if(seenIdsHoje[String(t.id)]) return false;
+      seenIdsHoje[String(t.id)] = true;
+      return true;
+    });
+
+    // Limpar containers de hoje antes de re-renderizar
+    ['hoje-task-list','hoje-atrasado-list','hoje-pgto-list','hoje-rec-list'].forEach(function(id){
+      var el=document.getElementById(id); if(el) el.innerHTML='';
+    });
+
     // 1. Tasks com deadline HOJE (pendentes e concluídas)
-    var todTasks = TASKS.filter(function(t){ return ymds(t.deadline)===tod; });
+    var todTasks = tasksHojeDedup.filter(function(t){ return ymds(t.deadline)===tod; });
     var todPend  = todTasks.filter(function(t){ return t.status!=='done'; });
 
     // 2. Atrasadas: deadline passado e ainda pendentes
-    var atrasados = TASKS.filter(function(t){
+    var atrasados = tasksHojeDedup.filter(function(t){
       return t.deadline && ymds(t.deadline)<tod && t.status!=='done';
     });
 
@@ -6487,7 +6580,7 @@ function renderHoje(){
     //    - doneDate===tod (marcadas hoje com a nova versão)
     //    - OU: sem doneDate mas deadline===tod e done (marcadas hoje antes da versão nova)
     //    - OU: sem doneDate e deadline passado mas done — mostrar as recentes (último mês)
-    var pagasHoje = TASKS.filter(function(t){
+    var pagasHoje = tasksHojeDedup.filter(function(t){
       if(t.status !== 'done') return false;
       if(parseFloat(t.value||0) <= 0) return false;
       if(t.type === 'task') return false;
@@ -7709,8 +7802,25 @@ function confirmarFechamentoFatura(){
   fecharFaturaInterno(cartaoId, mesAno);
   criarLembreteFatura(cartao, mesAno, valorConfirmado);
   closeFecharFaturaModal();
+
+  // Após fechar a fatura, calcular o próximo mês em aberto e
+  // avançar automaticamente o seletor — sem precisar navegar manualmente.
+  var proximoMes = mesFaturaAberta(cartao);
+  window._finCCMes = proximoMes;
+
+  // Sincronizar também o seletor da aba Cartões (cf-mes)
+  var cfMesEl = document.getElementById('cf-mes');
+  if(cfMesEl) cfMesEl.value = proximoMes;
+
   renderCC(); renderBal(); renderAll(); renderTasks();
-  toast('✅ Fatura fechada! Lembrete criado na Agenda para o vencimento.');
+  // Forçar atualização do label do mês na aba Finanças > Cartões
+  var lbl = document.getElementById('fincc-mes-lbl');
+  if(lbl){
+    var p = proximoMes.split('-');
+    var meses_br_ff = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    lbl.textContent = meses_br_ff[parseInt(p[1])-1]+'/'+p[0];
+  }
+  toast('✅ Fatura fechada! Exibindo próxima fatura em aberto.');
 }
 function renderListaCartoes(){
   var el=document.getElementById('cc-list'); if(!el) return;
@@ -7755,26 +7865,30 @@ function renderListaGastos(){
     '</div>';
   }).join('');
 }
-// Determina qual mês de fatura deve aparecer por padrão pra um cartão:
-// se o mês atual já está com a fatura fechada (tudo pago) E a data de
-// vencimento já passou, avança pro mês seguinte (a fatura em aberto).
+// Determina o próximo mês de fatura em aberto para um cartão.
+// Percorre a partir do mês atual até encontrar um mês que NÃO
+// esteja totalmente fechado/pago — esse é o que deve ser exibido.
+// Assim, ao fechar julho, a tela avança automaticamente para agosto.
 function mesFaturaAberta(cartao){
   var hoje = new Date();
-  var mesAtual = hoje.getFullYear()+'-'+pad(hoje.getMonth()+1);
-  var gastosNoMes = CGASTOS.filter(function(g){ return String(g.cartaoId)===String(cartao.id) && g.fatMes===mesAtual; });
-  var fechada = gastosNoMes.length>0 && gastosNoMes.every(function(g){ return g.pago; });
-  if(!fechada) return mesAtual;
+  var ano  = hoje.getFullYear();
+  var mes  = hoje.getMonth(); // 0-indexed
 
-  var venc = parseInt(cartao.venc)||10;
-  var ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate();
-  var diaVenc = Math.min(venc, ultimoDiaMes);
-  var dataVenc = new Date(hoje.getFullYear(), hoje.getMonth(), diaVenc);
-
-  if(hoje > dataVenc){
-    var prox = new Date(hoje.getFullYear(), hoje.getMonth()+1, 1);
-    return prox.getFullYear()+'-'+pad(prox.getMonth()+1);
+  // Verifica até 13 meses à frente para encontrar um mês com pendências
+  for(var i = 0; i < 13; i++){
+    var d = new Date(ano, mes + i, 1);
+    var moStr = d.getFullYear()+'-'+pad(d.getMonth()+1);
+    var gastosMes = CGASTOS.filter(function(g){
+      return String(g.cartaoId)===String(cartao.id) && g.fatMes===moStr;
+    });
+    // Mês sem gastos registrados OU com pendências = fatura em aberto
+    var faturaFechada = gastosMes.length > 0 && gastosMes.every(function(g){ return g.pago; });
+    if(!faturaFechada) return moStr;
   }
-  return mesAtual;
+
+  // Fallback: mês atual+1 (tudo fechado, mostrar próximo)
+  var prox = new Date(ano, mes + 1, 1);
+  return prox.getFullYear()+'-'+pad(prox.getMonth()+1);
 }
 
 function onCfCartaoChange(){
@@ -7842,9 +7956,22 @@ function renderCC(){
   });
   var dgEl=document.getElementById('cg-data'); if(dgEl&&!dgEl.value) dgEl.value=ymd(new Date());
   var mfEl=document.getElementById('cf-mes');
-  if(mfEl&&!mfEl.value){
-    var cartaoSelecionado = CARTOES.find(function(c){ return String(c.id)===((document.getElementById('cf-cartao')||{}).value||''); });
-    mfEl.value = cartaoSelecionado ? mesFaturaAberta(cartaoSelecionado) : (function(){ var n=new Date(); return n.getFullYear()+'-'+pad(n.getMonth()+1); })();
+  // Sempre recalcular o mês em aberto ao renderizar — garante que após
+  // fechar uma fatura o seletor já mostre o próximo mês em aberto.
+  var cfCartaoId = (document.getElementById('cf-cartao')||{}).value||'';
+  var cartaoSelecionado = CARTOES.find(function(c){ return String(c.id)===cfCartaoId; }) || CARTOES[0];
+  if(mfEl && cartaoSelecionado){
+    // Só força o avanço se o mês atual exibido já está fechado
+    var moAtual = mfEl.value || '';
+    var gastosAtual = moAtual ? CGASTOS.filter(function(g){
+      return String(g.cartaoId)===String(cartaoSelecionado.id) && g.fatMes===moAtual;
+    }) : [];
+    var atualFechada = moAtual && gastosAtual.length>0 && gastosAtual.every(function(g){ return g.pago; });
+    if(!moAtual || atualFechada){
+      mfEl.value = mesFaturaAberta(cartaoSelecionado);
+    }
+  } else if(mfEl && !mfEl.value){
+    var n=new Date(); mfEl.value = n.getFullYear()+'-'+pad(n.getMonth()+1);
   }
   renderListaCartoes(); renderListaGastos();
   if(curCCTab==='fatura') renderFatura();
@@ -10744,24 +10871,8 @@ function renderExtrato(){
     return true;
   });
 
-  // Totalizadores
-  var totC = txs.filter(function(t){return t.tipo==='C';}).reduce(function(s,t){return s+t.valor;},0);
-  var totD = txs.filter(function(t){return t.tipo==='D';}).reduce(function(s,t){return s+t.valor;},0);
-  if(totEl){
-    totEl.innerHTML =
-      '<div style="flex:1;padding:10px;background:rgba(46,204,154,.1);border-radius:10px;text-align:center">'+
-        '<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px">Entradas</div>'+
-        '<div style="font-size:15px;font-weight:900;color:var(--green)">'+fmtBRL(totC)+'</div>'+
-      '</div>'+
-      '<div style="flex:1;padding:10px;background:rgba(255,107,107,.1);border-radius:10px;text-align:center">'+
-        '<div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.5px">Saídas</div>'+
-        '<div style="font-size:15px;font-weight:900;color:var(--red)">'+fmtBRL(totD)+'</div>'+
-      '</div>'+
-      '<div style="flex:1;padding:10px;background:var(--bg3);border-radius:10px;text-align:center">'+
-        '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Líquido</div>'+
-        '<div style="font-size:15px;font-weight:900;color:'+(totC-totD>=0?'var(--green)':'var(--red)')+'">'+fmtBRL(Math.abs(totC-totD))+'</div>'+
-      '</div>';
-  }
+  // Totalizadores removidos — apenas a lista de transações é exibida
+  if(totEl){ totEl.innerHTML = ''; totEl.style.display = 'none'; }
 
   if(!txs.length){
     el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px;font-size:13px">Nenhuma transação encontrada</div>';
