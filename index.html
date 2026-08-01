@@ -116,6 +116,13 @@ html,body{
   color:#EDF2F7;
 }
 
+/* Garante herança de cor nos modais com fundo próprio */
+[style*="background:var(--bg2)"],
+[style*="background:var(--card)"],
+[style*="background:var(--bg3)"] {
+  color: var(--t1);
+}
+
 /* ── CSS VARS ── */
 :root{
   --bg:#0F1923;
@@ -1719,7 +1726,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Editar Cartão -->
 <div id="editcartao-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:360px;width:100%">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:360px;width:100%";color:var(--t1)>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div style="font-size:16px;font-weight:800">✏️ Editar Cartão</div>
       <button onclick="document.getElementById('editcartao-modal').style.display='none'" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1744,7 +1751,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Histórico da Dívida -->
 <div id="divhist-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800" id="divhist-title">Histórico</div>
       <button onclick="closeDivHistModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1755,7 +1762,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Amortização Extraordinária (Financiamento) -->
 <div id="amortextra-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">⚡ Amortização Extra</div>
       <button onclick="closeAmortExtra()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1769,7 +1776,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Novo Movimento (Capital de Giro Rotativo) -->
 <div id="rotmov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">+ Novo Movimento</div>
       <button onclick="closeRotMov()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1810,7 +1817,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Registrar Pagamento (SPV) -->
 <div id="spvpag-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">💵 Registrar Pagamento</div>
       <button onclick="closeSpvPagamento()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1834,7 +1841,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Confirmar Pagamento de Parcela (com valor editável) -->
 <div id="parcela-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">✅ Pagar Parcela</div>
       <button onclick="closeConfirmarParcela()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1849,7 +1856,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Confirmar Fechamento de Fatura (com valor editável) -->
 <div id="fecharfatura-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">💳 Fechar Fatura</div>
       <button onclick="closeFecharFaturaModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1864,7 +1871,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Editar Pagador -->
 <div id="editpag-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto";color:var(--t1)>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">✏️ Editar Contato</div>
       <button onclick="closeEditPagModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1893,7 +1900,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Detalhe da Categoria -->
 <div id="catmodal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <div style="font-size:16px;font-weight:800" id="catmodal-title">Categoria</div>
       <button onclick="closeCatModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -1904,7 +1911,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Novo Movimento (Dívidas) -->
 <div id="divmov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">+ Novo Movimento</div>
       <button onclick="closeMovModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -2354,7 +2361,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Atualizar valor do Patrimônio -->
 <div id="patrimonio-update-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">Atualizar Valor</div>
       <button onclick="closePatrimonioUpdate()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -2368,7 +2375,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Nota OFX -->
 <div id="ofxnota-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div style="font-size:15px;font-weight:800">📝 Nota</div>
       <button onclick="closeOfxNota()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -2384,7 +2391,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Detalhe completo da transação bancária -->
 <div id="txdetail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;max-height:85vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;max-height:85vh;overflow-y:auto";color:var(--t1)>
     <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
       <button onclick="closeTxDetail()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
     </div>
@@ -2395,7 +2402,7 @@ select option{background:#1A2A3A}
 <!-- Modal: Definir Apelido de operação bancária -->
 <!-- Modal: Explicações (Pré/Pós, indexadores, sistemas de amortização) -->
 <div id="info-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:220;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:80vh;overflow-y:auto;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div id="info-modal-titulo" style="font-size:16px;font-weight:800">ⓘ Explicação</div>
       <button onclick="closeInfoModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -2405,7 +2412,7 @@ select option{background:#1A2A3A}
 </div>
 
 <div id="apelido-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:210;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:400px;width:100%;color:var(--t1)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">🏷️ Definir Apelido</div>
       <button onclick="closeDefinirApelido()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -2426,7 +2433,7 @@ select option{background:#1A2A3A}
 
 <!-- Modal: Prévia e compartilhamento de dados bancários -->
 <div id="dadosbancarios-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:210;align-items:center;justify-content:center;padding:20px">
-  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+  <div style="background:var(--bg2);border-radius:16px;padding:20px;max-width:420px;width:100%;max-height:85vh;overflow-y:auto";color:var(--t1)>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-size:16px;font-weight:800">📋 Dados Bancários</div>
       <button onclick="closeDadosBancariosModal()" style="background:none;border:none;color:var(--t2);font-size:22px;cursor:pointer">×</button>
@@ -2440,7 +2447,7 @@ select option{background:#1A2A3A}
 </div>
 
 <div id="comprov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;padding:20px;align-items:flex-end;justify-content:center">
-  <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto">
+  <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:20px;margin:0 auto;color:var(--t1)">
     <div style="font-size:15px;font-weight:800;color:var(--t1);margin-bottom:4px">✅ Marcar como concluída</div>
     <div style="margin-bottom:12px"><div class="fl">Valor pago (R$)</div>
       <div class="r-wrap"><input id="task-comprov-valor" type="number" step="0.01" min="0" inputmode="decimal" style="width:100%"></div>
@@ -2460,7 +2467,7 @@ select option{background:#1A2A3A}
 </div><!-- /comprov-modal -->
 
 <div id="recur-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1000;align-items:flex-end;justify-content:center;padding:0">
-  <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:22px 20px 32px;margin:0 auto">
+  <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:22px 20px 32px;margin:0 auto;color:var(--t1)">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <span style="font-size:20px">🔁</span>
       <div>
@@ -4677,7 +4684,7 @@ function verificarDuplicidadeFaturas(){
   html += legados.map(function(t){
     var origem = t.fatMesOrigem ? ('mês de origem: '+esc(t.fatMesOrigem)) : 'cópia de gasto no cartão';
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">'+
-      '<div><div style="font-size:13px;font-weight:600">'+esc(t.desc)+'</div>'+
+      '<div><div style="font-size:13px;font-weight:600;color:var(--t1)">'+esc(t.desc)+'</div>'+
         '<div style="font-size:12px;color:var(--t3)">'+fmtDate(t.date)+' · '+origem+'</div></div>'+
       '<div style="font-weight:800;color:var(--red)">'+fmtBRL(t.value)+'</div>'+
     '</div>';
@@ -4891,7 +4898,7 @@ function abrirCategoriaModal(cat){
   var total = itens.reduce(function(s,i){ return s+i.value; }, 0);
 
   var html = '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">'+
-    '<div style="font-size:15px;font-weight:800">'+esc(cat)+'</div>'+
+    '<div style="font-size:15px;font-weight:800;color:var(--t1)">'+esc(cat)+'</div>'+
     '<div style="font-size:16px;font-weight:900;color:var(--red)">'+fmtBRL(total)+'</div>'+
   '</div>';
 
@@ -4928,11 +4935,11 @@ function abrirCategoriaModal(cat){
       return '<div '+(temDetalhe?'data-txcardtoggle="'+i.catItemId+'" style="cursor:pointer;padding:9px 0;border-bottom:1px solid var(--border)"':'style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)"')+'>'+
         (temDetalhe
           ? '<div style="display:flex;justify-content:space-between">'+
-              '<div><div style="font-size:13px;font-weight:600">'+esc(i.desc)+badgeCartao+'</div>'+
+              '<div><div style="font-size:13px;font-weight:600;color:var(--t1)">'+esc(i.desc)+badgeCartao+'</div>'+
               '<div style="font-size:12px;color:var(--t3)">'+fmtDate(i.date)+'</div></div>'+
               '<div style="font-size:13px;font-weight:700;color:var(--red)">'+fmtBRL(i.value)+'</div>'+
             '</div>'+detailHtml
-          : '<div><div style="font-size:13px;font-weight:600">'+esc(i.desc)+badgeCartao+'</div>'+
+          : '<div><div style="font-size:13px;font-weight:600;color:var(--t1)">'+esc(i.desc)+badgeCartao+'</div>'+
             '<div style="font-size:12px;color:var(--t3)">'+fmtDate(i.date)+'</div></div>'+
             '<div style="font-size:13px;font-weight:700;color:var(--red)">'+fmtBRL(i.value)+'</div>')+
       '</div>';
@@ -7409,7 +7416,7 @@ function abrirFichaAluguel(alugId){
     return '<tr><td style="padding:10px 12px;border-bottom:1px solid #222">'+ico+' '+mes+'</td>'+
       '<td style="padding:10px 12px;border-bottom:1px solid #222;font-weight:700">R$ '+(p?p.valor:a.valorBase).toFixed(2).replace('.',',')+'</td>'+
       '<td style="padding:10px 12px;border-bottom:1px solid #222;color:'+cor+';font-size:12px">'+status+'</td>'+
-      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-family:monospace;font-size:10px;color:#555">'+(p?p.codigo:'')+'</td></tr>';
+      '<td style="padding:10px 12px;border-bottom:1px solid #222;font-family:monospace;font-size:10px;color:#888">'+(p?p.codigo:'')+'</td></tr>';
   }).join('');
   var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
@@ -7422,7 +7429,7 @@ function abrirFichaAluguel(alugId){
     '.ftot:last-child{border:none}'+
     '.ftv{font-size:18px;font-weight:900;margin-bottom:2px}'+
     '.ftl{font-size:10px;color:#888;text-transform:uppercase}'+
-    'table{width:100%;border-collapse:collapse}td{font-size:13px}'+
+    'table{width:100%;border-collapse:collapse}td{font-size:13px;color:#eee}'+
     'button{display:block;margin:16px auto;padding:10px 24px;background:#2ecc9a;color:#0a1a0a;border:none;border-radius:8px;font-weight:700;cursor:pointer}'+
     '@media print{button{display:none}}</style></head><body>'+
     '<div class="f"><div class="fh">'+
@@ -9459,10 +9466,10 @@ function abrirExtratoSPV(id){
 
   var html = '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">'+
     '<span style="font-size:12px;color:var(--t3)">Saldo devedor atual</span>'+
-    '<span style="font-weight:800;font-size:15px">'+fmtBRL(r.saldoAtual)+'</span>'+
+    '<span style="font-weight:800;font-size:15px;color:var(--red)">'+fmtBRL(r.saldoAtual)+'</span>'+
   '</div>';
   html += '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:12px">'+
-    '<span style="font-size:12px;color:var(--t3)">Total pago: '+fmtBRL(r.totalPago)+' (juros '+fmtBRL(r.totalJuros)+' + amortização '+fmtBRL(r.totalAmortizado)+')</span>'+
+    '<span style="font-size:12px;color:var(--t3)">Total pago: <span style="color:var(--green)">'+fmtBRL(r.totalPago)+'</span> (juros '+fmtBRL(r.totalJuros)+' + amortização '+fmtBRL(r.totalAmortizado)+')</span>'+
   '</div>';
 
   html += '<button data-linkdiv="'+d.id+'" style="width:100%;margin-bottom:14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Abrir/compartilhar extrato completo</button>';
@@ -9471,8 +9478,8 @@ function abrirExtratoSPV(id){
     r.movimentos.forEach(function(m){
       html += '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
         '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;font-weight:700;color:var(--green)">💵 Pagamento</span>'+
-        '<span style="font-size:13px;font-weight:700">'+fmtBRL(m.valor)+'</span></div>'+
-        '<div style="font-size:12px;color:var(--t3);margin-top:2px">'+fmtDate(m.data)+' · juros do período: '+fmtBRL(m.jurosCalculado||0)+'</div>'+
+        '<span style="font-size:13px;font-weight:700;color:var(--t1)">'+fmtBRL(m.valor)+'</span></div>'+
+        '<div style="font-size:12px;color:var(--t3);margin-top:2px">'+fmtDate(m.data)+' · juros do período: <span style="color:var(--green)">'+fmtBRL(m.jurosCalculado||0)+'</span></div>'+
       '</div>';
     });
   } else {
@@ -9492,15 +9499,15 @@ function abrirExtratoRotativo(id){
 
   var html = '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">'+
     '<span style="font-size:12px;color:var(--t3)">Valor utilizado</span>'+
-    '<span style="font-weight:800;font-size:15px">'+fmtBRL(r.valorUtilizado)+'</span>'+
+    '<span style="font-weight:800;font-size:15px;color:var(--red)">'+fmtBRL(r.valorUtilizado)+'</span>'+
   '</div>';
   html += '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:12px">'+
-    '<span style="font-size:12px;color:var(--t3)">Total pago: juros '+fmtBRL(r.totalJurosPago)+' · IOF '+fmtBRL(r.totalIofPago)+'</span>'+
+    '<span style="font-size:12px;color:var(--t3)">Total pago: juros <span style="color:var(--t2)">'+fmtBRL(r.totalJurosPago)+'</span> · IOF <span style="color:var(--t2)">'+fmtBRL(r.totalIofPago)+'</span></span>'+
   '</div>';
 
   html += '<button data-linkdiv="'+d.id+'" style="width:100%;margin-bottom:14px;padding:10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔗 Abrir/compartilhar extrato completo</button>';
 
-  var tipoInfo = { saque:{icon:'📥',label:'Saque',cor:'var(--orange)'}, jurosrotativo:{icon:'💵',label:'Pagamento de juros',cor:'var(--green)'}, amortizacao:{icon:'📤',label:'Amortização',cor:'var(--blue)'} };
+  var tipoInfo = { saque:{icon:'📥',label:'Saque',cor:'var(--yellow)'}, jurosrotativo:{icon:'💵',label:'Pagamento de juros',cor:'var(--green)'}, amortizacao:{icon:'📤',label:'Amortização',cor:'var(--blue)'} };
   if(r.movimentos.length){
     r.movimentos.forEach(function(m){
       var info = tipoInfo[m.tipo] || {icon:'•',label:m.tipo,cor:'var(--t1)'};
@@ -9514,7 +9521,7 @@ function abrirExtratoRotativo(id){
       }
       html += '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
         '<div style="display:flex;justify-content:space-between"><span style="font-size:12px;font-weight:700;color:'+info.cor+'">'+info.icon+' '+info.label+'</span>'+
-        '<span style="font-size:13px;font-weight:700">'+sinal+' '+fmtBRL(m.valor)+'</span></div>'+
+        '<span style="font-size:13px;font-weight:700;color:var(--t1)">'+sinal+' '+fmtBRL(m.valor)+'</span></div>'+
         '<div style="font-size:12px;color:var(--t3);margin-top:2px">'+fmtDate(m.data)+(m.obs?' · '+esc(m.obs):'')+iofDetalhe+'</div>'+
       '</div>';
     });
@@ -9609,7 +9616,7 @@ function abrirTabelaFinanciamento(id){
     html += '<div class="slbl" style="margin-bottom:6px">📊 Histórico de taxas</div>';
     d.historicoTaxas.slice().sort(function(a,b){return a.data<b.data?-1:1;}).forEach(function(h){
       html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">'+
-        '<span style="color:var(--t3)">'+fmtDate(h.data)+'</span><span style="font-weight:700;color:#B794F6">'+h.taxaMensal.toFixed(2)+'%/mês</span>'+
+        '<span style="color:var(--t2)">'+fmtDate(h.data)+'</span><span style="font-weight:700;color:#B794F6">'+h.taxaMensal.toFixed(2)+'%/mês</span>'+
       '</div>';
     });
   }
@@ -9617,7 +9624,7 @@ function abrirTabelaFinanciamento(id){
   html += '<div class="slbl" style="margin:14px 0 6px">Tabela de amortização</div>';
   html += '<div style="max-height:400px;overflow-y:auto">';
   html += '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
-    '<tr style="color:var(--t3);text-align:left;position:sticky;top:0;background:var(--bg2)">'+
+    '<tr style="color:var(--t2);text-align:left;position:sticky;top:0;background:var(--bg2);border-bottom:2px solid var(--border)">'+
       '<th style="padding:5px 4px">#</th><th style="padding:5px 4px">Data</th>'+
       (isIndexada ? '<th style="padding:5px 4px;text-align:right">Taxa</th>' : '') +
       '<th style="padding:5px 4px;text-align:right">Parcela</th><th style="padding:5px 4px;text-align:right">Saldo após</th><th></th>'+
@@ -9629,12 +9636,12 @@ function abrirTabelaFinanciamento(id){
     var houveAjuste = paga && valorPagoReal!==undefined && Math.abs(valorPagoReal-linha.valorParcela)>0.01;
     var valorExibido = (paga && valorPagoReal!==undefined) ? valorPagoReal : linha.valorParcela;
     html += '<tr style="border-top:1px solid var(--border);'+(paga?'opacity:.5':'')+'">'+
-      '<td style="padding:5px 4px">'+linha.parcela+(paga?' ✅':'')+'</td>'+
-      '<td style="padding:5px 4px">'+fmtDate(linha.data)+'</td>'+
+      '<td style="padding:5px 4px;color:var(--t1)">'+linha.parcela+(paga?' ✅':'')+'</td>'+
+      '<td style="padding:5px 4px;color:var(--t2)">'+fmtDate(linha.data)+'</td>'+
       (isIndexada ? '<td style="padding:5px 4px;text-align:right;color:#B794F6">'+(linha.taxaAplicada||0).toFixed(2)+'%</td>' : '') +
-      '<td style="padding:5px 4px;text-align:right;font-weight:700">'+fmtBRL(valorExibido)+(houveAjuste?' <span title="Valor real pago, diferente do calculado ('+fmtBRL(linha.valorParcela)+')" style="color:var(--blue)">✏️</span>':'')+'</td>'+
-      '<td style="padding:5px 4px;text-align:right">'+fmtBRL(linha.saldoDevedor)+'</td>'+
-      '<td style="padding:5px 4px;text-align:right">'+(linha.extra?'<span style="color:#6D28D9;font-weight:700" title="Amortização extra">⚡'+fmtBRL(linha.extra)+'</span>':'')+'</td>'+
+      '<td style="padding:5px 4px;text-align:right;font-weight:700;color:var(--t1)">'+fmtBRL(valorExibido)+(houveAjuste?' <span title="Valor real pago, diferente do calculado ('+fmtBRL(linha.valorParcela)+')" style="color:var(--blue)">✏️</span>':'')+'</td>'+
+      '<td style="padding:5px 4px;text-align:right;color:var(--t2)">'+fmtBRL(linha.saldoDevedor)+'</td>'+
+      '<td style="padding:5px 4px;text-align:right">'+(linha.extra?'<span style="color:#B794F6;font-weight:700" title="Amortização extra">⚡'+fmtBRL(linha.extra)+'</span>':'')+'</td>'+
     '</tr>';
   });
   html += '</table></div>';
@@ -9763,12 +9770,12 @@ function verHistoricoDivida(id){
 
     html += '<div style="display:flex;justify-content:space-between;padding:10px;background:var(--bg3);border-radius:8px;margin-bottom:12px">'+
       '<span style="font-size:12px;color:var(--t3)">Saldo atual</span>'+
-      '<span style="font-weight:800;font-size:15px">'+fmtBRL(res.saldoAtual)+'</span>'+
+      '<span style="font-weight:800;font-size:15px;color:var(--t1)">'+fmtBRL(res.saldoAtual)+'</span>'+
     '</div>';
 
     var isDevo = d.tipo !== 'recebo';
     var tipoInfo = {
-      aporte:    {icon:'📥', label: isDevo ? 'Peguei emprestado' : 'Emprestei mais', cor:'var(--orange)'},
+      aporte:    {icon:'📥', label: isDevo ? 'Peguei emprestado' : 'Emprestei mais', cor:'var(--yellow)'},
       pagamento: {icon: isDevo?'💵':'💰', label: isDevo ? 'Paguei' : 'Recebi', cor:'var(--green)'},
       despesa:   {icon:'🧾', label:'Despesa em nome (legado)', cor:'var(--blue)'} // compat com registros antigos
     };
@@ -9785,10 +9792,10 @@ function verHistoricoDivida(id){
           '</div>'+
           '<div style="display:flex;justify-content:space-between;margin-top:3px">'+
             '<span style="font-size:12px;color:var(--t3)">'+fmtDate(l.data)+(l.obs?' · '+esc(l.obs):'')+'</span>'+
-            '<span style="font-size:13px;font-weight:700">'+sinal+' '+fmtBRL(l.valor)+'</span>'+
+            '<span style="font-size:13px;font-weight:700;color:var(--t1)">'+sinal+' '+fmtBRL(l.valor)+'</span>'+
           '</div>'+
-          (l.jurosNoPeriodo>0?'<div style="font-size:10px;color:var(--t3);margin-top:2px">Juros acumulados no período: '+fmtBRL(l.jurosNoPeriodo)+'</div>':'')+
-          '<div style="font-size:11px;font-weight:700;margin-top:3px">Saldo após: '+fmtBRL(l.saldoApos)+'</div>'+
+          (l.jurosNoPeriodo>0?'<div style="font-size:10px;color:var(--green);margin-top:2px">Juros acumulados no período: '+fmtBRL(l.jurosNoPeriodo)+'</div>':'')+
+          '<div style="font-size:11px;font-weight:700;margin-top:3px;color:var(--t2)">Saldo após: <span style="color:var(--t1)">'+fmtBRL(l.saldoApos)+'</span></div>'+
         '</div>';
       });
       if(res.jurosDesdeUltimo > 0){
@@ -10667,7 +10674,7 @@ function _renderListaArquivos(){
     var txCount = (ex.txs||[]).length;
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg3);border-radius:8px;margin-bottom:4px;gap:8px">' +
       '<div style="min-width:0;flex:1">'+
-        '<div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ex.arquivo)+'</div>'+
+        '<div style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t1)">'+esc(ex.arquivo)+'</div>'+
         '<div style="font-size:10px;color:var(--t3)">'+fmtDate(ex.dataIni)+' → '+fmtDate(ex.dataFim)+' · '+txCount+' transações'+(ex.saldoFim?' · saldo: '+fmtBRL(ex.saldoFim):'')+' · imp. '+new Date(ex.importadoEm).toLocaleDateString('pt-BR')+'</div>'+
       '</div>'+
       '<button data-shareextrato="'+idx+'" style="background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;flex-shrink:0;padding:2px" title="Compartilhar extrato">📤</button>'+
@@ -10956,7 +10963,7 @@ function abrirDetalheTx(fitId){
     '</div>':'')+
     '<div style="padding:10px 0;border-bottom:1px solid var(--border)">'+
       '<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Descrição completa (original do banco)</div>'+
-      '<div style="font-size:14px;font-weight:600;word-break:break-word;line-height:1.4">'+esc(tx.desc)+'</div>'+
+      '<div style="font-size:14px;font-weight:600;word-break:break-word;line-height:1.4;color:var(--t1)">'+esc(tx.desc)+'</div>'+
     '</div>'+
     '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">'+
       '<span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase">Data</span>'+
@@ -10964,7 +10971,7 @@ function abrirDetalheTx(fitId){
     '</div>'+
     (conta?'<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">'+
       '<span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase">Conta</span>'+
-      '<span style="font-size:13px;font-weight:600">'+esc(conta.nome)+'</span>'+
+      '<span style="font-size:13px;font-weight:600;color:var(--t1)">'+esc(conta.nome)+'</span>'+
     '</div>':'')+
     '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">'+
       '<span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;flex-shrink:0">ID da transação</span>'+
@@ -11300,7 +11307,7 @@ function renderProgressoSincronizacao(checks, idxAtual, resultados){
     }
     var opacidade = r ? '1' : (i===idxAtual ? '1' : '.35');
     html += '<tr style="border-top:1px solid var(--border);opacity:'+opacidade+'">'+
-      '<td style="padding:7px 4px">'+chk.nome+'</td>'+
+      '<td style="padding:7px 4px;color:var(--t2)">'+chk.nome+'</td>'+
       '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+corLocal+'">'+(r?r.local:chk.local.length)+'</td>'+
       '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+corLocal+'">'+servidorTxt+'</td>'+
       '<td style="padding:7px 4px;text-align:center">'+icone+'</td>'+
@@ -11330,7 +11337,7 @@ function mostrarResultadoSincronizacao(resultados){
     var cor = r.status==='ok' ? 'var(--t3)' : (r.status==='erro' ? 'var(--yellow)' : 'var(--red)');
     var icone = r.status==='ok' ? '✅' : (r.status==='erro' ? '⚠️' : '❌');
     html += '<tr style="border-top:1px solid var(--border)">'+
-      '<td style="padding:7px 4px">'+r.nome+'</td>'+
+      '<td style="padding:7px 4px;color:var(--t2)">'+r.nome+'</td>'+
       '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+cor+'">'+r.local+'</td>'+
       '<td style="padding:7px 4px;text-align:center;font-weight:700;color:'+cor+'">'+(r.servidor===null?'—':r.servidor)+'</td>'+
       '<td style="padding:7px 4px;text-align:center">'+icone+'</td>'+
