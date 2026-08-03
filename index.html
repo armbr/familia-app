@@ -1710,10 +1710,16 @@ select option{background:#1A2A3A}
       </div><!-- /div-form-body -->
     </div>
 
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button type="button" id="dvf-todos"  onclick="setDivFiltro('todos')"  class="vbtn on" style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px">📋 Todos</button>
+      <button type="button" id="dvf-devo"   onclick="setDivFiltro('devo')"   class="vbtn"    style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px">😟 Eu devo</button>
+      <button type="button" id="dvf-recebo" onclick="setDivFiltro('recebo')" class="vbtn"    style="flex:1;padding:8px 4px;border-radius:9px;font-size:11px">🤝 Me devem</button>
+    </div>
+
     <button onclick="abrirPlanilhaDividas()" style="width:100%;margin-bottom:14px;padding:11px;border:1px dashed var(--border);border-radius:10px;background:transparent;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">🔗 Abrir planilha completa de dívidas</button>
 
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
-      <div class="slbl" style="margin-bottom:0">Em aberto</div>
+      <div class="slbl" style="margin-bottom:0"><span id="div-total-lbl">Em aberto</span></div>
       <div id="div-total-geral" style="font-size:13px;font-weight:800;color:var(--red)"></div>
     </div>
     <div id="div-list"></div>
@@ -9048,6 +9054,7 @@ function financiamentoCardHTML(d){
 }
 
 var quitadosVisiveis = false;
+var divFiltro = 'todos';
 function toggleQuitados(){
   quitadosVisiveis = !quitadosVisiveis;
   var el = document.getElementById('div-list-quitados');
@@ -9069,6 +9076,15 @@ function renderQuitados(){
   el.innerHTML = quitados.map(function(d){ return dividaCardHTML(d); }).join('');
 }
 
+function setDivFiltro(filtro){
+  divFiltro = filtro;
+  ['todos','devo','recebo'].forEach(function(f){
+    var btn = document.getElementById('dvf-'+f);
+    if(btn) btn.classList.toggle('on', f===filtro);
+  });
+  renderDividas();
+}
+
 function renderDividas(){
   var pagSel = document.getElementById('dv-pag');
   if(pagSel){
@@ -9080,8 +9096,18 @@ function renderDividas(){
   var el = document.getElementById('div-list');
   if(!el) return;
 
-  var abertas = DIVIDAS.filter(function(d){ return d.status!=='pago'; });
+  var abertas = DIVIDAS.filter(function(d){
+    if(d.status==='pago') return false;
+    if(divFiltro==='devo')   return d.tipo!=='recebo';
+    if(divFiltro==='recebo') return d.tipo==='recebo';
+    return true;
+  });
   var totalEl = document.getElementById('div-total-geral');
+  var totalLbl = document.getElementById('div-total-lbl');
+  if(totalLbl){
+    var lblMap = {todos:'Em aberto', devo:'Total que você deve', recebo:'Total que devem a você'};
+    totalLbl.textContent = lblMap[divFiltro] || 'Em aberto';
+  }
 
   if(!abertas.length){
     el.innerHTML = '<div style="text-align:center;color:var(--t3);padding:24px">Nenhuma dívida em aberto 🎉</div>';
