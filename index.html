@@ -8619,9 +8619,7 @@ function addCapitalGiroRotativo(){
     existente.desc = desc; existente.valorLiberado = liberado; existente.taxaMensal = taxa;
     existente.iofBasicoPct = iofBasico; existente.iofAdicionalPct = iofAdic; existente.tipoTaxa = tipoTaxa;
     existente.dataFinalPagamento = dataFinal;
-    // Recalcula o status com a fórmula corrigida — antes essa edição não
-    // atualizava o status, então um item preso como "pago" indevidamente
-    // continuava preso mesmo depois de editar e salvar.
+    // Recalcula o status com a fórmula corrigida — exige saque+amortização+saldo zero
     var rNovo = resumoRotativo(existente);
     existente.status = rNovo.quitado ? 'pago' : (rNovo.valorUtilizado>0 ? 'parcial' : 'pendente');
     saveDividas();
@@ -8708,10 +8706,16 @@ function resumoRotativo(d){
     proximoIof: proximoIofBasico + proximoIofAdicional,
     diasDesdeUltimoEvento: dias, dataUltimoEvento: dataUltimoEvento,
     totalJurosPago: totalJurosPago, totalIofPago: totalIofPago,
-    // "Quitado" só faz sentido se em algum momento HOUVE um saque de
-    // verdade (senão nunca teve saldo pra "quitar" — só pagar juros sem
-    // nunca ter sacado nada, por exemplo, não deveria contar como quitado)
-    movimentos: movs, quitado: valorUtilizado<=0.01 && movs.some(function(m){ return m.tipo==='saque'; })
+    // "Quitado" só faz sentido se:
+    // 1. O valor utilizado atual é zero (ou quase)
+    // 2. Houve pelo menos um saque de verdade em algum momento
+    // 3. E também houve pelo menos uma amortização — garante que não é
+    //    apenas um cadastro zerado sem movimentos reais, ou um caso onde
+    //    o saldo nunca saiu do zero por dado inconsistente.
+    movimentos: movs,
+    quitado: valorUtilizado<=0.01
+      && movs.some(function(m){ return m.tipo==='saque'; })
+      && movs.some(function(m){ return m.tipo==='amortizacao'; })
   };
 }
 
@@ -8829,12 +8833,9 @@ function addFinanciamentoSPV(){
     existente.desc = desc; existente.taxaMensal = taxa; existente.diaVencimento = diaVenc||0;
     existente.tipoTaxa = tipoTaxa; existente.indexador = tipoTaxa==='indexada' ? indexador : '';
     if(saldoAtualInformado>0) existente.valorUtilizado = saldoAtualInformado;
-    // Recalcula o status com a fórmula corrigida — antes essa edição não
-    // atualizava o status, então um item preso como "pago" indevidamente
-    // continuava preso mesmo depois de editar e salvar (mesmo bug que já
-    // tinha sido corrigido no Rotativo, mas não aqui no SPV).
+    // Recalcula o status com a fórmula corrigida — exige totalAmortizado>0
     var rNovoSpv = resumoSPV(existente);
-    existente.status = rNovoSpv.quitado ? 'pago' : 'parcial';
+    existente.status = rNovoSpv.quitado ? 'pago' : (rNovoSpv.movimentos.length>0 ? 'parcial' : 'pendente');
     saveDividas();
     apiPost('salvarDivida', existente, function(){});
     spvEmEdicaoId = null;
@@ -8905,11 +8906,14 @@ function resumoSPV(d){
     saldoAtual: saldo, totalPago: totalPago, totalJuros: totalJuros,
     totalAmortizado: totalAmortizado, movimentos: movs,
     diasDesdeUltimoPagamento: diasDesdeUltimo, jurosProjetados: jurosProjetados,
-    // Proteção igual à do Rotativo: só considera quitado se realmente
-    // existia um valor original válido — senão, um saldo que já nasceu
-    // zerado (por dado ausente/errado) seria erroneamente considerado
-    // "quitado" no primeiro movimento registrado.
-    quitado: saldo<=0.01 && movs.length>0 && parseFloat(d.valorOriginal)>0
+    // Só considera quitado se:
+    // 1. O saldo calculado é zero (ou quase)
+    // 2. Há pelo menos um pagamento registrado
+    // 3. O valor original era positivo (protege contra cadastros com dado zerado)
+    // 4. O total amortizado é positivo — garante que houve abatimento real
+    //    de principal, não apenas pagamentos de juros que deixaram o saldo
+    //    intacto (o que pode resultar em saldo≈0 por arredondamento).
+    quitado: saldo<=0.01 && movs.length>0 && parseFloat(d.valorOriginal)>0 && totalAmortizado>0.01
   };
 }
 
@@ -9169,15 +9173,25 @@ function renderDividas(){
   rotativos.forEach(function(d){
     var r = resumoRotativo(d);
     totalGeral += r.valorUtilizado;
+    // Só marca como pago se a função resumoRotativo confirmou quitado=true
+    // (que agora exige saque + amortização + saldo zero — não apenas saldo zero).
+    // Nunca rebaixa de 'pago' para 'pendente' automaticamente (evita flip
+    // indesejado causado por dados parciais carregados na ordem errada).
     var novoStatus = r.quitado ? 'pago' : (r.valorUtilizado>0 ? 'parcial' : 'pendente');
-    if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
+    if(novoStatus !== d.status && !(d.status==='pago' && novoStatus!=='pago')){
+      d.status = novoStatus; saveDividas();
+    }
   });
   // SPV: cálculo síncrono a partir do ledger de pagamentos
   spvs.forEach(function(d){
     var r = resumoSPV(d);
     totalGeral += r.saldoAtual;
-    var novoStatus = r.quitado ? 'pago' : 'parcial';
-    if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
+    // Sem movimentos ainda = 'pendente', não 'parcial'
+    var novoStatus = r.quitado ? 'pago' : (r.movimentos.length>0 ? 'parcial' : 'pendente');
+    // Mesma proteção do Rotativo: não rebaixa automaticamente de 'pago'
+    if(novoStatus !== d.status && !(d.status==='pago' && novoStatus!=='pago')){
+      d.status = novoStatus; saveDividas();
+    }
   });
 
   var pending = comLedger.length;
@@ -9398,6 +9412,7 @@ function salvarMovimentoRotativo(){
   d.movimentos = (d.movimentos||[]).concat([mov]);
   var rNovo = resumoRotativo(d);
   d.valorUtilizado = rNovo.valorUtilizado;
+  // Usa a mesma lógica do resumoRotativo: quitado só se saque+amortização+saldo zero
   d.status = rNovo.quitado ? 'pago' : (rNovo.valorUtilizado>0 ? 'parcial' : 'pendente');
 
   saveDividas();
@@ -9474,7 +9489,8 @@ function confirmarPagamentoSPV(){
 
   var rNovo = resumoSPV(d);
   d.valorUtilizado = rNovo.saldoAtual; // manter campo sincronizado, mesma convenção do Rotativo
-  d.status = rNovo.quitado ? 'pago' : 'parcial';
+  // quitado só se totalAmortizado > 0 (não apenas juros pagos, mas principal abatido de verdade)
+  d.status = rNovo.quitado ? 'pago' : (rNovo.movimentos.length>0 ? 'parcial' : 'pendente');
 
   saveDividas();
   apiPost('salvarDivida', d, function(){});
