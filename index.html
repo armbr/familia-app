@@ -8271,17 +8271,22 @@ function resumoFinanciamento(fin){
   var saldoAtual = (parseFloat(fin.saldoDevedorInformado)>0)
     ? parseFloat(fin.saldoDevedorInformado)
     : (pagas>0 ? (tabela[pagas-1] ? tabela[pagas-1].saldoDevedor : fin.valorOriginal) : fin.valorOriginal);
+  // Capital de Giro (Bullet) nunca é quitado automaticamente só porque
+  // o número de parcelas foi atingido — o critério é o saldo ser zero.
+  // Para Price/SAC o critério duplo continua válido: pagas>=total OU saldo=0.
+  var isBullet = (fin.sistemaAmortizacao === 'BULLET');
   return {
     tabela: tabela,
     parcelasPagas: pagas,
     numParcelas: tabela.length,
     proximaParcela: linhaAtual || null,
     saldoAtual: saldoAtual,
-    // "pagas >= tabela.length" só é um sinal válido de quitado se a
-    // tabela realmente tiver linhas — se veio vazia (por algum dado
-    // inválido no cadastro, tipo número de parcelas ou valor zerados),
-    // isso daria um falso positivo de "quitado" mesmo sem nada pago.
-    quitado: (tabela.length>0 && pagas >= tabela.length) || saldoAtual <= 0.01
+    // Bullet: só quitado quando saldo devedor chega a zero — nunca por contagem de parcelas,
+    // pois o vencimento pode chegar mas o principal ainda estar em aberto (renegociação, atraso).
+    // Price/SAC: quitado quando pagas atingem o total de parcelas OU saldo chega a zero.
+    quitado: isBullet
+      ? (saldoAtual <= 0.01 && pagas > 0)
+      : ((tabela.length > 0 && pagas >= tabela.length) || saldoAtual <= 0.01)
   };
 }
 
@@ -8891,7 +8896,10 @@ function resumoSPV(d){
   movs.forEach(function(m){
     var dias = _diasEntre(dataUltimoPagamento, m.data);
     var jurosPeriodo = m.jurosCalculado!==undefined ? m.jurosCalculado : (saldo * (parseFloat(d.taxaMensal)||0) / 100 * (dias/30));
-    var amort = m.valor - jurosPeriodo;
+    // Se o pagamento não cobre os juros do período, a amortização é zero —
+    // nunca negativa. Um pagamento menor que os juros não aumenta o saldo
+    // (isso seria capitalização), apenas não abate o principal.
+    var amort = Math.max(0, m.valor - jurosPeriodo);
     saldo = Math.max(0, saldo - amort);
     totalPago += parseFloat(m.valor)||0;
     totalJuros += jurosPeriodo;
@@ -9162,12 +9170,18 @@ function renderDividas(){
   var spvs = abertas.filter(function(d){ return d.tipo === 'financiamento' && d.sistemaAmortizacao === 'SPV'; });
 
   var totalGeral = 0;
-  // Financiamentos: cálculo síncrono, soma direto
+  // Financiamentos Price/SAC/Bullet: cálculo síncrono, soma direto.
+  // Mesma proteção anti-flip do Rotativo e SPV: nunca rebaixa de 'pago'
+  // para outro status automaticamente — isso evitava que um Bullet
+  // marcado como quitado voltasse a aparecer como "em andamento" quando
+  // os dados chegavam em ordem diferente durante o sync.
   financiamentos.forEach(function(d){
     var resumo = resumoFinanciamento(d);
     totalGeral += resumo.saldoAtual;
     var novoStatus = resumo.quitado ? 'pago' : (resumo.parcelasPagas>0 ? 'parcial' : 'pendente');
-    if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
+    if(novoStatus !== d.status && !(d.status==='pago' && novoStatus!=='pago')){
+      d.status = novoStatus; saveDividas();
+    }
   });
   // Capital de Giro Rotativo: cálculo síncrono a partir do ledger
   rotativos.forEach(function(d){
@@ -9453,14 +9467,15 @@ function previewPagamentoSPV(){
   var r = resumoSPV(d);
   var dias = _diasEntre(r.movimentos.length ? r.movimentos[r.movimentos.length-1].data : d.dataOriginal, data);
   var juros = r.saldoAtual * (parseFloat(d.taxaMensal)||0) / 100 * (dias/30);
-  var amort = valor - juros;
+  var amortBruta = valor - juros; // pode ser negativa se não cobrir juros
+  var amort = Math.max(0, amortBruta); // amort real nunca é negativa
   var novoSaldo = Math.max(0, r.saldoAtual - amort);
 
   previewEl.style.display = 'block';
-  if(amort < 0){
+  if(amortBruta < 0){
     previewEl.innerHTML = '⚠️ <b style="color:var(--red)">Esse valor não cobre nem os juros do período!</b><br>'+
       'Juros calculados: '+fmtBRL(juros)+' ('+dias+' dias sobre '+fmtBRL(r.saldoAtual)+')<br>'+
-      'Faltam '+fmtBRL(Math.abs(amort))+' pra cobrir só os juros — o saldo devedor vai <b>aumentar</b> se continuar assim.';
+      'Faltam '+fmtBRL(Math.abs(amortBruta))+' pra cobrir só os juros — o saldo permanece em '+fmtBRL(r.saldoAtual)+'.';
   } else {
     previewEl.innerHTML = '💡 Juros do período ('+dias+' dias): <b>'+fmtBRL(juros)+'</b><br>'+
       'Amortização (abate o principal): <b style="color:var(--green)">'+fmtBRL(amort)+'</b><br>'+
