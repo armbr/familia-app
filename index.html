@@ -9221,9 +9221,17 @@ function renderDividas(){
         if(saldoEl) saldoEl.textContent = fmtBRL(res.saldoAtual);
         d._saldoCache = res.saldoAtual;
         totalGeral += res.saldoAtual;
-        // Atualizar status localmente se mudou (ex: ficou pago)
-        var novoStatus = res.saldoAtual<=0.01 ? 'pago' : (d.movimentos.length>1?'parcial':'pendente');
-        if(novoStatus !== d.status){ d.status = novoStatus; saveDividas(); }
+        // Atualizar status localmente se mudou (ex: ficou pago).
+        // Critério conservador: só marca 'pago' se saldo é zero E há mais
+        // de um movimento (pelo menos 1 aporte + 1 pagamento) — evita que
+        // um registro recém-criado com saldo zero por dado ausente seja
+        // marcado como quitado antes de qualquer operação real.
+        // A proteção anti-flip impede rebaixar de 'pago' para outro status
+        // automaticamente (evita flip causado por dados chegando fora de ordem).
+        var novoStatus = (res.saldoAtual<=0.01 && d.movimentos.length>1) ? 'pago' : (d.movimentos.length>1?'parcial':'pendente');
+        if(novoStatus !== d.status && !(d.status==='pago' && novoStatus!=='pago')){
+          d.status = novoStatus; saveDividas();
+        }
       } else {
         if(saldoEl) saldoEl.textContent = '⚠️ erro';
       }
@@ -9593,7 +9601,11 @@ function abrirExtratoRotativo(id){
 function _syncFinanciamento(d){
   var resumo = resumoFinanciamento(d);
   d.saldoAtual = resumo.saldoAtual;
-  d.status = resumo.quitado ? 'pago' : (resumo.parcelasPagas>0 ? 'parcial' : 'pendente');
+  // Mesma proteção anti-flip do renderDividas: nunca rebaixa de 'pago'
+  // automaticamente — evita que o Bullet volte a aparecer como "em andamento"
+  // quando os dados chegam fora de ordem durante o sync.
+  var novoStatus = resumo.quitado ? 'pago' : (resumo.parcelasPagas>0 ? 'parcial' : 'pendente');
+  if(!(d.status==='pago' && novoStatus!=='pago')) d.status = novoStatus;
   saveDividas();
   apiPost('salvarDivida', d, function(){});
 }
