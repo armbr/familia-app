@@ -3651,11 +3651,43 @@ function syncAll(){
     exclRecur.forEach(function(id){ exclRecurSet[String(id)] = true; });
     apiCall('getRecur',null,function(err,d){
       if(!err && d && d.ok && d.data){
-        var serverIds = d.data.map(function(r){ return String(r.id); });
-        var localOnly = RECUR.filter(function(r){ return serverIds.indexOf(String(r.id))===-1 && !exclRecurSet[String(r.id)]; });
-        // Reenviar ao servidor — addRecur já é idempotente por ID.
+        var serverMap = {};
+        d.data.forEach(function(r){ serverMap[String(r.id)] = r; });
+
+        // Itens só locais (nunca chegaram ao servidor) — enviar
+        var localOnly = RECUR.filter(function(r){
+          return !serverMap[String(r.id)] && !exclRecurSet[String(r.id)];
+        });
         localOnly.forEach(function(r){ apiCall('addRecur', r, function(){}); });
-        RECUR = d.data.filter(function(r){ return !exclRecurSet[String(r.id)]; }).concat(localOnly);
+
+        // Itens que existem nos dois lados mas foram editados localmente
+        // (valor, categoria ou descrição alterados via modal) — reenviar
+        // para atualizar o servidor. Usa o campo updatedAt como critério;
+        // se não existir, reenvia por precaução (custo baixo, é idempotente).
+        var editadosLocalmente = RECUR.filter(function(r){
+          var srv = serverMap[String(r.id)];
+          if(!srv || exclRecurSet[String(r.id)]) return false;
+          // Comparar valor e categoria — campos que o usuário pode editar
+          var valorMudou = Math.abs(parseFloat(r.value||0) - parseFloat(srv.value||0)) > 0.005;
+          var catMudou   = String(r.cat||'') !== String(srv.cat||'');
+          var descMudou  = String(r.desc||'') !== String(srv.desc||'');
+          return valorMudou || catMudou || descMudou;
+        });
+        editadosLocalmente.forEach(function(r){ apiCall('addRecur', r, function(){}); });
+
+        // Lista final: dados do servidor + pendentes locais
+        // (o servidor é a fonte de verdade para itens que existem nos dois)
+        var pendMap = {};
+        localOnly.forEach(function(r){ pendMap[String(r.id)] = true; });
+        RECUR = d.data
+          .filter(function(r){ return !exclRecurSet[String(r.id)]; })
+          .map(function(srv){
+            // Se foi editado localmente, devolver a versão local
+            // (que já foi reenviada ao servidor acima)
+            var local = RECUR.find(function(r){ return String(r.id)===String(srv.id); });
+            return (local && editadosLocalmente.indexOf(local)!==-1) ? local : srv;
+          })
+          .concat(localOnly);
         saveRecur();
       }
       recurReady = true;
@@ -4226,24 +4258,57 @@ function saveRecur(){
 
 function limparRecurDuplicados(){
   function nd(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' ').replace(/[àáâã]/g,'a').replace(/[èéê]/g,'e').replace(/[ìí]/g,'i').replace(/[òóô]/g,'o').replace(/[ùú]/g,'u').replace(/[ç]/g,'c'); }
-  var seenR = {}; var removidos = 0;
+
+  // ── Passo 1: deduplicar RECUR por ID ──────────────────────────
+  // IDs idênticos = mesmo objeto chegou duas vezes (ex: retry de rede).
+  // Manter apenas a primeira ocorrência (mais antiga / já enviada).
+  var seenId = {}; var removidosId = 0;
   RECUR = RECUR.filter(function(r){
-    var k = nd(r.desc);
-    if(seenR[k]){ removidos++; return false; }
-    seenR[k] = true; return true;
+    var k = String(r.id||'');
+    if(!k){ return true; } // sem id: manter (não sabemos se é duplicata)
+    if(seenId[k]){ removidosId++; return false; }
+    seenId[k] = true; return true;
   });
-  // Limpar TASKS duplicadas (mesmo desc normalizado + mês)
+
+  // ── Passo 2: deduplicar RECUR por descrição, MAS só para entradas
+  // sem id definido — recorrências com ids diferentes e mesma descrição
+  // podem ser legítimas (ex: duas contas de água de imóveis distintos).
+  var seenDesc = {}; var removidosDesc = 0;
+  RECUR = RECUR.filter(function(r){
+    if(r.id) return true; // tem id próprio → nunca remover por desc
+    var k = nd(r.desc);
+    if(seenDesc[k]){ removidosDesc++; return false; }
+    seenDesc[k] = true; return true;
+  });
+
+  var removidos = removidosId + removidosDesc;
+
+  // ── Passo 3: deduplicar TASKS por recurId + mês ───────────────
+  // Critério mais preciso que desc+mês: se duas tasks têm o mesmo
+  // recurId no mesmo mês, é duplicata garantida. Desc+mês só é usado
+  // como fallback para tasks sem recurId (criadas manualmente).
   var seenT = {}; var removidosT = 0;
   TASKS = TASKS.filter(function(t){
     var dl = ymds(t.deadline||'').substring(0,7)||'none';
-    var k  = nd(t.desc)+'|'+dl;
+    var k;
+    if(t.recurId && String(t.recurId)!==''){
+      k = 'rid:'+String(t.recurId)+'|'+dl;
+    } else {
+      k = 'desc:'+nd(t.desc)+'|'+dl;
+    }
     if(seenT[k]){ removidosT++; return false; }
     seenT[k] = true; return true;
   });
+
   if(removidos||removidosT){
     saveRecur();
     localStorage.setItem('ff_tasks', JSON.stringify(TASKS));
-    if(removidos) toast('🧹 '+removidos+' recorrência'+(removidos>1?'s duplicadas removidas':' duplicada removida')+'!');
+    var partes = [];
+    if(removidos)  partes.push(removidos+' recorrência'+(removidos>1?'s':''));
+    if(removidosT) partes.push(removidosT+' task'+(removidosT>1?'s':''));
+    toast('🧹 Limpeza: '+partes.join(' e ')+' duplicada'+(removidos+removidosT>1?'s':'')+' removida'+(removidos+removidosT>1?'s':'')+'!');
+  } else {
+    toast('✅ Nenhuma duplicata encontrada');
   }
 }
 
@@ -4503,8 +4568,24 @@ function processRecur(){
 }
 
 function addRecur(tx){
-  var r = Object.assign({ id: Date.now() }, tx);
-  RECUR.unshift(r);
+  // Preservar o id que vem em tx (se existir); só gerar novo se ausente.
+  // Object.assign({ id: Date.now() }, tx) era problemático: se tx.id
+  // existisse ele sobrescrevia o fallback — mas a ordem de propriedades
+  // em Object.assign não é garantida em todos os engines para objetos
+  // literais misturados com variáveis, então tornamos explícito.
+  var r = Object.assign({}, tx);
+  if(!r.id) r.id = Date.now();
+  r.id = String(r.id); // normalizar sempre para string
+
+  // Deduplicar: se já existe uma recorrência com o mesmo id, atualizar
+  // em vez de criar uma segunda entrada (evita duplicatas ao chamar
+  // addRecur duas vezes para o mesmo objeto, ex: retry de rede).
+  var idxExist = RECUR.findIndex(function(x){ return String(x.id)===r.id; });
+  if(idxExist >= 0){
+    RECUR[idxExist] = r;
+  } else {
+    RECUR.unshift(r);
+  }
   saveRecur();
   apiCall('addRecur', r, function(err){
     if(err) toast('⚠️ Recorrência salva só localmente','err');
