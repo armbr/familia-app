@@ -3675,17 +3675,29 @@ function syncAll(){
         });
         editadosLocalmente.forEach(function(r){ apiCall('addRecur', r, function(){}); });
 
-        // Lista final: dados do servidor + pendentes locais
-        // (o servidor é a fonte de verdade para itens que existem nos dois)
+        // Lista final: mesclar servidor + local, nunca perdendo campos extras.
+        // Regra por campo:
+        //   value/cat/desc → local prevalece se foi editado localmente
+        //   cartaoId/aluguelId/codigoBarras → local prevalece quando servidor
+        //     devolve vazio (planilha antiga ainda sem a coluna)
+        //   demais → servidor é fonte de verdade
+        var camposExtras = ['cartaoId', 'aluguelId', 'codigoBarras'];
         var pendMap = {};
         localOnly.forEach(function(r){ pendMap[String(r.id)] = true; });
         RECUR = d.data
           .filter(function(r){ return !exclRecurSet[String(r.id)]; })
           .map(function(srv){
-            // Se foi editado localmente, devolver a versão local
-            // (que já foi reenviada ao servidor acima)
             var local = RECUR.find(function(r){ return String(r.id)===String(srv.id); });
-            return (local && editadosLocalmente.indexOf(local)!==-1) ? local : srv;
+            if(!local) return srv;
+            // Editado localmente → usar versão local (já foi reenviada ao servidor)
+            if(editadosLocalmente.indexOf(local) !== -1) return local;
+            // Caso geral → partir do servidor, mas preservar campos extras
+            // locais quando o servidor os devolver vazios
+            var merged = Object.assign({}, srv);
+            camposExtras.forEach(function(campo){
+              if(!merged[campo] && local[campo]) merged[campo] = local[campo];
+            });
+            return merged;
           })
           .concat(localOnly);
         saveRecur();
