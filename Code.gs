@@ -626,12 +626,19 @@ function getRecur() {
     var obj = {};
     r.headers.forEach(function(h, i) { obj[String(h).trim()] = row[i]; });
     return {
-      id:    String(obj.id    || ''),
-      type:  String(obj.type  || 'exp'),
-      desc:  String(obj.desc  || ''),
-      value: parseFloat(obj.value || 0),
-      cat:   String(obj.cat   || ''),
-      date:  fmtDate(obj.date) || String(obj.date || '')
+      id:           String(obj.id           || ''),
+      type:         String(obj.type         || 'exp'),
+      desc:         String(obj.desc         || ''),
+      value:        parseFloat(obj.value    || 0),
+      cat:          String(obj.cat          || ''),
+      date:         fmtDate(obj.date)       || String(obj.date || ''),
+      // Campos extras — essenciais para manter vínculos no frontend:
+      // cartaoId:   liga a recorrência a um cartão (valor atualiza com a fatura)
+      // aluguelId:  liga a recorrência a um aluguel (desvincular sem excluir)
+      // codigoBarras: código de boleto recorrente (ex: conta de luz)
+      cartaoId:     String(obj.cartaoId     || ''),
+      aluguelId:    String(obj.aluguelId    || ''),
+      codigoBarras: String(obj.codigoBarras || '')
     };
   }).filter(function(r) { return r.desc; });
   return { ok: true, data: data };
@@ -642,44 +649,66 @@ function addRecur(body) {
   var sheet = ss2.getSheetByName('Recorrentes');
   if (!sheet) {
     sheet = ss2.insertSheet('Recorrentes');
-    sheet.appendRow(['id','type','desc','value','cat','date','updatedAt','cartaoId','codigoBarras']);
+    sheet.appendRow(['id','type','desc','value','cat','date','updatedAt','cartaoId','codigoBarras','aluguelId']);
     sheet.setFrozenRows(1);
     sheet.getRange('1:1').setFontWeight('bold').setBackground('#162030').setFontColor('#FFF');
   } else {
-    // Migração não-destrutiva — adiciona coluna codigoBarras se ainda não existir
+    // Migração não-destrutiva — adiciona colunas que ainda não existam
     var headerAtualR = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     if (headerAtualR.indexOf('codigoBarras') === -1) {
       sheet.getRange(1, sheet.getLastColumn() + 1).setValue('codigoBarras');
+      headerAtualR = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    }
+    if (headerAtualR.indexOf('aluguelId') === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue('aluguelId');
     }
   }
-  var id = String(body.id || Date.now());
-  var now = new Date().toISOString();
-  var cartaoId = body.cartaoId || '';
-  var codigoBarras = body.codigoBarras ? String(body.codigoBarras) : '';
+
+  var id           = String(body.id || Date.now());
+  var now          = new Date().toISOString();
+  var cartaoId     = String(body.cartaoId     || '');
+  var codigoBarras = String(body.codigoBarras || '');
+  var aluguelId    = String(body.aluguelId    || '');
+
+  // Lê cabeçalhos atuais para escrever por posição correta (robusto a migrações)
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  function colOf(nome) { return headers.indexOf(nome); } // 0-based
 
   // Verificar se já existe linha com esse id — se sim, atualizar
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][0]) === id) {
-      // Atualizar linha existente
-      sheet.getRange(i + 1, 1, 1, 9).setValues([[
-        id,
-        body.type  || data[i][1],
-        body.desc  || data[i][2],
-        parseFloat(body.value) || 0,
-        body.cat   || data[i][4],
-        body.date  || data[i][5],
-        now,
-        cartaoId,
-        codigoBarras
-      ]]);
+      // Montar linha completa usando posição dos headers (evita desalinhamento)
+      var updRow = data[i].slice(); // cópia da linha atual
+      updRow[0] = id;
+      if (colOf('type')  >= 0) updRow[colOf('type')]  = body.type  || data[i][colOf('type')];
+      if (colOf('desc')  >= 0) updRow[colOf('desc')]  = body.desc  || data[i][colOf('desc')];
+      if (colOf('value') >= 0) updRow[colOf('value')] = parseFloat(body.value) || 0;
+      if (colOf('cat')   >= 0) updRow[colOf('cat')]   = body.cat   || data[i][colOf('cat')];
+      if (colOf('date')  >= 0) updRow[colOf('date')]  = body.date  || data[i][colOf('date')];
+      if (colOf('updatedAt')   >= 0) updRow[colOf('updatedAt')]   = now;
+      if (colOf('cartaoId')    >= 0) updRow[colOf('cartaoId')]    = cartaoId;
+      if (colOf('codigoBarras')>= 0) updRow[colOf('codigoBarras')]= codigoBarras;
+      if (colOf('aluguelId')   >= 0) updRow[colOf('aluguelId')]   = aluguelId;
+      sheet.getRange(i + 1, 1, 1, updRow.length).setValues([updRow]);
       Logger.log('addRecur: atualizado id=' + id + ' valor=' + body.value + ' cat=' + body.cat);
       return { ok: true, id: id, updated: true };
     }
   }
 
-  // Não existe — inserir nova linha
-  sheet.appendRow([id, body.type, body.desc, parseFloat(body.value)||0, body.cat, body.date, now, cartaoId, codigoBarras]);
+  // Não existe — inserir nova linha na posição certa de cada coluna
+  var novaLinha = new Array(headers.length).fill('');
+  novaLinha[0] = id;
+  if (colOf('type')        >= 0) novaLinha[colOf('type')]        = body.type || 'exp';
+  if (colOf('desc')        >= 0) novaLinha[colOf('desc')]        = body.desc || '';
+  if (colOf('value')       >= 0) novaLinha[colOf('value')]       = parseFloat(body.value) || 0;
+  if (colOf('cat')         >= 0) novaLinha[colOf('cat')]         = body.cat || '';
+  if (colOf('date')        >= 0) novaLinha[colOf('date')]        = body.date || '';
+  if (colOf('updatedAt')   >= 0) novaLinha[colOf('updatedAt')]   = now;
+  if (colOf('cartaoId')    >= 0) novaLinha[colOf('cartaoId')]    = cartaoId;
+  if (colOf('codigoBarras')>= 0) novaLinha[colOf('codigoBarras')]= codigoBarras;
+  if (colOf('aluguelId')   >= 0) novaLinha[colOf('aluguelId')]   = aluguelId;
+  sheet.appendRow(novaLinha);
   Logger.log('addRecur: criado id=' + id + ' valor=' + body.value);
   return { ok: true, id: id, created: true };
 }
