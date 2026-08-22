@@ -3654,20 +3654,27 @@ function syncAll(){
         var serverMap = {};
         d.data.forEach(function(r){ serverMap[String(r.id)] = r; });
 
-        // Itens só locais (nunca chegaram ao servidor) — enviar
+        // IDs que existem localmente agora
+        var localIds = {};
+        RECUR.forEach(function(r){ localIds[String(r.id)] = true; });
+
+        // Tombstones locais: itens deletados neste dispositivo.
+        // Mesmo que o servidor ainda os tenha (deleteRecur falhou ou
+        // foi feito em outro dispositivo), nao devem ressuscitar.
+        var localTombstones = getTombstones('recur');
+        var localTombstoneSet = {};
+        localTombstones.forEach(function(id){ localTombstoneSet[String(id)] = true; });
+
+        // Itens so locais (nunca chegaram ao servidor) — enviar
         var localOnly = RECUR.filter(function(r){
           return !serverMap[String(r.id)] && !exclRecurSet[String(r.id)];
         });
         localOnly.forEach(function(r){ apiCall('addRecur', r, function(){}); });
 
-        // Itens que existem nos dois lados mas foram editados localmente
-        // (valor, categoria ou descrição alterados via modal) — reenviar
-        // para atualizar o servidor. Usa o campo updatedAt como critério;
-        // se não existir, reenvia por precaução (custo baixo, é idempotente).
+        // Itens editados localmente — reenviar para atualizar servidor
         var editadosLocalmente = RECUR.filter(function(r){
           var srv = serverMap[String(r.id)];
           if(!srv || exclRecurSet[String(r.id)]) return false;
-          // Comparar valor e categoria — campos que o usuário pode editar
           var valorMudou = Math.abs(parseFloat(r.value||0) - parseFloat(srv.value||0)) > 0.005;
           var catMudou   = String(r.cat||'') !== String(srv.cat||'');
           var descMudou  = String(r.desc||'') !== String(srv.desc||'');
@@ -3675,24 +3682,32 @@ function syncAll(){
         });
         editadosLocalmente.forEach(function(r){ apiCall('addRecur', r, function(){}); });
 
-        // Lista final: mesclar servidor + local, nunca perdendo campos extras.
-        // Regra por campo:
-        //   value/cat/desc → local prevalece se foi editado localmente
-        //   cartaoId/aluguelId/codigoBarras → local prevalece quando servidor
-        //     devolve vazio (planilha antiga ainda sem a coluna)
-        //   demais → servidor é fonte de verdade
+        // Itens que so existem no servidor mas nao localmente:
+        // se estao no tombstone local → foram deletados aqui, reenviar delete
+        d.data.forEach(function(srv){
+          var sid = String(srv.id);
+          if(localIds[sid]) return;          // ja existe localmente
+          if(exclRecurSet[sid]) return;      // ja excluido no servidor
+          if(localTombstoneSet[sid]){
+            // Deletado aqui mas servidor nao recebeu — reenviar
+            apiCall('deleteRecur', {id: sid}, function(){});
+          }
+          // Se nao esta no tombstone: outro dispositivo criou, aceitar (entra via d.data abaixo)
+        });
+
+        // Lista final: servidor como base, filtrando tombstones de ambos os lados
         var camposExtras = ['cartaoId', 'aluguelId', 'codigoBarras'];
-        var pendMap = {};
-        localOnly.forEach(function(r){ pendMap[String(r.id)] = true; });
         RECUR = d.data
-          .filter(function(r){ return !exclRecurSet[String(r.id)]; })
+          .filter(function(r){
+            var sid = String(r.id);
+            // Rejeitar se excluido no servidor OU deletado localmente
+            return !exclRecurSet[sid] && !localTombstoneSet[sid];
+          })
           .map(function(srv){
             var local = RECUR.find(function(r){ return String(r.id)===String(srv.id); });
-            if(!local) return srv;
-            // Editado localmente → usar versão local (já foi reenviada ao servidor)
+            if(!local) return srv; // novo de outro dispositivo
             if(editadosLocalmente.indexOf(local) !== -1) return local;
-            // Caso geral → partir do servidor, mas preservar campos extras
-            // locais quando o servidor os devolver vazios
+            // Preservar campos extras locais quando servidor devolver vazio
             var merged = Object.assign({}, srv);
             camposExtras.forEach(function(campo){
               if(!merged[campo] && local[campo]) merged[campo] = local[campo];
